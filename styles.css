@@ -1,0 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans&display=swap');
+
+html{
+    background-color: whitesmoke;
+    font-family: 'Open Sans', sans-serif;
+}
+
+.menu{
+    display: flex;
+    flex-grow: 1;
+    justify-content: center;
+    gap: 20px 10px; /* row-gap column gap */ 
+    background-color: lightgray;
+}
+
+.idxelement{
+    color: darkgrey;
+}
