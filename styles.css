@@ -18,5 +18,12 @@ html{
 }
 
 .home-top{
+    display: flex;
+    
+}
+
+.home-top-div{
+/*     display: inline-block;*/    
     flex: 1;
+/*     width: 50%;*/
 }
