@@ -16,3 +16,7 @@ html{
 .idxelement{
     color: darkgrey;
 }
+
+.home-top{
+    flex: 1;
+}
