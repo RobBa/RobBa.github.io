@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans&display=swap');
 
+/* ------------------- Global elements -------------- */
+
 html{
     background-color: whitesmoke;
     font-family: 'Open Sans', sans-serif;
@@ -8,13 +10,24 @@ html{
 .menu{
     display: flex;
     flex-grow: 1;
-    justify-content: center;
-    gap: 20px 10px; /* row-gap column gap */ 
-    background-color: lightgray;
+    justify-content: end;
+    gap: 100px 10px; /* row-gap column gap */ 
+    background-color: blue;
 }
 
 .idxelement{
-    color: darkgrey;
+    color: white;
+}
+
+img{
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    max-width:500px;
+}
+
+h1{
+    text-align: center;
 }
 
 /* -------------- The main page ---------------- */
@@ -41,6 +54,7 @@ html{
 @media (min-width: 601px){
     .home-top{
         display: flex;
+        justify-content: space-around;
     }
     
     #home-top-left{
@@ -61,20 +75,21 @@ html{
     display: flex;
 }
 
-/* TODO: we don't need that many class names. Use elements instead */
 .social-media-elem{
     flex: 1;
 }
 
-img{
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-    max-width:500px;
+.bi{
+    color: lightskyblue;
 }
 
-h1{
-    text-align: center;
+.btn {
+    color: white;
+}
+
+.fa{
+    color: white;
+    margin-right: 5px;
 }
 
 .social-media-div{
