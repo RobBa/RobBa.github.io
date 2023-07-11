@@ -12,7 +12,13 @@ html{
     flex-grow: 1;
     justify-content: end;
     gap: 100px 10px; /* row-gap column gap */ 
-    background-color: blue;
+    background-color: lightskyblue;
+}
+
+.menu h4 {
+    color: white;
+    flex: 0.9;
+    vertical-align: auto;
 }
 
 .idxelement{
