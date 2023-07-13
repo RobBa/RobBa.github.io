@@ -38,7 +38,7 @@ h1{
 
 /* -------------- The main page ---------------- */
 
-@media (max-width: 600px) {
+@media (max-width: 1200px) {
     .home-top {
         display: block;
     }
@@ -57,7 +57,7 @@ h1{
     }
 }
 
-@media (min-width: 601px){
+@media (min-width: 1201px){
     .home-top{
         display: flex;
         justify-content: space-around;
@@ -75,6 +75,10 @@ h1{
         margin-right: 3%;
         max-width: 500px;
     }
+}
+
+#short-description{
+    text-align: center;
 }
 
 .social-media-div{

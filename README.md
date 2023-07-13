@@ -1,1 +1,1 @@
-# private_homepage
+This is my homepage. I used this to get a bit of a hang on front-end, and I am continuously updating and improving it. Feedback to improve the page or the code is always welcome, please do not hesitate to contact me or to raise an issue.
