@@ -17,6 +17,9 @@
     <!-- my native stylesheet -->
     <link rel="stylesheet" href="styles.css">
 
+    <!-- scrolling functions -->
+    <script src="code/scrolling.js"></script> 
+
     <!-- fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com"> 
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> 
@@ -27,19 +30,36 @@
 
     <nav class="menu">
         <h4>Navigation</h4>
-        <a href="./subpages/projects.html" class="idxelement">
-          <button class="btn"><i class="fa fa-briefcase" aria-hidden="true"></i>Projects</button>
+          <!-- 
+          <button class="nav-btn" onclick="scrollToTop()"><i class="fa fa-briefcase" aria-hidden="true"></i>Home</button>
+          <button class="nav-btn" onclick="scrollToTop()"><i class="fa fa-ellipsis-h" aria-hidden="true"></i></i>Education</button>
+          <button class="nav-btn" onclick="scrollToTop()"><i class="fa fa-ellipsis-h" aria-hidden="true"></i></i>Publications</button>
+          <button class="nav-btn" onclick="scrollToTop()"><i class="fa fa-ellipsis-h" aria-hidden="true"></i></i>Private</button>
+          <button class="blog-btn"><i class="fa fa-pencil" aria-hidden="true"></i></i>Blog</button>
+          <button class="nav-btn" onclick="scrollToTop()"><i class="fa fa-ellipsis-h" aria-hidden="true"></i></i></button>
+          -->
+        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Home</button>
+        <a href="./subpages/research.html" class="idxelement">
+          <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Research</button>
         </a>
-
-        <a href="./subpages/blog.html" class="idxelement">
-          <button class="btn"><i class="fa fa-pencil" aria-hidden="true"></i></i>Blog</button>          
-        </a>
-        <a href="./subpages/other.html" class="idxelement">
-          <button class="btn"><i class="fa fa-ellipsis-h" aria-hidden="true"></i></i>Other</button>
+        <a href="./subpages/cv.html" class="idxelement">
+          <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>CV</button>
         </a>
     </nav>
 
     <h1>Home</h1>
+
+    <div class="home-grid">
+      <div class="grid-item">1</div>
+      <div class="grid-item">2</div>
+      <div class="grid-item">3</div>
+      <div class="grid-item">4</div>
+      <div class="grid-item">5</div>
+      <div class="grid-item">6</div>
+      <div class="grid-item">7</div>
+      <div class="grid-item">8</div>
+      <div class="grid-item">9</div>
+    </div> 
 
     <div class="home-top">
 
@@ -47,38 +67,35 @@
         <img class="singapore-image" src="./assets/images/singapore-crop.png" alt="at singapore airport" width="70%">
         <h2>Robert Baumgartner</h2>
         <p id="short-description">
-          PhD candidate at TU Delft Cyber-Analytics-Lab, software engineer and life enthusiast.
+          Software engineer, ex-PhD candidate at the TU Delft <a href="https://cyber-analytics.nl/">cyber-analytics lab</a>, 
+          hobby musician and sports fanatic.
         </p>
         <div class="social-media-div">
           <a href="https://github.com/RobBa"><h2><i class="bi bi-github"></i></h2></a>
           <a href="https://de.linkedin.com/in/robertbaumg"><h2><i class="bi bi-linkedin"></i></h2></a>
           <a href="https://instagram.com/r_drops_photos?igshid=OGQ5ZDc2ODk2ZA=="><h2><i class="bi bi-instagram"></i></h2></a>
-          <a href="https://twitter.com/RobertB82856790"><h2><i class="bi bi-twitter"></i></h2></a>
         </div>
       </div>
 
       <div class="home-top-div", id="home-top-right">
         <h2>About me</h2>
         <p>
-          Hi, I'm Robert, currently pursuing a PhD degree at the TU Delft in the Netherlands and part of the <a href="https://cyber-analytics.nl/">cyber-analytics lab</a>. 
-          We collaboratively try to model discrete event systems such as networks and software systems to infer visual representations of the systems. To this 
-          means we are developing and enhancing the <a href="https://github.com/tudelft-cda-lab/FlexFringe">Flexfringe tool</a>, which we use to build 
-          automata from system traces.
-        </p>
-    
-        <p>
-          Apart from our research my interests lie in general in applied statistics, machine learning, algorithms, and well written code. My main languages 
-          are C++ and Python. In my free time I like to do sports, engage with music, and learn more about the world.
+          Hi, I'm Robert, a software engineer and ex-PhD candidate at the TU Delft (defense date TBA). 
+          I implement algorithms and systems, mostly in C++ and Python, but also have experience in C#.
+          Other forms of science I am more or less comfortable with are machine learning and applied statistics,
+          physics and math-stuff, and I have some idea about electronics and chemistry from my electrical 
+          engineering degree.
         </p>
 
-        <img class="surf-imgage" src="./assets/images/surf.jpg" alt="surfing" width="80%">
+        <p>
+          Apart from coding and science I do sports like hitting the gym, ping-pong, volleyball at the 
+          beach, and surfing. Musically I play guitar, and strive to learn as much as I can about programming.
+        </p>
+
+        <img class="surf-image" src="./assets/images/surf.jpg" alt="surfing" width="80%">
       </div>
 
     </div>
-
-<!--     <footer>
-      <p>TODO: Social media here</p>
-    </footer> -->
 
   </body>
   
