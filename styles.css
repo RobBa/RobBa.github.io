@@ -36,6 +36,12 @@ h1{
     text-align: center;
 }
 
+div {
+margin-left:5%;
+margin-right:5%;
+margin-bottom:2%;
+}
+
 /* -------------- The main page ---------------- */
 
 @media (max-width: 1200px) {
