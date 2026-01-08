@@ -100,10 +100,10 @@
         Simple state machines are mostly a domain of smaller systems. For example, 
         controllers in embedded system design are often first modeled as a state machine before translated into 
         code, adding a layer of code security on critical applications. The interested learner is referred to 
-        <a href="https://www.udemy.com/course/embedded-system-design-using-uml-state-machines/">this excellent course</a>.
-        An advantage of that method is also that other techniques such as model checking can be employed to 
-        ensure code testing. A book recommended by a former instructor is the 
-        <a href="https://mitpress.mit.edu/9780262026499/principles-of-model-checking/">Principles of Model Checking</a>.
+        <a href="https://www.udemy.com/course/embedded-system-design-using-uml-state-machines/" target="_blank">
+        this excellent course</a>. An advantage of that method is also that other techniques such as model checking can 
+        be employed to ensure code testing. A book recommended by a former instructor is the 
+        <a href="https://mitpress.mit.edu/9780262026499/principles-of-model-checking/" target="_blank">Principles of Model Checking</a>.
       </p>
 
       <p>
@@ -128,7 +128,7 @@
       <p>
         R. Baumgartner, S. Verwer<br>
         Published: LearnAUT 2022, Paris, France<br>
-        Link: <a href="https://learnaut22.github.io/programme.html">https://learnaut22.github.io/programme.html</a>
+        Link: <a href="https://learnaut22.github.io/programme.html" target="_blank">https://learnaut22.github.io/programme.html</a>
       </p>
 
       <p>
@@ -167,7 +167,7 @@
       <p>
         R. Baumgartner, S. Verwer<br>
         Published: International Conference for Grammatical Inference 2023, Rabat, Morocco<br>
-        Link: <a href="https://proceedings.mlr.press/v217/">https://proceedings.mlr.press/v217/</a>
+        Link: <a href="https://proceedings.mlr.press/v217/" target="_blank">https://proceedings.mlr.press/v217/</a>
       </p>
 
       <p>
@@ -179,7 +179,7 @@
         <li>
           <b>Better data compression</b>: As already mentioned, we use this Count-Min-Sketches structure to compress information.
           However, we can further improve on this by using appropriate hashing-algorithms to compress
-          similar information together. We use <a href="https://en.wikipedia.org/wiki/Locality-sensitive_hashing">
+          similar information together. We use <a href="https://en.wikipedia.org/wiki/Locality-sensitive_hashing" target="_blank">
           Locality-sensitive_hashing</a> with the metric of choice being the Jaccard-distance. This approach 
           also saves us run-time.
         </li>
@@ -187,7 +187,7 @@
           <b>Better learning routine</b>: The previous routine was geared towards outputting a model periodically. 
           While this helps us having models without interrupting the system that is being inferred, mistakes the algorithm
           makes at early stages due to having not seen enough data can lead to even more mistakes in later stages. 
-          <a href="https://proceedings.mlr.press/v21/balle12a.html">Balle et al.</a> solve this problem by first
+          <a href="https://proceedings.mlr.press/v21/balle12a.html" target="_blank">Balle et al.</a> solve this problem by first
           mathematically determining a sample size that is deemed safe enough before making decisions. However, this
           sample size can be potentially huge, and the decisions can still be wrong. We opt for a different approach,
           where we enable the search routine to reconsider its decisions.
@@ -195,8 +195,8 @@
         <li>
           <b>Mathematical proof of convergence (PAC-bounds)</b>: Since our algorithm learns statistically from data
           that is statistically generated as well, we cannot give a formal proof of correctness without making unrealistic
-          assumptions. However, we can employ the <a href="https://en.wikipedia.org/wiki/Probably_approximately_correct_learning">PAC-framework</a>
-          to give statistical guarantees on the learning algorithm. We provide this work with a thorough mathematical analysis 
+          assumptions. However, we can employ the <a href="https://en.wikipedia.org/wiki/Probably_approximately_correct_learning" target="_blank">
+          PAC-framework</a> to give statistical guarantees on the learning algorithm. We provide this work with a thorough mathematical analysis 
           showing formal PAC bounds. However, due to space constraints we could not include the proof in this work, but it will 
           be included in my PhD thesis. I will update this section with a link once it is published.
         </li>
@@ -215,20 +215,20 @@
       <p>
         H. Walinga, R. Baumgartner, S. Verwer<br>
         Published: LearnAUT 2024, Tallinn, Estonia<br>
-        Link: <a href="https://learnaut24.github.io/programme.html">https://learnaut24.github.io/programme.html</a>
+        Link: <a href="https://learnaut24.github.io/programme.html" target="_blank">https://learnaut24.github.io/programme.html</a>
       </p>
 
       <p>
-        In this work we take another view on the problem of limited memory. To overcome the limitations we use a database
-        to store the data, and subsequently employ active learning to build a state machine from the data that is being 
+        In this work we take another view on the problem of limited memory. To overcome the limitations we <b>use a database
+        to store the data</b>, and subsequently employ <b>active learning to build a state machine</b> from the data that is being 
         stored in the database. We show that this approach is capable of reducing working memory and reduce the amount of 
         data used as input to the algorithm by employing targeted queries, when contrasted with classic passive learning 
         approaches.
       </p>
 
       <p>
-        The below figure (generated by <a href="https://hielkewalinga.nl/">H. Walinga</a>) compares working memory 
-        footprint of the two methods compared. For more information and results consult the publication.
+        The below figure (generated by <a href="https://hielkewalinga.nl/" target="_blank">H. Walinga</a>) compares working 
+        memory footprint of the two methods compared. For more information and results consult the publication.
       </p>
 
       <img class="res-daalder" src="./images/research/res_daalder.png" alt="res_daalder" width="80%">
@@ -242,15 +242,16 @@
       <p>
         R. Baumgartner, S. Verwer<br>
         Published: International Conference on Implementation and Application of Automata 2024, Akita, Japan<br>
-        Link: <a href="https://link.springer.com/chapter/10.1007/978-3-031-71112-1_4">https://link.springer.com/chapter/10.1007/978-3-031-71112-1_4</a>
+        Link: <a href="https://link.springer.com/chapter/10.1007/978-3-031-71112-1_4" target="_blank">https://link.springer.com/chapter/10.1007/978-3-031-71112-1_4</a>
       </p>
 
       <p>
-        Probabilistic state machines have the potential to be used as surrogate models for language models, where they
+        Probabilistic state machines have the potential to be used as <b>surrogate models for language models</b>, where they
         provide a reverse-engineered and visualizable model whose output mimics that of the language model. Recent 
         works explore the possibilities of how to extract those surrogate models from neural networks functioning as 
-        language models. In this work we design an algorithm to extract probabilistic state machines from a given 
-        language model and test our approach on networks trained on public datasets. We further prove 
+        language models. In this work we design an <b>algorithm to extract probabilistic state machines</b> from a given 
+        language model and test our approach on networks trained on public datasets. We further provide proof
+        of correctness of our algorithm.
       </p>
 
       <p>
@@ -270,20 +271,20 @@
       <p>
         R. Baumgartner, S. Verwer<br>
         Published: LearnAUT 2024, Tallinn<br>
-        Link: <a href="https://learnaut24.github.io/programme.html">https://learnaut24.github.io/programme.html</a>
+        Link: <a href="https://learnaut24.github.io/programme.html" target="_blank">https://learnaut24.github.io/programme.html</a>
       </p>
 
       <p>
         This work presents a variation of our algorithm presented in 'PDFA Distillation with Error Bound Guarantees'. 
-        This variant of the algorithm infers transition probabilities to build a model from the probability
+        This variant of the algorithm <b>infers transition probabilities</b> to build a model from the probability
         that a series of events occur. This enables the algorithm to work under different constraints. Proof of
         convergence of the inferred probabilities is provided.
       </p>
 
       <p>
         The table below shows the results on a dataset modeled for the recent 
-        <a href="https://remieyraud.github.io/TAYSIR/">TAYSIR competition</a>, contrasting with the actual winner of the 
-        competition. For more information, as usual consult the publication.  
+        <a href="https://remieyraud.github.io/TAYSIR/" target="_blank">TAYSIR competition</a>, contrasting with the actual 
+        winner of the competition. For more information, as usual consult the publication.  
       </p>
 
       <img class="res-pdfa-with-prob" src="./images/research/res_pdfa_with_prob.png" alt="res_pdfa_with_prob" width="100%">
@@ -309,13 +310,13 @@
         cyberattacks happen. Our algorithms were supposed to be working on the Netflow-capture level within 
         a network. However, we quickly learned that the algorithm had much less of an impact on our detection 
         performances compared with how we preprocessed the data. This has led us to instead investigate proper
-        preprocessing techniques, resulting in a concrete pipeline and subsequent ablation studies, with which 
+        preprocessing techniques, resulting in a <b>concrete pipeline and subsequent ablation studies</b>, with which 
         we empirically show the impact of each of the preprocessing steps. 
       </p>
 
       <p>
         We did our study on multiple datasets and with multiple machine learning methods. In the end the
-        preprocessing method performed best with a simple <a href="https://en.wikipedia.org/wiki/Autoencoder">
+        preprocessing method performed best with a simple <a href="https://en.wikipedia.org/wiki/Autoencoder" target="_blank">
         autoencoder model</a>, which resulted in strong performance. The publication will be linked later,
         perhaps after a simple arXiv upload. 
       </p>
