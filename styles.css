@@ -37,9 +37,14 @@ h1{
 }
 
 div {
-margin-left:5%;
-margin-right:5%;
+margin-left:2%;
+margin-right:2%;
 margin-bottom:2%;
+}
+
+.article-div {
+    max-width: 1600px;
+    /* text-align:center; */
 }
 
 /* -------------- The home page ---------------- */
