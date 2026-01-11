@@ -67,7 +67,7 @@ footer{
     position: absolute;
     bottom: 0;
     flex-grow: 1;
-    align-items: bottom;
+    align-items: stretch;
     justify-content: space-between;
     background-color: lightskyblue;
     height: 45px;
