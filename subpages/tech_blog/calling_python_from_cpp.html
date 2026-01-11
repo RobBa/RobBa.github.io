@@ -316,7 +316,7 @@
         for(int i=0; i&lt;cpp_list.size(); i++){<br>
           &nbsp; &nbsp; PyObject p_int = PyLong_FromLong(cpp_list[i]);<br>
           &nbsp; &nbsp; // some error checking here<br>
-          &nbsp; &nbsp; PyList_SET_ITEM(p_list, i, p_int); // this function does no error checking like e.g. out-of-bounds check<br>
+          &nbsp; &nbsp; PyList_SET_ITEM(p_list, i, p_int); // this function does no error checking<br>
         }<br>
         
         <br>
@@ -337,7 +337,7 @@
         for(int i=0; i&lt;query_traces.size(); i++){<br>
           &nbsp; &nbsp; PyObject* p_type = PyList_GET_ITEM(p_result, i);<br>
           &nbsp; &nbsp; // you can check the output p_type here for additional code safety<br>
-          &nbsp; &nbsp; res[i] = PyLong_AsLong(p_type);<br>
+          &nbsp; &nbsp; res[i] = PyLong_AsLong(p_type); // we expect int-values from Python <br>
         }<br>
         
         <br>
