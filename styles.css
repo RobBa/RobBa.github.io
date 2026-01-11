@@ -7,12 +7,28 @@ html{
     font-family: 'Open Sans', sans-serif;
 }
 
+body {
+    padding-top: 47px;  /* Padding to menu */
+
+    min-height: 100vh;  /* Add this */
+    position: relative;  /* Add this */
+    padding-bottom: 45px; /* Padding to footer */
+}
+
+main{
+    flex: 1;
+}
+
 .menu{
     display: flex;
+    position: fixed;
+    height: 40px;
+    top: 0;
     flex-grow: 1;
     justify-content: end;
-    gap: 100px 10px; /* row-gap column gap */ 
+    gap: 10px 10px; /* row-gap column gap */ 
     background-color: lightskyblue;
+    width: 100%;
 }
 
 .menu h4 {
@@ -37,13 +53,39 @@ h1{
 }
 
 div {
-margin-left:2%;
-margin-right:2%;
-margin-bottom:2%;
+    margin-left:2%;
+    margin-right:2%;
+    margin-bottom:2%;
 }
 
-code {
+code{
     color: darkblue
+}
+
+footer{
+    display: flex;
+    position: absolute;
+    bottom: 0;
+    flex-grow: 1;
+    align-items: bottom;
+    justify-content: space-between;
+    background-color: lightskyblue;
+    height: 45px;
+    width: 100%;
+}
+
+.footer-div{
+    display: flex;
+    height: 40px;
+    align-items: center;
+    flex-grow: 1;
+    justify-content: center;
+    gap: 0px 5px; /* row-gap column gap */ 
+    color:white;
+}
+
+.footer-btn{
+    color: white;
 }
 
 .article-text-div {
