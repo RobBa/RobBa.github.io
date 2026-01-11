@@ -42,6 +42,10 @@ margin-right:2%;
 margin-bottom:2%;
 }
 
+code {
+    color: darkblue
+}
+
 .article-text-div {
     max-width: 900px;
     margin-left:auto;
