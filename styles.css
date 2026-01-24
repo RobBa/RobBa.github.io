@@ -101,6 +101,40 @@ footer{
     margin-right:auto;
 }
 
+/* Mobile-specific styles */
+@media screen and (max-width: 768px) {
+  body {
+    font-size: 18px; /* Increase base font size for mobile */
+  }
+
+  .menu {
+    height: 60px; /* Increase header height for mobile */
+    font-size: 16px; /* Adjust font size */
+  }
+  
+  footer {
+    height: 70px; /* Increase footer height for mobile */
+    font-size: 14px; /* Adjust font size */
+  }
+}
+
+/* For smaller phones */
+@media screen and (max-width: 480px) {
+  header {
+    height: 70px;
+    font-size: 18px;
+  }
+  
+  footer {
+    height: 80px;
+    font-size: 15px;
+  }
+
+  body {
+    font-size: 20px; /* Even larger for small phones */
+  }
+}
+
 /* -------------- The home page ---------------- */
 
 @media (max-width: 1200px) {
