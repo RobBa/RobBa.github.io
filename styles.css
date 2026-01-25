@@ -101,6 +101,23 @@ footer{
     margin-right:auto;
 }
 
+/* Modern phones with hight resolution */
+@media (hover: none) and (pointer: coarse) and  {
+  body {
+    font-size: 25px;
+  }
+  
+  .menu {
+    height: 70px;
+    font-size: 25px;
+  }
+  
+  footer {
+    height: 80px;
+    font-size: 25px;
+  }
+}
+
 /* Mobile-specific styles */
 @media screen and (max-width: 768px) {
   body {
