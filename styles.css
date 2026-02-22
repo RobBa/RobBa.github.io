@@ -101,6 +101,10 @@ footer{
     margin-right:auto;
 }
 
+.social-media-div i {
+  font-size: 24px; /* desktop size */
+}
+
 /* Touchscreen devices (phones and tablets) */
 @media (hover: none) and (pointer: coarse) {
   body {
@@ -133,6 +137,14 @@ footer{
 
   h4 {
     font-size: 30px;
+  }
+
+  .social-media-div i {
+    font-size: 50px; /* mobile size */
+  }
+
+  .social-media-div a {
+    padding: 3px; /* Add some spacing around icons */
   }
 }
 
