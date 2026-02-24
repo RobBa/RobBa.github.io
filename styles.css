@@ -118,8 +118,8 @@ footer{
   p, li {
     font-size: 18px;
     line-height: 1.5;
-    /* padding-left: 3px;
-    padding-right: 3px; */
+    margin-left: 3px;
+    margin-right: 3px;
   }
   
   .menu {
