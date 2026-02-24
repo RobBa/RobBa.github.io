@@ -111,52 +111,51 @@ footer{
 /* Touchscreen devices (phones and tablets) */
 @media (hover: none) and (pointer: coarse) {
   body {
-    font-size: 26px; /* Base size for body text */
-    padding-top: 70px;
-    padding-bottom: 70px;
+    padding-top: 60px;
+    padding-bottom: 55px;
   }
   
   p, li {
-    font-size: 26px; /* Paragraphs and list items */
+    font-size: 20px;
     line-height: 1.5;
   }
   
   .menu {
-    height: 65px;
-    font-size: 25px; /* Keep button text reasonable */
-    justify-content: space-between; /* Distribute evenly */
-    align-items: center; /* Vertical alignment */
-    gap: 0; /* Remove gap on mobile */
-    padding: 0; /* Remove any padding */
+    height: 55px;
+    font-size: 20px;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0;
+    padding: 0;
   }
   
   footer {
-    height: 55px;
-    font-size: 25px;
+    height: 50px;
+    font-size: 20px;
   }
   
   .footer-div {
-    height: 55px;
+    height: 50px;
   }
   
   .btn {
-    font-size: 25px;
+    font-size: 20px;
   }
   
   h1 {
-    font-size: 38px;
+    font-size: 26px;
   }
   
   h2 {
-    font-size: 32px;
+    font-size: 24px;
   }
   
   h4 {
-    font-size: 28px;
+    font-size: 22px;
   }
   
   .social-media-div i {
-    font-size: 60px;
+    font-size: 50px;
   }
 }
 
