@@ -116,8 +116,10 @@ footer{
   }
   
   p, li {
-    font-size: 20px;
+    font-size: 18px;
     line-height: 1.5;
+    /* padding-left: 3px;
+    padding-right: 3px; */
   }
   
   .menu {
@@ -139,23 +141,28 @@ footer{
   }
   
   .btn {
-    font-size: 20px;
+    font-size: 18px;
   }
   
   h1 {
-    font-size: 26px;
-  }
-  
-  h2 {
     font-size: 24px;
   }
   
-  h4 {
+  h2 {
     font-size: 22px;
+  }
+  
+  h4 {
+    font-size: 18px;
   }
   
   .social-media-div i {
     font-size: 50px;
+  }
+
+  div {
+    margin-left: 3px;
+    margin-right: 3px;
   }
 }
 
