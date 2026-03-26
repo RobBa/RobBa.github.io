@@ -301,10 +301,16 @@ figcaption {
     max-width:700px;
 }
 
-#calling_network_from_cpp{
+/* -------------- Blogposts ---------------- */
+
+#calling-network-from-cpp{
     max-width:700px;
 }
 
 #code-example-python-call{
-    max-width: 600px;
+    max-width: 900px;
+}
+
+#memory-management-cpp-vs-cpython{
+    max-width: 700px;
 }
