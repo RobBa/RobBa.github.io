@@ -45,6 +45,8 @@ img{
     display: block;
     margin-left: auto;
     margin-right: auto;
+    max-width: 100%;
+    height: auto;
     /*max-width:1000px;*/
 }
 
@@ -92,7 +94,8 @@ footer{
     max-width: 900px;
     margin-left:auto;
     margin-right:auto;
-    /* text-align:center; */
+    padding-left: 10px;  /* Add padding so content doesn't touch edges */
+    padding-right: 10px;
 }
 
 .article-content-div {
@@ -158,6 +161,12 @@ footer{
   
   .social-media-div i {
     font-size: 50px;
+  }
+
+  .article-content-div {
+    max-width: 100%;
+    margin-left: 10px;
+    margin-right: 10px;
   }
 
   div {
@@ -254,6 +263,20 @@ footer{
 
 /* -------------- The research page ---------------- */
 
+figure {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+figcaption {
+  text-align: center;
+  font-style: italic;
+  color: #666;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
 #streaming1-image{
     max-width:700px;
 }
@@ -276,4 +299,12 @@ footer{
 
 #res-preprocessing-in-cybersecurity{
     max-width:700px;
+}
+
+#calling_network_from_cpp{
+    max-width:700px;
+}
+
+#code-example-python-call{
+    max-width: 600px;
 }

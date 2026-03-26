@@ -97,6 +97,15 @@
         that keeps conventions intact.
       </p>
 
+      <figure>
+      <img 
+      id="calling_network_from_cpp"
+      class="blog-image" 
+      src="./calling_python_from_cpp/network_calls.png" 
+      alt="Calling Python script from flexfringe">
+      <figcaption>Control flow of application at a very coarse level</figcaption>
+      </figure> 
+
       <p>
         In this article will learn how I did this, and therefore also a bit about CPython.
         You will also hopefully learn a technique to make your life easier or build better systems. 
@@ -177,10 +186,10 @@
     <br>
 
     <div id="garbage-collection-and-error-handling" class="article-text-div">
-      <h2>Garbage collection and error handling in CPython</h2>
+      <h2>Ownership rules and error handling in CPython</h2>
 
       <p>
-        To understand garbage collection we first have to have a look at the PyObject-type. In the 
+        To understand the ownership rules we first have to have a look at the PyObject-type. In the 
         <a href="https://github.com/python/cpython/blob/main/Include/pytypedefs.h" target="_blank">
           official source code</a> of CPython we find the typedef 
         <code>typedef struct _object PyObject;</code>. Investigating the 
@@ -193,7 +202,7 @@
         </ul>
 
         For us these two are interesting, as they reveal how CPython distinguishes between different data 
-        types, as well as the main idea of garbage collection, namely by reference counting. At runtime
+        types, as well as the main idea of ownership, namely by reference counting. At runtime
         the Python interpreter only sees a struct of type _object, masked through typedef PyObject. 
         And since a C struct can be thought of as an ordered container of bits it knows exactly where 
         the reference count and the data type are stored.
@@ -215,8 +224,15 @@
       </p>
 
       <p>
-        The garbage collector works just as you'd expect then: Objects with a reference count of zero 
-        are to be removed. Therefore the reference count is a proxy for ownership to an object. A 
+        Destruction of CPython objects works just as you'd expect then: Objects whose a reference count reaches 
+        zero are removed. Users who encountered cyclic owership used std::shared_ptr will recognize a problem here,
+        which is solved by the garbage collector. It's job is to detect cycles and clean up objects participating in
+        in such when they are to be destroyed. C++ returns the responsibility of cleaning up cyclic ownership to the 
+        programmer via a std::weak_ptr.
+      </p>
+
+      <p>
+        Because of the above we can say that the reference count is a proxy for ownership to an object. A 
         caller receiving an object increases its count by one, and once it relinquishes ownership it 
         decreases the count by one again. Pitfalls arise when functions 'steal' references. A notable 
         example mentioned in the documentation are <code>PyList_SetItem()</code> and
@@ -235,6 +251,15 @@
         which typically indicates that an error occured.
       </p>
     </div>
+
+      <figure>
+      <img 
+      id="memory-management-cpp-vs-cpython"
+      class="blog-image" 
+      src="./calling_python_from_cpp/cpp_vs_python.png" 
+      alt="C++ vs CPython memory model">
+      <figcaption>Contrasting ownership and memory management of C++ and CPython</figcaption>
+      </figure> 
 
     <br>
 
@@ -315,42 +340,16 @@
         purposes we omit the error checking when translating our vector to a Python list and back.
       </p>
 
-      <code>
-        // step 1: Prepare the input<br>
-        PyObject* p_list = PyList_New(cpp_list.size());<br>
-        for(int i=0; i&lt;cpp_list.size(); i++){<br>
-          &nbsp; &nbsp; PyObject p_int = PyLong_FromLong(cpp_list[i]);<br>
-          &nbsp; &nbsp; // some error checking here<br>
-          &nbsp; &nbsp; PyList_SET_ITEM(p_list, i, p_int); // this function does no error checking<br>
-        }<br>
+      <figure>
+      <img 
+      id="code-example-python-call"
+      class="blog-image" 
+      src="./calling_python_from_cpp/summary_code.png" 
+      alt="CPython from C++ full example">
+      <figcaption>Full sample code for calling Python from within C++</figcaption>
+      </figure> 
         
-        <br>
 
-        // step 2: call function and check for errors<br>
-        PyObject* p_result = PyObject_CallOneArg(query_func, p_list);<br>
-        if (p_result == NULL || !PyList_Check(p_result)){ // PyList_Check() to see if we got expected return type<br>
-          &nbsp; &nbsp; PyErr_Print();<br>
-          &nbsp; &nbsp; // do error handling<br>
-        }<br>
-        
-        <br>
-
-        // step 3: translate back to C++ data<br>
-        // more on the size can be found here: https://docs.python.org/3/c-api/intro.html#c.Py_ssize_t<br>
-        size_t p_result_size = static_cast&lt;size_t&gt;(PyList_GET_SIZE(p_result));<br>
-        std::vector&lt;int&gt; res(p_result_size);<br>
-        for(int i=0; i&lt;query_traces.size(); i++){<br>
-          &nbsp; &nbsp; PyObject* p_type = PyList_GET_ITEM(p_result, i);<br>
-          &nbsp; &nbsp; // you can check the output p_type here for additional code safety<br>
-          &nbsp; &nbsp; res[i] = PyLong_AsLong(p_type); // we expect int-values from Python <br>
-        }<br>
-        
-        <br>
-        
-        // step 4: free up space to avoid memory leaks<br>
-        Py_DECREF(p_list);<br>
-        Py_DECREF(p_result);<br>
-      </code>
     </div>
 
     <div id="summary-calling-python-from-within-cpp" class="article-text-div">
