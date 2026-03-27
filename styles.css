@@ -111,6 +111,20 @@ footer{
   padding: 3px;
 }
 
+figure {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+figcaption {
+  text-align: center;
+  font-style: italic;
+  color: #666;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
 /* Touchscreen devices (phones and tablets) */
 @media (hover: none) and (pointer: coarse) {
   body {
@@ -136,7 +150,7 @@ footer{
   
   footer {
     height: 50px;
-    font-size: 20px;
+    font-size: 18px;
   }
   
   .footer-div {
@@ -263,20 +277,6 @@ footer{
 
 /* -------------- The research page ---------------- */
 
-figure {
-  text-align: center;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-figcaption {
-  text-align: center;
-  font-style: italic;
-  color: #666;
-  margin-top: 8px;
-  font-size: 14px;
-}
-
 #streaming1-image{
     max-width:700px;
 }
@@ -307,10 +307,16 @@ figcaption {
     max-width:700px;
 }
 
-#code-example-python-call{
-    max-width: 900px;
-}
-
 #memory-management-cpp-vs-cpython{
     max-width: 700px;
+}
+
+#python-execution-path{
+    width: 50%;
+    max-width: 350px;
+}
+
+#code-example-python-call{
+    width: 95%;
+    max-width: 800px;
 }

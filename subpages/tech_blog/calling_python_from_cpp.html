@@ -107,7 +107,7 @@
       </figure> 
 
       <p>
-        In this article will learn how I did this, and therefore also a bit about CPython.
+        In this article you will learn how I did this, and therefore also a bit about CPython.
         You will also hopefully learn a technique to make your life easier or build better systems. 
         So let's dive in.
       </p>
@@ -129,11 +129,30 @@
       <p>
         <b>But what is CPython?</b> We already know that Python is an interpreter language. That 
         means that unlike e.g. a C++ program a Python-script does not need to get compiled first 
-        to be run on a machine. However, in order to run a set of other programs have to run in to 
-        get the Python script translated into machine executable code. These programs are written in 
-        other languages, and chances are on your machine that language is C. We call this standard 
-        implementation of Python CPython.
+        to be run on a machine. Instead, it will be translated into platform agnostic bytecode, and
+        that bytecode will be executed by a piece of software called the Python interpreter. The Python
+        interpreter is usually implemented in C using its own library. We call this standard 
+        implementation of Python CPython. For the interested reader I have outlined the Python 
+        execution path below. 
       </p>
+
+      <p>
+        The rough execution flow when running a Python script is outlined
+        in the figure below. At first a parser runs over the Python script. It tokenizes the script
+        and generates an abstract syntax tree (AST), that serves the compiler as input. The compiler 
+        translates the AST into bytecode, something that looks similar to assembly code, and caches
+        the bytecode into .pyc files for a faster warmup next time the script is executed again.
+        Lastly, the Python interpreter reads in the bytecode and executes it.
+      </p>
+
+      <figure>
+      <img 
+      id="python-execution-path"
+      class="blog-image" 
+      src="./calling_python_from_cpp/python_execution.png" 
+      alt="Python execution path">
+      <figcaption>Outline of execution path when running a Python-script</figcaption>
+      </figure> 
     </div>
 
     <br>
@@ -179,7 +198,7 @@
 
       <p>
         We can now import the Python module and gain access to it, but first we need to understand 
-        garbage collection and error handling in CPYthon.
+        how ownership and error handling work in CPYthon.
       </p>
     </div>
 
@@ -245,12 +264,11 @@
       
       <p>
         <b>Error handling</b> is much simpler to understand than reference counting: Exception-states are 
-        stored on a per-thread basis, and the occurance of an exception can be checked via 
+        stored on a per-thread basis, and the occurence of an exception can be checked via 
         <code>PyErr_Occurred()</code>. Additionally, typically functions of the CPython-API will
         have a return value. Usually, the return value can be checked on <code>NULL</code>, 
         which typically indicates that an error occured.
       </p>
-    </div>
 
       <figure>
       <img 
@@ -260,6 +278,8 @@
       alt="C++ vs CPython memory model">
       <figcaption>Contrasting ownership and memory management of C++ and CPython</figcaption>
       </figure> 
+
+    </div>
 
     <br>
 
@@ -348,7 +368,61 @@
       alt="CPython from C++ full example">
       <figcaption>Full sample code for calling Python from within C++</figcaption>
       </figure> 
+    </div>
+
+    <div id="python-gil" class="article-text-div">
+      <h2>The GIL for multithreaded code</h2>
+
+      <p>
+        While the above works well in most of the cases it omits one critical use case: What if multiple 
+        threads want to access the Python interpreter at the same time? The answer is that in general the 
+        Python interpreter is not thread safe. For instance, when accessing the same recourses and there is 
+        a write operation involved, race conditions can occur. Race conditions can also occur on ownership 
+        itself, leading to false reference counts, hecne memory leaks or segfaults.
+      </p>
+
+      <p>
+        The solution Python proposes is the Global Interpreter Lock (GIL). In our example, when calling the 
+        script, holding the GIL would look like this:
+      </p>
+
+      <code>
+        // acquire GIL, blocking for other threads <br>
+        PyGILState_STATE gstate = PyGILState_Ensure(); <br>
+        PyObject* p_result = PyObject_CallOneArg(func, args); <br>
+        PyGILState_Release(gstate); // release GIL <br>
+        <br>
+        // process results... <br>
+        Py_DECREF(p_result); <br>
+      </code>
+
+      <p>
+        The experienced programmer will immediately see two caveats in this design: Firstly, we process the 
+        result after releasing the lock. This design assumes that the calling thread is the owner of result 
+        now. In our example in the beginning result is a return value of a function call, therefore it this 
+        design is safe. But in case the Python script or some other instance holds a reference to exactly the 
+        same object we incur race conditions, therefore need to process the result before releasing the lock.
+      </p>
         
+      <p>
+        Secondly, the multithreading runs only in the C++ code we're using, but only one thread per time is allowed 
+        to access the interpreter. This means that true parallelism is not possible on the Python side with this 
+        design. And while one process can 
+        hold multiple Python interpreters, they share the same GIL as of 
+        <a href="https://docs.python.org/3.12/c-api/init.html#thread-state-and-the-global-interpreter-lock">
+          Python 3.12
+        </a>. According to the documentation, the functions <code>PyGILState_Ensure()</code> and 
+        <code>PyGILState_Release()</code> do not work well when multiple interpreters exist within the 
+        same process, meaning that true parallelism can only be reached via actual multiprocessing.
+      </p>
+      
+      <p>
+        To solve the problem above, <code>PyGILState_Ensure()</code> and <code>PyGILState_Release()</code> 
+        were move to the Legacy API in the newest Python release as of today,
+        <a href="https://docs.python.org/3/c-api/threads.html">Python 3.14.3</a>, and newer functions have been 
+        introduced to solve for actualy parallelism. I will leave it up to the reader to get familiar with them 
+        if needed, at this point it is sufficient to know that updates exist to solve the problem of parallelism.
+      </p>
 
     </div>
 
@@ -358,8 +432,8 @@
       <p>
         That concludes our brief tutorial. We touched upon various topics and aspects of safely calling 
         Python code from within C++, such as compilation, memory management, error handling, initialization and the 
-        CPython calling API. This enables us to play out the strengths of both languages. For a thorough 
-        example of how I used this technique I refer to 
+        CPython calling API, and multithreading. This enables us to play out the strengths of both languages. 
+        For a thorough example of how I used this technique I refer to 
         <a href="https://github.com/tudelft-cda-lab/FlexFringe/tree/main/source/active_learning/system_under_learning/neural_network_suls" 
         target="_blank">this project</a>. For feedback or questions please do not hesitate to contact me, e.g. 
         via <a href="https://de.linkedin.com/in/robertbaumg" target="_blank">LinkedIn</a>.
