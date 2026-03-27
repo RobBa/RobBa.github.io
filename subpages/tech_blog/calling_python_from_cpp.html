@@ -22,6 +22,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
 
     <script src="../../code/scrolling.js"></script> 
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
   </head>
 
   <body>
@@ -58,7 +62,7 @@
         </li>
         <li>
           <a href="#garbage-collection-and-error-handling">
-            Garbage collection and error handling in CPython
+            Ownership rules and error handling in CPython
           </a>
         </li>
         <li>
@@ -66,6 +70,9 @@
         </li>
         <li>
           <a href="#calling-python-function-with-argument">Calling the Python function and receiving the argument</a>
+        </li>
+        <li>
+          <a href="#python-gil">Multithreading</a>
         </li>
         <li>
           <a href="#summary-calling-python-from-within-cpp">Summary</a>
@@ -89,12 +96,23 @@
       <p>
         In that implementation (currently found through source/active_learning) I once coded up 
         algorithms to infer surrogate automata from neural networks. The flexfringe tool was written
-        in C++, however, getting a good interface for the neural networks including all the data 
-        management seemed intimidating, especially given how assumptions about how data is being 
-        dished out changes quickly from dataset to dataset. I decided to give some generic C++
-        interfaces, and leave the brunt of the neural network and data management in Python scripts.
-        This way one only has to know which C++ to use, and then adapt the Python script in a way 
-        that keeps conventions intact.
+        in C++, however, writing a good and flexible inference framework for the neural networks 
+        including all the data management seemed intimidating, especially given how assumptions about 
+        how data is being dished out changes quickly from dataset to dataset.
+      </p>
+
+      <p>
+        For applications like data science and machine learning Python simply remains king due to 
+        its flexibility and its ability to write relatively complex code with a few lines of code. 
+        Thus I decided to give my application some generic C++ interfaces, and leave the brunt of 
+        the neural network and data management in Python scripts. This way one only has to know which 
+        C++ to use, and then adapt the Python script's input and output to the C++ interface.
+      </p>
+
+      <p>
+        In this article you will learn how I did this, and therefore also a bit about CPython.
+        You will also hopefully learn a technique to make your life easier or build better systems. 
+        So let's dive in.
       </p>
 
       <figure>
@@ -103,14 +121,8 @@
       class="blog-image" 
       src="./calling_python_from_cpp/network_calls.png" 
       alt="Calling Python script from flexfringe">
-      <figcaption>Control flow of application at a very coarse level</figcaption>
+      <figcaption>Simplified control flow of the application</figcaption>
       </figure> 
-
-      <p>
-        In this article you will learn how I did this, and therefore also a bit about CPython.
-        You will also hopefully learn a technique to make your life easier or build better systems. 
-        So let's dive in.
-      </p>
 
     </div>
 
@@ -151,7 +163,7 @@
       class="blog-image" 
       src="./calling_python_from_cpp/python_execution.png" 
       alt="Python execution path">
-      <figcaption>Outline of execution path when running a Python-script</figcaption>
+      <figcaption>Steps to run a Python-script</figcaption>
       </figure> 
     </div>
 
@@ -180,20 +192,19 @@
       </p>
 
       <p>
-      <code>
-        // init 
-        Py_Initialize();<br>
-        PyRun_SimpleString("import sys");<br>
-        PyRun_SimpleString("import os");<br>
+      <pre><code class="language-cpp">// init 
+Py_Initialize();<br>
+PyRun_SimpleString("import sys");<br>
+PyRun_SimpleString("import os");<br>
         <br>
-        // manipulate syspath<br>
-        stringstream cmd;<br>
-        cmd &lt;&lt; "sys.path.append( os.path.join(os.getcwd(), \"";<br>
-        cmd &lt;&lt; PYTHON_SCRIPT_PATH;<br>
-        cmd &lt;&lt; "\") )\n";<br>
-        cmd &lt;&lt; "sys.path.append( os.path.join(os.getcwd(), \"source/active_learning/system_under_learning/neural_network_suls/python/util\") )";<br>
-        PyRun_SimpleString(cmd.str().c_str());<br>
-      </code>
+// manipulate syspath<br>
+stringstream cmd;<br>
+cmd &lt;&lt; "sys.path.append( os.path.join(os.getcwd(), \"";<br>
+cmd &lt;&lt; PYTHON_SCRIPT_PATH;<br>
+cmd &lt;&lt; "\") )\n";<br>
+cmd &lt;&lt; "sys.path.append( os.path.join(os.getcwd(), \"source/active_learning/system_under_learning/neural_network_suls/python/util\") )";<br>
+PyRun_SimpleString(cmd.str().c_str());<br>
+</code></pre>
       </p>
 
       <p>
@@ -299,11 +310,10 @@
         target="_blank">in our code</a>, and that we use to query the output of neural networks):
       </p>
 
-      <code>
-        def do_query(x: list):<br>
-          &nbsp; &nbsp; # do something<br>
-          &nbsp; &nbsp; return some_list_of_ints<br>
-      </code>
+      <pre><code lang="python">def do_query(x: list):<br>
+&nbsp; &nbsp; # do something<br>
+&nbsp; &nbsp; return some_list_of_ints<br>
+</code></pre>
 
       <br>
 
@@ -315,15 +325,14 @@
         is some boilerplate in CPython):
       </p>
 
-      <code>
-        query_func = PyObject_GetAttrString(p_module, "do_query");<br>
-        if (query_func == NULL || !PyCallable_Check(query_func)) {<br>
-          &nbsp; &nbsp; Py_DECREF(p_name);<br>
-          &nbsp; &nbsp; Py_DECREF(p_module);<br>
-          &nbsp; &nbsp; cerr &lt;&lt; "Problem in loading the query function. Terminating program." &lt;&lt; endl;<br>
-          &nbsp; &nbsp; exit(1);<br>
-        }
-      </code>
+      <pre><code lang="language-cpp">query_func = PyObject_GetAttrString(p_module, "do_query");<br>
+if (query_func == NULL || !PyCallable_Check(query_func)) {<br>
+&nbsp; &nbsp; Py_DECREF(p_name);<br>
+&nbsp; &nbsp; Py_DECREF(p_module);<br>
+&nbsp; &nbsp; cerr &lt;&lt; "Problem in loading the query function. Terminating program." &lt;&lt; endl;<br>
+&nbsp; &nbsp; exit(1);<br>
+}
+</code></pre>
     </div>
 
     <br>
@@ -360,18 +369,39 @@
         purposes we omit the error checking when translating our vector to a Python list and back.
       </p>
 
-      <figure>
-      <img 
-      id="code-example-python-call"
-      class="blog-image" 
-      src="./calling_python_from_cpp/summary_code.png" 
-      alt="CPython from C++ full example">
-      <figcaption>Full sample code for calling Python from within C++</figcaption>
-      </figure> 
+      <pre><code lang="language-cpp">// step 1: Prepare the input<br>
+PyObject* p_list = PyList_New(cpp_list.size());<br>
+for(int i=0; i&lt;cpp_list.size(); i++){<br>
+&nbsp; &nbsp; PyObject p_int = PyLong_FromLong(cpp_list[i]);<br>
+&nbsp; &nbsp; // some error checking here<br>
+&nbsp; &nbsp; PyList_SET_ITEM(p_list, i, p_int); // this function does no error checking<br>
+}
+        
+// step 2: call function and check for errors<br>
+PyObject* p_result = PyObject_CallOneArg(query_func, p_list);<br>
+if (p_result == NULL || !PyList_Check(p_result)){ // PyList_Check() to see if we got expected return type<br>
+&nbsp; &nbsp; PyErr_Print();<br>
+&nbsp; &nbsp; // do error handling<br>
+}<br>
+
+// step 3: translate back to C++ data<br>
+// more on the size can be found here: https://docs.python.org/3/c-api/intro.html#c.Py_ssize_t<br>
+size_t p_result_size = static_cast&lt;size_t&gt;(PyList_GET_SIZE(p_result));<br>
+std::vector&lt;int&gt; res(p_result_size);<br>
+for(int i=0; i&lt;query_traces.size(); i++){<br>
+&nbsp; &nbsp; PyObject* p_type = PyList_GET_ITEM(p_result, i);<br>
+&nbsp; &nbsp; // you can check the output p_type here for additional code safety<br>
+&nbsp; &nbsp; res[i] = PyLong_AsLong(p_type); // we expect int-values from Python <br>
+}<br>
+                
+// step 4: free up space to avoid memory leaks<br>
+Py_DECREF(p_list);<br>
+Py_DECREF(p_result);
+</code>
     </div>
 
     <div id="python-gil" class="article-text-div">
-      <h2>The GIL for multithreaded code</h2>
+      <h2>Multithreading</h2>
 
       <p>
         While the above works well in most of the cases it omits one critical use case: What if multiple 
@@ -386,15 +416,14 @@
         script, holding the GIL would look like this:
       </p>
 
-      <code>
-        // acquire GIL, blocking for other threads <br>
-        PyGILState_STATE gstate = PyGILState_Ensure(); <br>
-        PyObject* p_result = PyObject_CallOneArg(func, args); <br>
-        PyGILState_Release(gstate); // release GIL <br>
-        <br>
-        // process results... <br>
-        Py_DECREF(p_result); <br>
-      </code>
+      <pre><code lang="language-cpp">// acquire GIL, blocking for other threads <br>
+PyGILState_STATE gstate = PyGILState_Ensure(); <br>
+PyObject* p_result = PyObject_CallOneArg(func, args); <br>
+PyGILState_Release(gstate); // release GIL <br>
+
+// process results... <br>
+Py_DECREF(p_result); <br>
+</code></pre>
 
       <p>
         The experienced programmer will immediately see two caveats in this design: Firstly, we process the 
@@ -409,7 +438,8 @@
         to access the interpreter. This means that true parallelism is not possible on the Python side with this 
         design. And while one process can 
         hold multiple Python interpreters, they share the same GIL as of 
-        <a href="https://docs.python.org/3.12/c-api/init.html#thread-state-and-the-global-interpreter-lock">
+        <a href="https://docs.python.org/3.12/c-api/init.html#thread-state-and-the-global-interpreter-lock"
+         target="_blank">
           Python 3.12
         </a>. According to the documentation, the functions <code>PyGILState_Ensure()</code> and 
         <code>PyGILState_Release()</code> do not work well when multiple interpreters exist within the 
@@ -419,9 +449,10 @@
       <p>
         To solve the problem above, <code>PyGILState_Ensure()</code> and <code>PyGILState_Release()</code> 
         were move to the Legacy API in the newest Python release as of today,
-        <a href="https://docs.python.org/3/c-api/threads.html">Python 3.14.3</a>, and newer functions have been 
-        introduced to solve for actualy parallelism. I will leave it up to the reader to get familiar with them 
-        if needed, at this point it is sufficient to know that updates exist to solve the problem of parallelism.
+        <a href="https://docs.python.org/3/c-api/threads.html"  target="_blank">Python 3.14.3</a>, 
+        and newer functions have been introduced to solve the conundrum. I will leave it up to the 
+        reader to get familiar with them if needed, at this point it is sufficient to know that updates exist to 
+        solve the problem of parallelism.
       </p>
 
     </div>
