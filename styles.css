@@ -308,6 +308,18 @@ figcaption {
 
 /* -------------- Blogposts ---------------- */
 
+@media (hover: none) and (pointer: coarse) {
+    .blog-image {
+    width: 100%; /* Should not exceed container */
+    height: auto;
+    }
+
+    #python-execution-path{
+        width: 100%;
+        max-width: 350px;
+    }
+}
+
 .blog-image {
   width: 98%; /* Should not exceed container */
   height: auto;
