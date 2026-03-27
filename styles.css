@@ -117,6 +117,11 @@ figure {
   margin-right: auto;
 }
 
+figure img {
+  max-width: 100%; /* prevents image from exceeding figure width */
+  height: auto; /* Maintains aspect ratio */
+}
+
 figcaption {
   text-align: center;
   font-style: italic;
@@ -302,6 +307,11 @@ figcaption {
 }
 
 /* -------------- Blogposts ---------------- */
+
+.blog-image {
+  width: 98%; /* Should not exceed container */
+  height: auto;
+}
 
 #calling-network-from-cpp{
     max-width:700px;

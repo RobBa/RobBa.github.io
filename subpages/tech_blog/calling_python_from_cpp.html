@@ -37,8 +37,8 @@
         <button class="btn"><i class="fa fa-house" aria-hidden="true"></i></i>Research</button>          
       </a>
 
-      <a href="../tech_blog.html" class="idxelement">
-        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Tech-Blog</button>
+      <a href="../blog.html" class="idxelement">
+        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Blog</button>
       </a>
     </nav>
 
@@ -404,8 +404,8 @@ Py_DECREF(p_result);
       <h2>Multithreading</h2>
 
       <p>
-        While the above works well in most of the cases it omits one critical use case: What if multiple 
-        threads want to access the Python interpreter at the same time? The answer is that in general the 
+        While the above works well in most of the cases it omits one critical use case: <b>What if multiple 
+        threads want to access the Python interpreter at the same time?</b> The answer is that in general the 
         Python interpreter is not thread safe. For instance, when accessing the same recourses and there is 
         a write operation involved, race conditions can occur. Race conditions can also occur on ownership 
         itself, leading to false reference counts, hecne memory leaks or segfaults.
