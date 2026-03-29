@@ -65,10 +65,13 @@
           <a href="#pac-bounds">Definition of PAC-bounds</a>
         </li>
         <li>
-          <a href="#pac-bounds-testing">PAC-bounds for statistial test</a>
+          <a href="#pac-bounds-statistical-test">PAC-bounds for statistial test</a>
         </li>
         <li>
-          <a href="#pac-bounds-summary">Summary</a>
+          <a href="#pac-bounds-streaming">PAC-bounds on data stream</a>
+        </li>
+        <li>
+          <a href="#pac-bounds-connect">Stay connected</a>
         </li>
       </ul>
     </div>
@@ -147,13 +150,12 @@
         $L_1$ in this definition is the $L_1$-distance, which is a measure for the 
         maximum error the output $H$ produces when compared with $D$. This definition essentially tells us 
         that if we have a PAC-learner, and we let it learn a problem, then the learner learns the target distribution 
-        $D$ with a maximum induced error $\epsilon$, for any chosen maximum error $\epsilon$, with a probability 
+        $D$ with a maximum sum of errors of $\epsilon$, for any chosen maximum error $\epsilon$, with a probability 
         $1-\delta$, if samples are provided i.i.d. from the target distribution. Pretty cool I'd say. 
       </p>
     </div>
 
-    <div id="pac-bounds-testing" class="article-text-div">
-
+    <div id="pac-bounds-statistical-test" class="article-text-div">
       <h2>PAC-bounds for statistial test</h2>
       
       <p>
@@ -181,7 +183,7 @@
         on the total size of samples it suffices to show that the left hand side is error bounded. If the error on the left hand side is 
         zero, is the sampled frequencies are the real ones the test will also make the right decision. In order to proof it we start with
         the error bounds on the CMS given by the 
-        <a href="https://dsf.berkeley.edu/cs286/papers/countmin-latin2004.pdf">
+        <a href="https://dsf.berkeley.edu/cs286/papers/countmin-latin2004.pdf" target="_blank">
           original authors of the data structure 
         </a>, and we define a new random variable from their approach using indicator variables. Subsequently we use the Markov bound
         $$ P(X>a) \leq \frac{E(X)}{a} $$
@@ -192,17 +194,90 @@
 
         $$P(A \cup B)= P(A) + B(B) - P(A \cap B) \leq P(A) + P(B)$$
       </p>
-
-      <p>
-
-      </p>
-
     </div>
 
-    <div id="pac-bounds-summary" class="article-text-div">
-      <h2>Summary</h2>
-      
-      ... and there went 2 months of my lifetime.
+    <div id="pac-bounds-streaming" class="article-text-div">
+      <h2>PAC-bounds on data stream</h2>
+
+      <p>
+        Having bound individual tests we can move toward seeing what happens when we continue reading data, and how the possibility of individual
+        mistakes on the statistical test can still be bound so that the global result will satisfy our bounds. We will also have to reason about
+        how many samples to read, and how to choose our batch size. We start with the cryptic 
+      </p>
+
+      <p>
+        <b>Theorem 6:</b> Given batch-size $B$, upper bound on state $n$, and $p_{min}$ the minimum transition probability 
+        $\lambda_{min}=\min_{i, j} \lambda(q_i, a_j)$. The algorithm reads $\mathcal{O}(nBN_{max})$ samples from the stream, where 
+        $\mathbb{E}[|\lambda(q', a')|] = N_{max} \cdot \lambda_{min}$, with $q', a'$ chosen s.t. $\lambda_{min}=\lambda(q', a')$.
+      </p>
+
+      <p>
+        Here, $n$ is an upper bound on the states that are expected of the final automaton (technically we do not need this)
+        in a practical scenario, but we need it to show PAC-bounds, see 
+        <a href="https://www.cs.ox.ac.uk/people/paul.goldberg/papers/alt05.pdf" target="_blank">
+          this publication
+        </a>
+        by Palmer and Goldberg (which has greatly served as a guideline for me while constructing my own proof). What this means essentially is that 
+        we know that there must a minimum non-zero transition probability within the automaton. Once we know that transition probability we can define an 
+        expected constant proportional to the inverse of the minimum probability, and then the maximum number of expected samples grows linearly in 
+        the number of states and the batch size. While not needed for the remainder, it is still nice to know that we can bound how many i.i.d. samples 
+        the algorithm needs. The proof follows again via the Markov bound and proof by induction. For the next one we want to get an actual number of how 
+        many samples we need to read in order to keep the error of a single statistical test low:
+      </p>
+
+      <p>
+        <b>Theorem 7:</b> Given the Hoeffding-test as defined earlier, the probability  of a false rejection is kept below $2\alpha$.
+      </p>
+
+      <p>
+        In our work we chose to adapt the statistical test to mirror that of 
+        <a href="https://link.springer.com/chapter/10.1007/3-540-58473-0_144" target="_blank">
+          Carrasco and Oncina
+        </a>. We showed it previously. The test that they showed is a clever reformulation of the classical Hoeffding-test, where they inject and $\alpha$
+        parameter that serves as an upper bound for the error. We can simply use their results here. To bound the number of samples need for a test we want a 
+        metric on how to separate two statistical distributions:
+      </p>
+
+      <p>
+        <b>Definition 1:</b> We call two distributions $D_1$ and $D_2$ $\mu$-distinguishable when $L_{\infty}^p(D_1, D_2) \geq \mu$. We call a PDFA $T$ $\mu$-distinguishable when 
+        $\forall q_1, q_2\in T: L_{\infty}^p\left(D_{q1}, D_{q2}\right) \geq \mu$. 
+      </p>
+
+      <p>
+        This definition simply tells us that we use a threshold, and if the maximum distance is larger than it we say the distributions are not the same. We call this threshold 
+        $\mu$, and we want it to be the maximum induced distance between two distributions. Obviously $\mu$ and $\epsilon$ are closely related with each other. Now with that 
+        definition we can go to the following, more interesting theorem:
+      </p>
+
+      <p>
+        <b>Theorem 7:</b> Assuming the target PDFA we are trying to learn is $\mu$-distinguishable, there exists a minimum sample size $m_0$ per state such that the probability 
+        of a false reject per state-pair is bounded by $\frac{\delta'}{2n^2|\Sigma|^2}$ under the assumption of no collisions.
+      </p>
+
+      <p>
+        The proof follows by first bounding the variance term of the earlier indicator variables using the Cauchy-Schwarz inequality, and subsequently using the Chebychev-Cantelly
+        inequality. In the following we present two more theorems to show that the test indeed can be bounded arbitrarily small, and I omit those steps here. The gist shoudl be there.
+      </p>
+    </div>
+
+    <div id="pac-bounds-graph-creation" class="article-text-div">
+
+      <h2>PAC-bounds on graph creation</h2>
+
+      <p>
+        Once we can bound the number of samples needed to perform statistical tests in a way that we can bound the minimum error, we have everything we need to follow Palmer and Goldberg
+        analogously. I will outline their main ideas in this last section of this post and refer again to 
+        <a href="https://link.springer.com/chapter/10.1007/3-540-58473-0_144" target="_blank">
+          their work
+        </a> to give credits where credits are due. 
+      </p>
+    </div>
+
+
+    <div id="pac-bounds-connect" class="article-text-div">
+      <h2>Stay connected</h2>
+      ... and there went 2 months of my lifetime. However, if you enjoyed this article or want to stay connected please feel free to reach out. You can find me on 
+      <a href="https://de.linkedin.com/in/robertbaumg" target="_blank">LinkedIn</a> and <a href="https://github.com/RobBa" target="_blank">GitHub</a>. 
     </div>
 
     <footer>
