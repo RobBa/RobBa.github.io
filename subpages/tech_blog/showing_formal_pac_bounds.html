@@ -173,7 +173,7 @@
       </p>
 
       <p>
-        <b>Theorem 2:</b> Given the parameters ($\beta$, $\gamma$), and given two CMS whose width $w$ and depth $d$ of a CMS assume 
+        <b>Theorem 1:</b> Given the parameters ($\beta$, $\gamma$), and given two CMS whose width $w$ and depth $d$ of a CMS assume 
         $w=\left\lceil{\frac{e}{\beta}}\right\rceil$ and $d=\left\lceil{\ln \frac{1}{\gamma}}\right\rceil$. The error on the left hand 
         side of the Hoeffding-test is upper-bounded by $\beta$ with probability at least $1-2\gamma$.
       </p>
@@ -251,7 +251,7 @@
 
       <p>
         <b>Theorem 7:</b> Assuming the target PDFA we are trying to learn is $\mu$-distinguishable, there exists a minimum sample size $m_0$ per state such that the probability 
-        of a false reject per state-pair is bounded by $\frac{\delta'}{2n^2|\Sigma|^2}$ under the assumption of no collisions.
+        of a false accept per state-pair is bounded by $\frac{\delta'}{2n^2|\Sigma|^2}$ under the assumption of no collisions.
       </p>
 
       <p>
@@ -278,7 +278,9 @@
       <h2>Wrapping up</h2>
       <p>
         ... and there went 2 months of my lifetime. However, I hope you got a little more familiar with some techniques and how to use them. Essentially PAC-bounds proofs need a series of 
-        subsequent bounding, where each step provides the foundation for the next one, similar to system design almost.
+        subsequent bounding, where each step provides the foundation for the next one, similar to system design almost. The bounds will reveal how to choose parameters such that the bounds
+        are fulfilled. In practice those numbers often get really large however, so often the bounds only serve a theoretical purpose, showing that at least in theory the algorithm can 
+        fulfill error bounds.
       </p>
 
       <p>
