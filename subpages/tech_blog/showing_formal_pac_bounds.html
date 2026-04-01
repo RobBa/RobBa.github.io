@@ -401,8 +401,16 @@
       <p>
         What this essentially means is that with a high probability we create states and transitions that are isomorphic to the target graph. Meaning our states and transitions are correct. The batch-size is intentionally
         chosen large, so that in each iteration of the algorithm at least one new state is created, i.e. the batch-size is intentionally engineered so that we can almost guarantee that a new state
-        will emerge. This also helps to bound the number of iterations the algorithm performs in relation with $n$ and $|\Sigma|$, so it also gives us runtime-guarantees. Stitching all of the above together
-        finally yields
+        will emerge. This also helps to bound the number of iterations the algorithm performs in relation with $n$ and $|\Sigma|$, so it also gives us runtime-guarantees. 
+      </p>
+        
+      <p>
+        So now that we know we can bound the merge heuristic, and we can find the right states in the automaton, all that is missing is making sure that the transition probabilities are correct. Luckily, while differing in
+        our merge heuristic and employing a different streaming framework, we estimate the outgoing probabilities analogous to Palmer and Goldberg, and our proof so far has layer the groundwork to follow their analysis on
+        the transition probabilities one on one. Thus we did not elaborate on this part in our paper, but instead again refer to 
+        <a href="https://www.cs.ox.ac.uk/people/paul.goldberg/papers/alt05.pdf" target="_blank">
+          their work
+        </a>. All that is left for as it this point is stitching it all together with the last theorem:   
       </p>
 
       <br>
