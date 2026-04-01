@@ -318,6 +318,8 @@ nav.menu {
 
 .MathJax {
     z-index: 1;
+    max-width: 100%;
+    overflow-x: auto;
 }
 
 @media (hover: none) and (pointer: coarse) {
@@ -328,12 +330,12 @@ nav.menu {
 
     #python-execution-path{
         width: 100%;
-        max-width: 350px;
+        max-width: 750px;
     }
 
     #pac-bounds-graph{
         width: 100%;
-        max-width: 400px; 
+        max-width: 800px; 
     }
 }
 
@@ -363,4 +365,21 @@ nav.menu {
 #pac-bounds-graph{
     width: 55%;
     max-width: 400px; 
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .blog-image {
+    width: 100%; /* Should not exceed container */
+    height: auto;
+    }
+
+    #python-execution-path{
+        width: 100%;
+        /*max-width: 750px;*/
+    }
+
+    #pac-bounds-graph{
+        width: 100%;
+        /*max-width: 800px; */
+    }
 }

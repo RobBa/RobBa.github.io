@@ -68,7 +68,10 @@
           <a href="#pac-bounds-cms">Bounds for Count-Min-Sketches</a>
         </li>
         <li>
-          <a href="#pac-bounds-test">PAC-bounds on statistical test</a>
+          <a href="#pac-bounds-test">Bounds on statistical test</a>
+        </li>
+        <li>
+          <a href="#pac-bounds-graph-creation">Bounds on graph creation</a>
         </li>
         <li>
           <a href="#pac-bounds-connect">Wrapping up</a>
@@ -319,7 +322,9 @@
 
       <p>
         Assuming that the target PDFA is $\mu$-distinguishable is a reasonable assumption and a simple mathemcatical formulation. The proof for this theorem follows by first bounding 
-        the variance term of the earlier indicator variables using the Cauchy-Schwarz inequality, and subsequently using the Chebychev-Cantelly inequality. After that we have to 
+        the variance term of the earlier indicator variables using the Cauchy-Schwarz inequality, and subsequently using the Chebychev-Cantelly inequality.
+        <br>
+        After that we have to 
         move the CMS back into the picture. We already know that we can bound the error on the CMS, and we know what happens when they do not mistakes. The following theorems describe
         what happens when they make a mistake:
       </p>
@@ -348,7 +353,7 @@
 
     <div id="pac-bounds-graph-creation" class="article-text-div">
 
-      <h2>PAC-bounds on graph creation</h2>
+      <h2>Bounds on graph creation</h2>
 
       <p>
         Once we can bound the number of samples needed to perform statistical tests in a way that we can bound the minimum error, we have everything we need to follow Palmer and Goldberg
