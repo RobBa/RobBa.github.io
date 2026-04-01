@@ -308,6 +308,16 @@ figcaption {
 
 /* -------------- Blogposts ---------------- */
 
+/* Those two make sure that latex does not overlap 
+the header*/
+nav.menu {
+    z-index: 9999;
+}
+
+.MathJax {
+    z-index: 1;
+}
+
 @media (hover: none) and (pointer: coarse) {
     .blog-image {
     width: 100%; /* Should not exceed container */
@@ -317,6 +327,11 @@ figcaption {
     #python-execution-path{
         width: 100%;
         max-width: 350px;
+    }
+
+    #pac-bounds-graph{
+        width: 100%;
+        max-width: 400px; 
     }
 }
 
@@ -341,4 +356,9 @@ figcaption {
 #code-example-python-call{
     width: 95%;
     max-width: 800px;
+}
+
+#pac-bounds-graph{
+    width: 55%;
+    max-width: 400px; 
 }
