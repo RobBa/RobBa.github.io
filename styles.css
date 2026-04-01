@@ -374,12 +374,12 @@ nav.menu {
     }
 
     #python-execution-path{
-        width: 90%;
+        width: 65%;
         /*max-width: 750px;*/
     }
 
     #pac-bounds-graph{
-        width: 90%;
+        width: 75%;
         /*max-width: 800px; */
     }
 }
