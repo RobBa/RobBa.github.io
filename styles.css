@@ -102,6 +102,8 @@ footer{
     max-width: 900px;
     margin-left:auto;
     margin-right:auto;
+    padding-left: 10px;  /* Add padding so content doesn't touch edges */
+    padding-right: 10px;
 }
 
 .social-media-div i {
