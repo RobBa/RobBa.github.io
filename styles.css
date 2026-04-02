@@ -355,12 +355,12 @@ nav.menu {
 }
 
 #pac-bounds-graph-traversal{
-    width: 70%;
+    width: 60%;
     max-width:700px;
 }
 
 #pac-bounds-pdfa-example{
-    width: 85%;
+    width: 100%;
     max-width:800px;  
 }
 
