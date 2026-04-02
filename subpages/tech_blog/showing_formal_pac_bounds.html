@@ -86,7 +86,7 @@
       <h2>Introduction</h2>
       
       <p>
-        In our publication <a href="https://github.com/tudelft-cda-lab/FlexFringe" target="_blank">
+        In our publication <a href="https://proceedings.mlr.press/v217/baumgartner23a.html" target="_blank">
             Learning state machines from data streams: A generic strategy and an improved heuristic
         </a> we introduced an algorithm learning probabilistic automata from data streams. Probabilistic 
         means that parsing the automaton with a string will yield its probability to occur, information 
@@ -100,7 +100,7 @@
         to the real distribution. Statistics tells us that the more samples we gather 
         <a href="https://en.wikipedia.org/wiki/Central_limit_theorem">the more certain we can be about
         our predictions</a>. Therefore, the more samples a node in our automaton sees the more likely 
-        its predicted probabilities will resemble the true probabilities. However, we can never be certain.
+        its predicted probabilities will resemble the true probabilities, but we can never be certain.
         This is a problem inherent to machine learning frameworks and has been studied by famous statisticians
         such as Vladimir Vapnik and Alexey Chervonenkis, who are famous for their VC-dimension, a concept of
         <a href="https://www.mit.edu/~6.454/www_spring_2001/emin/slt.pdf">statistical learning theory</a>. 
@@ -110,7 +110,7 @@
         Another approach to estimate the learning capacity of a statistical learner is a formal proof of 
         PAC-bounds (PAC=Probably Approximately Correct). We take this approach to show the correctness 
         of our algorithm in the extended version of our publication, found <a href="TODO">here</a>. However,
-        because the proof is long and not straightforward to understand, I outline its main ideas and steps in
+        because the proof is long and has lots of mathematical details I outline its main ideas and steps in
         this blog post. For simplicity I use the same notation as in the paper, thus this blogpost is a
         complemetary piece to the original proof. With that said, let's dive in with the definition of 
         PAC-bounds and why we use them.
