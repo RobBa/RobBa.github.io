@@ -173,7 +173,7 @@
       class="blog-image" 
       src="./showing_fomal_pac_bounds/pac-bounds-graph.png" 
       alt="Concept of how we will show the bounds">
-      <figcaption>Steps for proof of PAC-bounds, from bottom to top</figcaption>
+      <figcaption>Steps for proof of PAC-bounds, from bottom to top.</figcaption>
       </figure>
 
     </div>
@@ -184,7 +184,7 @@
       <p>
         In order to show formal PAC-bounds we have to build them from the ground up, as shown in the figure above. 
         We have to start with the smallest unit of operation in our algorithm, show that we can probabilistically bound the error 
-        they produce, and move it up layer by layer until we cover the whole algorithm. In our publication we choose Count-Min-Sketches 
+        they produce, and move it up layer by layer until we cover the whole algorithm. In our publication we chose Count-Min-Sketches 
         (CMS) as the most basic data structure. Hence, we first have to show that the CMS and the operations we perform on them are bounded.
         We store samples distributions in the CMS and test with the Hoeffding-bound whether the two sampled distributions are
         equal or not. If the sampled distribution satisfies
@@ -246,7 +246,7 @@
 
         we obtain the union bound as
 
-        $$ P(\cap_i A_i) \leq \sum_i P(A_i).$$
+        $$ P(\cup_i A_i) \leq \sum_i P(A_i).$$
 
         This settles our score with the CMS.
       </p>
@@ -350,9 +350,16 @@
       <br>
 
       <p>
-        Assuming that the target PDFA is $\mu$-distinguishable is a reasonable assumption and a simple mathemcatical formulation. The proof for this theorem follows by first bounding 
-        the variance term of the earlier indicator variables using the Cauchy-Schwarz inequality, and subsequently using the Chebychev-Cantelly inequality.
-        <br>
+        Assuming that the target PDFA is $\mu$-distinguishable is a reasonable assumption and a simple mathemcatical formulation. The proof for this theorem follows by first 
+        modeling the variance term using the indicator variables used earlier too, and then bounding it using Cauchy-Schwarz. Subsequently using the Chebychev-Cantelly inequality 
+        for the lower tail
+
+        $$P(X - \mathbb{E}[X] \leq -\lambda) \leq \frac{Var(X)}{Var(X) + \lambda^2},$$
+
+        with $Var(X)$ being the variance we earlier bounded, we get the result using a clever substitute for $\lambda$. 
+      </p>
+
+      <p>
         After that we have to 
         move the CMS back into the picture. We already know that we can bound the error on the CMS, and we know what happens when they do not do any mistakes. The following theorems 
         describe what happens when they actually do make mistakes, starting with false accepts:
