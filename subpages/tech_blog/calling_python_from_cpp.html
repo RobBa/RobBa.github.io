@@ -184,7 +184,7 @@
 
       <p>
         Once we have access to the Python headers we first have to run <code>Py_Initialize();</code>. 
-        This line of code then simply starts the Python interpreter. We can then already issue
+        This line of code simply starts the Python interpreter, so we can issue
         our first commands to the interpreter via <code>PyRun_SimpleString();</code>. I used this 
         command to first import the os- and sys-modules in Python, so that I could manipulate the 
         syspath of the interpreter to make sure it actually finds and can include my Python script 
@@ -202,6 +202,8 @@ stringstream cmd;<br>
 cmd &lt;&lt; "sys.path.append( os.path.join(os.getcwd(), \"";<br>
 cmd &lt;&lt; PYTHON_SCRIPT_PATH;<br>
 cmd &lt;&lt; "\") )\n";<br>
+
+// can be done smoother with pathlib now (https://docs.python.org/3/library/pathlib.html)
 cmd &lt;&lt; "sys.path.append( os.path.join(os.getcwd(), \"source/active_learning/system_under_learning/neural_network_suls/python/util\") )";<br>
 PyRun_SimpleString(cmd.str().c_str());<br>
 </code></pre>

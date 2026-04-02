@@ -102,12 +102,12 @@
         our predictions</a>. Therefore, the more samples a node in our automaton sees the more likely 
         its predicted probabilities will resemble the true probabilities. However, we can never be certain.
         This is a problem inherent to machine learning frameworks and has been studied by famous statisticians
-        such as Vladimir Vapnik and Alexey Chervonenkis, who are famous for the VC-dimension, a concept of
+        such as Vladimir Vapnik and Alexey Chervonenkis, who are famous for their VC-dimension, a concept of
         <a href="https://www.mit.edu/~6.454/www_spring_2001/emin/slt.pdf">statistical learning theory</a>. 
       </p>
 
       <p>
-        Another approach to estimate the learning capacity of a statistical learner is a proof of formal 
+        Another approach to estimate the learning capacity of a statistical learner is a formal proof of 
         PAC-bounds (PAC=Probably Approximately Correct). We take this approach to show the correctness 
         of our algorithm in the extended version of our publication, found <a href="TODO">here</a>. However,
         because the proof is long and not straightforward to understand, I outline its main ideas and steps in
@@ -116,6 +116,16 @@
         PAC-bounds and why we use them.
       </p>
 
+      <figure>
+        <img 
+        id="pac-bounds-pdfa-example" 
+        src="./showing_fomal_pac_bounds/hdfs_model.png" 
+        alt="Example PDFA">
+        <figcaption>
+          Example of a model we once learned. Traversing the graph yields probabilities of related events 
+          happening, and we want to error bound these probabilities, making sure that the result is correct.
+        </figcaption>
+      </figure>
     </div>
 
     <div id="pac-bounds" class="article-text-div">
@@ -163,7 +173,7 @@
       class="blog-image" 
       src="./showing_fomal_pac_bounds/pac-bounds-graph.png" 
       alt="Concept of how we will show the bounds">
-      <figcaption>Steps for proof of PAC-bounds, bottom up</figcaption>
+      <figcaption>Steps for proof of PAC-bounds, from bottom to top</figcaption>
       </figure>
 
     </div>
@@ -172,10 +182,10 @@
       <h2>Bounds on Count-Min-Sketches</h2>
       
       <p>
-        In order to show formal PAC-bounds we have to build them from the ground up. We have to start with the smallest 
-        unit of operation in our algorithm, show that we can probabilistically bound the error they produce, and move 
-        it up layer by layer until we cover the whole algorithm. In our publication we choose Count-Min-Sketches (CMS) as the 
-        most basic data structure. Hence, we first have to show that the CMS and the operations we perform on them are bounded.
+        In order to show formal PAC-bounds we have to build them from the ground up, as shown in the figure above. 
+        We have to start with the smallest unit of operation in our algorithm, show that we can probabilistically bound the error 
+        they produce, and move it up layer by layer until we cover the whole algorithm. In our publication we choose Count-Min-Sketches 
+        (CMS) as the most basic data structure. Hence, we first have to show that the CMS and the operations we perform on them are bounded.
         We store samples distributions in the CMS and test with the Hoeffding-bound whether the two sampled distributions are
         equal or not. If the sampled distribution satisfies
 
@@ -240,7 +250,22 @@
 
         This settles our score with the CMS.
       </p>
+
+      <figure>
+      <img 
+      id="pac-bounds-cms-to-test"
+      class="blog-image" 
+      src="./showing_fomal_pac_bounds/cms-to-statistical-test.png" 
+      alt="CMS to statistical test">
+      <figcaption>Comparing two states. Each state has one CMS, through which we can retrieve a sampled distribution
+        over input words. The two distributions are then compared through a statistical test. Mistakes can happen in the 
+        statistical test and in retrieving the sampled distributions.
+      </figcaption>
+      </figure>
+      
     </div>
+
+    <br>
 
     <div id="pac-bounds-test" class="article-text-div">
       <h2>Bounds on statistical test</h2>
@@ -273,7 +298,11 @@
         we know that there must a minimum non-zero transition probability within the automaton. Once we know that transition probability we can define an 
         expected constant proportional to the inverse of the minimum probability, and then the maximum number of expected samples grows linearly in 
         the number of states and the batch size. While not needed for the remainder, it is still nice to know that we can bound how many i.i.d. samples 
-        the algorithm needs. The proof follows again via the Markov bound and proof by induction. With that in mind we move on bounding the probability of 
+        the algorithm needs. The proof follows again via the Markov bound and proof by induction. 
+      </p>
+
+      <p>
+        With that in mind we move on bounding the probability of 
         making a mistake in the statistical test. An error can either be a false reject (should merge those two states, but choose not to), or a false accept
         (should not merge those two states, but actually choose to merge). We first look at the probability of a false reject when the CMS are correct:
       </p>
@@ -326,7 +355,7 @@
         <br>
         After that we have to 
         move the CMS back into the picture. We already know that we can bound the error on the CMS, and we know what happens when they do not do any mistakes. The following theorems 
-        describe what happens when they actually do make mistakes:
+        describe what happens when they actually do make mistakes, starting with false accepts:
       </p>
 
       <br>
@@ -339,6 +368,12 @@
       <br>
 
       <p>
+        And of course we also need to updated our analysis on false rejects.
+      </p>
+
+      <br>
+
+      <p>
         <b>Theorem 7:</b> Narrowing the Hoeffding-test via $\sqrt{\frac{1}{2}log\left(\frac{2}{\alpha}\right)}\left(\frac{1}{\sqrt{m_1}}+\frac{1}{\sqrt{m_2}}\right) - \beta$, the upper bound for 
         a false reject remains bounded by a maximum of $2\alpha$.
       </p>
@@ -346,9 +381,8 @@
       <br>
 
       <p>
-        Their proofs are trivial, once Theorem 4 and 5 have been proven. Therefore we can move to the next topic.
+        Their proofs are trivial once Theorem 4 and 5 have been proven, we omit them here. Instead we can move to the next topic.
       </p>
-
     </div>
 
     <div id="pac-bounds-graph-creation" class="article-text-div">
@@ -379,7 +413,7 @@
 
       <p>
         This is a statement on how many samples need to be read by the algorithm to produce new states. The proof follows the Hoeffding-bound, and the number shows up again in the 
-        chosen batch-size in the next, more important theorem: 
+        chosen batch-size in the next theorem:
       </p>
 
       <br>
@@ -403,6 +437,17 @@
         chosen large, so that in each iteration of the algorithm at least one new state is created, i.e. the batch-size is intentionally engineered so that we can almost guarantee that a new state
         will emerge. This also helps to bound the number of iterations the algorithm performs in relation with $n$ and $|\Sigma|$, so it also gives us runtime-guarantees. 
       </p>
+
+      <figure>
+      <img 
+      id="pac-bounds-graph-traversal"
+      class="blog-image" 
+      src="./showing_fomal_pac_bounds/traverse-graph.png" 
+      alt="Tree with example trace">
+      <figcaption>Mini example of a tree before creating the graph from it with an example trace of states to be parsed. We need to be sure that each of the nodes has seen enough 
+        data samples so that its sampled distributions and predicted probabilities can be error bound for our purposes.
+      </figcaption>
+      </figure>
         
       <p>
         So now that we know we can bound the merge heuristic, and we can find the right states in the automaton, all that is missing is making sure that the transition probabilities are correct. Luckily, while differing in
@@ -410,21 +455,23 @@
         the transition probabilities one on one. Thus we did not elaborate on this part in our paper, but instead again refer to 
         <a href="https://www.cs.ox.ac.uk/people/paul.goldberg/papers/alt05.pdf" target="_blank">
           their work
-        </a>. All that is left for as it this point is stitching it all together with the last theorem:   
+        </a>. The basic idea however is once again making sure that each state sees enough samples, so that errors on probabilities can be bound. 
+        For us in turn, all that is left is stitching it all together with the last theorem:   
       </p>
 
       <br>
 
       <p>
         <b>Theorem 10:</b> Given a target PDFA $A$ and given our streaming strategy along with our merge heuristic. Given the required input parameters $L', n', \mu', \Sigma, \epsilon, \delta$, then for each 
-        $L'\geq L$, $\mu' \leq \mu$, and $n' \geq n$ our framework returns a hypothesis automaton $H$ such that with probability at least $1-\delta$ the error is bounded by $L_1(H, A)\leq \epsilon$,
+        $L'\geq L$, $\mu' \leq \mu$, and $n' \geq n$ our framework returns a hypothesis automaton $H$ such that with probability at least $1-\delta$ the error is bounded by $L_1(H, A)\leq \epsilon$.
       </p>
 
       <br>
 
-      which essentially concludes our bounds. However, our runtime analysis yielded that our PAC-learner is not an efficient PAC-learner. We therefore show a modification of the algorithm that can be done
-      when the sample size per sketch is sufficiently large, greatly simplifying our algorithm. However, we show that the modification works and is mathematically sound. Experiments are yet to follow, and I will hand
-      the torch down to the interested reader.
+      With this we can conclude that our learner indeed satisfies PAC-bounds, and throughout the analysis we showed what needs to be satisfied in order for the bounds to happen. However, our runtime of the algorithm  
+      shows that our PAC-learner is not an efficient PAC-learner. The end of the paper section thus shows a modification of the algorithm that can be done
+      when the sample size per sketch is sufficiently large, greatly simplifying our algorithm and improving runtime. We did not test this modification experimentally, but we consider it a great theoretical improvement
+      that works on larger data sizes. We leave it up to the community to build on the idea.
     </div>
 
 

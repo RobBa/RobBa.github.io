@@ -319,24 +319,6 @@ nav.menu {
 .MathJax {
     z-index: 1;
     max-width: 100%;
-    overflow-x: auto;
-}
-
-@media (hover: none) and (pointer: coarse) {
-    .blog-image {
-    width: 100%; /* Should not exceed container */
-    height: auto;
-    }
-
-    #python-execution-path{
-        width: 100%;
-        max-width: 750px;
-    }
-
-    #pac-bounds-graph{
-        width: 100%;
-        max-width: 800px; 
-    }
 }
 
 .blog-image {
@@ -367,19 +349,45 @@ nav.menu {
     max-width: 400px; 
 }
 
+#pac-bounds-cms-to-test{
+    width: 60%;
+    max-width:500px;
+}
+
+#pac-bounds-graph-traversal{
+    width: 70%;
+    max-width:700px;
+}
+
+#pac-bounds-pdfa-example{
+    width: 85%;
+    max-width:800px;  
+}
+
 @media (hover: none) and (pointer: coarse) {
     .blog-image {
     width: 100%; /* Should not exceed container */
     height: auto;
     }
 
+    .MathJax {
+        overflow-x: auto;
+    }
+
     #python-execution-path{
         width: 65%;
-        /*max-width: 750px;*/
     }
 
     #pac-bounds-graph{
         width: 75%;
-        /*max-width: 800px; */
+    }
+
+    #pac-bounds-cms-to-test{
+        width: 80%;
+        max-width:500px;
+    }
+
+    #pac-bounds-pdfa-example{
+        width: 100%;
     }
 }
