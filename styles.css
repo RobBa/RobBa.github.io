@@ -4,33 +4,29 @@
 
 /* ------------------- Global elements -------------- */
 
-html{
+html {
     background-color: whitesmoke;
     font-family: 'Open Sans', sans-serif;
 }
 
 body {
-    padding-top: 47px;  /* Padding to menu */
-
-    min-height: 100vh;  /* Add this */
-    position: relative;  /* Add this */
-    padding-bottom: 50px; /* Padding to footer */
+    padding-top: 47px;
+    min-height: 100vh;
+    position: relative;
+    padding-bottom: 50px;
 }
 
-main{
-    flex: 1;
-}
-
-.menu{
+.menu {
     display: flex;
     position: fixed;
     height: 40px;
     top: 0;
     flex-grow: 1;
     justify-content: end;
-    gap: 10px 10px; /* row-gap column gap */ 
+    gap: 10px;
     background-color: lightskyblue;
     width: 100%;
+    z-index: 9999;
 }
 
 .menu h4 {
@@ -39,34 +35,46 @@ main{
     vertical-align: auto;
 }
 
-.idxelement{
+.idxelement {
     color: white;
 }
 
-img{
+.btn {
+    color: white;
+}
+
+.fa {
+    color: white;
+    margin-right: 5px;
+}
+
+.bi {
+    color: lightskyblue;
+}
+
+img {
     display: block;
     margin-left: auto;
     margin-right: auto;
     max-width: 100%;
     height: auto;
-    /*max-width:1000px;*/
 }
 
-h1{
+h1 {
     text-align: center;
 }
 
 div {
-    margin-left:2%;
-    margin-right:2%;
-    margin-bottom:2%;
+    margin-left: 2%;
+    margin-right: 2%;
+    margin-bottom: 2%;
 }
 
-code{
-    color: darkblue
+code {
+    color: darkblue;
 }
 
-footer{
+footer {
     display: flex;
     position: absolute;
     bottom: 0;
@@ -78,124 +86,113 @@ footer{
     width: 100%;
 }
 
-.footer-div{
+.footer-div {
     display: flex;
     height: 40px;
     align-items: center;
     flex-grow: 1;
     justify-content: center;
-    gap: 0px 5px; /* row-gap column gap */ 
-    color:white;
+    gap: 0 5px;
+    color: white;
 }
 
-.footer-btn{
+.footer-btn {
     color: white;
 }
 
 .article-text-div {
     max-width: 900px;
-    margin-left:auto;
-    margin-right:auto;
-    padding-left: 10px;  /* Add padding so content doesn't touch edges */
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 10px;
     padding-right: 10px;
 }
 
 .article-content-div {
     max-width: 900px;
-    margin-left:auto;
-    margin-right:auto;
-    padding-left: 10px;  /* Add padding so content doesn't touch edges */
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 10px;
     padding-right: 10px;
 }
 
-.social-media-div i {
-  font-size: 40px; /* desktop size */
-}  
-.social-media-div a {
-  padding: 3px;
-}
-
 figure {
-  text-align: center;
-  margin-left: auto;
-  margin-right: auto;
+    text-align: center;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 figure img {
-  max-width: 100%; /* prevents image from exceeding figure width */
-  height: auto; /* Maintains aspect ratio */
+    max-width: 100%;
+    height: auto;
 }
 
 figcaption {
-  text-align: center;
-  font-style: italic;
-  color: #666;
-  margin-top: 8px;
-  font-size: 14px;
+    text-align: center;
+    font-style: italic;
+    color: #666;
+    margin-top: 8px;
+    font-size: 14px;
 }
 
 /* Touchscreen devices (phones and tablets) */
 @media (hover: none) and (pointer: coarse) {
-  body {
-    padding-top: 60px;
-    padding-bottom: 55px;
-  }
-  
-  p, li {
-    font-size: 18px;
-    line-height: 1.5;
-    margin-left: 3px;
-    margin-right: 3px;
-  }
-  
-  .menu {
-    height: 55px;
-    font-size: 20px;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0;
-    padding: 0;
-  }
-  
-  footer {
-    height: 50px;
-    font-size: 18px;
-  }
-  
-  .footer-div {
-    height: 50px;
-  }
-  
-  .btn {
-    font-size: 18px;
-  }
-  
-  h1 {
-    font-size: 24px;
-  }
-  
-  h2 {
-    font-size: 22px;
-  }
-  
-  h4 {
-    font-size: 18px;
-  }
-  
-  .social-media-div i {
-    font-size: 50px;
-  }
+    body {
+        padding-top: 60px;
+        padding-bottom: 55px;
+    }
 
-  .article-content-div {
-    max-width: 100%;
-    margin-left: 10px;
-    margin-right: 10px;
-  }
+    p, li {
+        font-size: 18px;
+        line-height: 1.5;
+        margin-left: 3px;
+        margin-right: 3px;
+    }
 
-  div {
-    margin-left: 3px;
-    margin-right: 3px;
-  }
+    .menu {
+        height: 55px;
+        font-size: 20px;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0;
+        padding: 0;
+    }
+
+    footer {
+        height: 50px;
+        font-size: 18px;
+    }
+
+    .footer-div {
+        height: 50px;
+    }
+
+    .btn {
+        font-size: 18px;
+    }
+
+    h1 {
+        font-size: 24px;
+    }
+
+    h2 {
+        font-size: 22px;
+    }
+
+    h4 {
+        font-size: 18px;
+    }
+
+    .article-content-div {
+        max-width: 100%;
+        margin-left: 10px;
+        margin-right: 10px;
+    }
+
+    div {
+        margin-left: 3px;
+        margin-right: 3px;
+    }
 }
 
 /* -------------- The home page ---------------- */
@@ -205,13 +202,13 @@ figcaption {
         display: block;
     }
 
-    #home-top-left{
+    #home-top-left {
         display: block;
         margin-left: 5%;
         margin-right: 5%;
     }
 
-    #home-top-right{
+    #home-top-right {
         display: block;
         margin-left: 5%;
         margin-right: 5%;
@@ -219,67 +216,64 @@ figcaption {
     }
 }
 
-@media (min-width: 1201px){
-    .home-top{
+@media (min-width: 1201px) {
+    .home-top {
         display: flex;
         justify-content: space-around;
     }
-    
-    #home-top-left{
+
+    #home-top-left {
         flex: 0.4;
         margin-left: 4%;
         margin-right: 2%;
         max-width: 600px;
     }
-    
-    #home-top-right{
+
+    #home-top-right {
         flex: 0.6;
         margin-right: 3%;
         max-width: 500px;
     }
 }
 
-.home-images{
+.home-images {
     display: block;
     margin-left: auto;
     margin-right: auto;
-    max-width:500px;
+    max-width: 500px;
 }
 
-#short-description{
+#short-description {
     text-align: center;
 }
 
-.social-media-div{
-    display: flex;
-}
-
-.social-media-elem{
-    flex: 1;
-}
-
-.bi {
-    color: lightskyblue;
-}
-
-.btn {
-    color: white;
-}
-
-.fa{
-    color: white;
-    margin-right: 5px;
-}
-
-.social-media-div{
+.social-media-div {
     display: flex;
     justify-content: center;
 }
 
+.social-media-div i {
+    font-size: 40px;
+}
+
+.social-media-div a {
+    padding: 3px;
+}
+
 .social-media-div h3 {
-    flex: 1;   
+    flex: 1;
+}
+
+.social-media-elem {
+    flex: 1;
 }
 
 .home-top-div h2 {
     text-align: center;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .social-media-div i {
+        font-size: 50px;
+    }
 }
