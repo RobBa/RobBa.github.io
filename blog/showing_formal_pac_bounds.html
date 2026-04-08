@@ -51,7 +51,8 @@
 
     <br>
 
-    <h1>Proving formal PAC-bounds: An example step-by-step</h1>
+      <h1>Proving formal PAC-bounds: An example step-by-step</h1>
+      <p class="article-date">Published: April 8, 2026</p>
 
     <br>
 
@@ -74,7 +75,7 @@
           <a href="#pac-bounds-graph-creation">Bounds on graph creation</a>
         </li>
         <li>
-          <a href="#pac-bounds-random_algos">On non-optimal solutions</a>
+          <a href="#pac-bounds-random-algos">On non-optimal solutions</a>
         </li>
         <li>
           <a href="#pac-bounds-connect">Wrapping up</a>
@@ -486,14 +487,15 @@
       that works on larger data sizes. We leave it up to the community to build on the idea.
     </div>
 
-    <div id="pac-bounds-random_algos" class="article-text-div">
+    <div id="pac-bounds-random-algos" class="article-text-div">
       <h2>On non-optimal solutions</h2>
 
       <p>
-        Now this is all nice and well, but one can note that we don't have explicite guarantees, and therefore the whole concept is shaky at best. While I do acknowledge the limitations of the approach, 
+        Now this is all nice and well, but one can note that we don't have explicit guarantees, and therefore the whole concept is shaky at best. While I do acknowledge the limitations of the approach, 
         I briefly want to address the rightfully critical mind's concerns. The first thing I want to note is the following: Pretty much all of contemporary ML algorithms run on the same assumptions.
         I do know that there is foundational work on the mathematical framework of deep learning (see e.g. works of <a href="https://web.cs.ucla.edu/~qgu/" target="_blank">this interesting scholar</a>, 
-        e.g. a publication on <a href="https://arxiv.org/abs/2202.06526" target="_blank">benign overfitting</a>), but regardless of that, large models have yet to proven. The casual approach is still
+        e.g. a publication on <a href="https://arxiv.org/abs/2202.06526" target="_blank">benign overfitting</a>), but regardless of that, analyses normally focus on small models only thus far.
+        That is, the theoretical bounds that works come up with do not hold for the extremely large models that have popped up over the past years. The casual approach is still
         to train and hope for the best through empirical evaluation. 
       </p>
 
@@ -512,7 +514,7 @@
       alt="Example graph with a minimum-cut">
       <figcaption>
         Example mini-graph with a minimum-cut solution. The min-cut separates the graph into two virtual components, connected through a minimum number of edges. Applications are e.g. finding vulnerabilities 
-        in one's system, say a distributed system, to reinforce it and making it more robust against fallouts.
+        in one's system, say a distributed system, to make it more robust against fallouts.
       </figcaption>
       </figure>
 
@@ -532,12 +534,13 @@
       <p>
         It is clearly sleek and elegant in its pseudocode, and so is the mathematical analysis. Because we are not guaranteed to find the correct solution the algorithm is normally run multiple times, and
         the solution which minimizes crossing edges is the correct solution. If we have $n$ nodes and do $N$ trials, then the probability of not finding the optimal solution (the true minimum), i.e. $P[all \text{ } trials \text{ } fail]$, is bounded
-        by $$P[all \text{ } trials \text{ } fail] \leq (1-\frac{1}{n^2})^N.$$ Looking awfully familiar with $$\lim_{n \rightarrow \infty} (1-\frac{x}{n})^n=e^x$$ we can do e.g. $N=n^2$, therefore $$P[all \text{ } trials \text{ } fail] \leq \frac{1}{e}$$,
-        or alternatively with $N=n^2log(n)$ we get the even smoother $$P[all \text{ } trials \text{ } fail] \leq \frac{1}{n}.$$
+        by $$P[all \text{ } trials \text{ } fail] \leq (1-\frac{1}{n^2})^N.$$ Looking awfully familiar with $$\lim_{n \rightarrow \infty} (1-\frac{x}{n})^n=e^x$$ we can perform e.g. $N=n^2$ trials, resulting in a 
+        false solution bounded with probability $$P[all \text{ } trials \text{ } fail] \leq \frac{1}{e}.$$
+        Or alternatively we perform $N=n^2log(n)$ trials to get the even smoother bound $$P[all \text{ } trials \text{ } fail] \leq \frac{1}{n}.$$
       </p>
 
       <p>
-        The benefit of this algorithm is clearly is simplicity and elegant math, not its practicality, which is mostly why it is academic in nature. There exist deterministic solutions solving the same problem in better 
+        The benefit of this algorithm is clearly its simplicity and elegant math, not its practicality, which is mostly why it is academic in nature. There exist deterministic solutions solving the same problem in better 
         asymptotic time. However, sometimes we do not have this luxury and need to resort to randomized algorithms that do not always give the best solution, but give it only with a certain probability. This example was 
         to show that algorithms that do not always find the optimal solution do have a legitimate place in the overarching toolbox of algorithms. In fact, many algorithms inside of the very computers we use are not 
         optimal, but good enough. Optimal caching and the Bankers algorithm for instance both rely on knowlede of the future, clearly a real world contraint, which is why the clever engineers who designed our systems cooked up 

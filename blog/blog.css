@@ -4,6 +4,14 @@
     max-width: 100%;
 }
 
+.article-date {
+    color: #888;
+    font-size: 0.85em;
+    margin-top: -10px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
 .blog-image {
     width: 98%;
     height: auto;
@@ -73,6 +81,11 @@
     #pac-bounds-cms-to-test {
         width: 80%;
         max-width: 500px;
+    }
+
+    #pac-bounds-min-cut {
+        width: 75%;
+        max-width: 600px;
     }
 
     #pac-bounds-pdfa-example {
