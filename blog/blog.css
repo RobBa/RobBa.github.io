@@ -42,6 +42,11 @@
     max-width: 700px;
 }
 
+#pac-bounds-min-cut {
+    width: 65%;
+    max-width: 600px;
+}
+
 #pac-bounds-pdfa-example {
     width: 100%;
     max-width: 800px;

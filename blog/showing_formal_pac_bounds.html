@@ -74,6 +74,9 @@
           <a href="#pac-bounds-graph-creation">Bounds on graph creation</a>
         </li>
         <li>
+          <a href="#pac-bounds-random_algos">On non-optimal solutions</a>
+        </li>
+        <li>
           <a href="#pac-bounds-connect">Wrapping up</a>
         </li>
       </ul>
@@ -483,6 +486,70 @@
       that works on larger data sizes. We leave it up to the community to build on the idea.
     </div>
 
+    <div id="pac-bounds-random_algos" class="article-text-div">
+      <h2>On non-optimal solutions</h2>
+
+      <p>
+        Now this is all nice and well, but one can note that we don't have explicite guarantees, and therefore the whole concept is shaky at best. While I do acknowledge the limitations of the approach, 
+        I briefly want to address the rightfully critical mind's concerns. The first thing I want to note is the following: Pretty much all of contemporary ML algorithms run on the same assumptions.
+        I do know that there is foundational work on the mathematical framework of deep learning (see e.g. works of <a href="https://web.cs.ucla.edu/~qgu/" target="_blank">this interesting scholar</a>, 
+        e.g. a publication on <a href="https://arxiv.org/abs/2202.06526" target="_blank">benign overfitting</a>), but regardless of that, large models have yet to proven. The casual approach is still
+        to train and hope for the best through empirical evaluation. 
+      </p>
+
+      <p>
+        A second argument can be made just by studying 'classical' algorithmic design. For instance, for complex problems often heuristics in the form of greedy algorithms have to employed. Other 
+        times, randomized algorithms are used. For instance, Karger's algorithm for the min-cut problem on graphs is a classical example in a good curriculum to show that simple algorithms can elegantly achieve 
+        desired results. The min-cut problem essentially states as the following. Given a graph ($V$, $E$), find two partitions $G$, $H$, s.t. $G \cup H = V$ and that the set of edges crossing the two sets are 
+        minimal.
+      </p>
+
+      <figure>
+      <img 
+      id="pac-bounds-min-cut"
+      class="blog-image" 
+      src="./showing_fomal_pac_bounds/min-cut.png" 
+      alt="Example graph with a minimum-cut">
+      <figcaption>
+        Example mini-graph with a minimum-cut solution. The min-cut separates the graph into two virtual components, connected through a minimum number of edges. Applications are e.g. finding vulnerabilities 
+        in one's system, say a distributed system, to reinforce it and making it more robust against fallouts.
+      </figcaption>
+      </figure>
+
+      <br>
+
+      <p>
+        The algorithm itself is random and does not guarantee an optimial solution. Instead it gives you only a few lines of pseudocode to describe it fully: <br> <br> 
+        <b>Karger's random contraction algorithm</b> <br>
+        While there are more than two nodes/vertices do: <br>
+        <ul>
+          <li>Pick a random edge $(u, v)\in V^2$ uniformly</li>
+          <li>Contract $u$ and $v$ into a single nodes/vertex</li>
+          <li>Remove self-loops from contracted node/vertext</li>
+        </ul>
+      </p>
+
+      <p>
+        It is clearly sleek and elegant in its pseudocode, and so is the mathematical analysis. Because we are not guaranteed to find the correct solution the algorithm is normally run multiple times, and
+        the solution which minimizes crossing edges is the correct solution. If we have $n$ nodes and do $N$ trials, then the probability of not finding the optimal solution (the true minimum), i.e. $P[all \text{ } trials \text{ } fail]$, is bounded
+        by $$P[all \text{ } trials \text{ } fail] \leq (1-\frac{1}{n^2})^N.$$ Looking awfully familiar with $$\lim_{n \rightarrow \infty} (1-\frac{x}{n})^n=e^x$$ we can do e.g. $N=n^2$, therefore $$P[all \text{ } trials \text{ } fail] \leq \frac{1}{e}$$,
+        or alternatively with $N=n^2log(n)$ we get the even smoother $$P[all \text{ } trials \text{ } fail] \leq \frac{1}{n}.$$
+      </p>
+
+      <p>
+        The benefit of this algorithm is clearly is simplicity and elegant math, not its practicality, which is mostly why it is academic in nature. There exist deterministic solutions solving the same problem in better 
+        asymptotic time. However, sometimes we do not have this luxury and need to resort to randomized algorithms that do not always give the best solution, but give it only with a certain probability. This example was 
+        to show that algorithms that do not always find the optimal solution do have a legitimate place in the overarching toolbox of algorithms. In fact, many algorithms inside of the very computers we use are not 
+        optimal, but good enough. Optimal caching and the Bankers algorithm for instance both rely on knowlede of the future, clearly a real world contraint, which is why the clever engineers who designed our systems cooked up 
+        approximate solutions or entirely different ones to solve these problems.
+      </p>
+
+      <p>
+        In our algorithm however we can either use PAC-bounds, or accept that guarantees exist, but in the real world just run the algorithm and accept that the solution might not be the optimal solution, but good enough for our 
+        purposes. And this is something we can control by understanding the algorithm and its limits, and by setting our hyperparameters according to our needs.
+      </p>
+    </div>
+
 
     <div id="pac-bounds-connect" class="article-text-div">
       <h2>Wrapping up</h2>
@@ -490,12 +557,12 @@
       <p>
         ... and there went 2 months of my lifetime. However, I hope you got a little more familiar with some techniques and how to use them. Essentially PAC-bounds proofs need a series of 
         subsequent bounding, where each step provides the foundation for the next one, similar to system design almost. The bounds will reveal how to choose parameters such that the bounds
-        are fulfilled. In practice those numbers often get really large however, so often the bounds only serve a theoretical purpose, showing that at least in theory the algorithm can 
-        fulfill error bounds.
+        are fulfilled. In practice those numbers often get really large however, so often the bounds only serve a theoretical purpose, showing that at least in theory the algorithm has 
+        guarantees.
       </p>
 
       <p>
-        As an upside to all this however we have mathematical guarantees that our learner does learn the correct result. if we could we could bake those found parameters into the actual
+        As an upside to all this however we have mathematical guarantees that our learner does learn the correct result. If we wanted to we could bake those found parameters into the actual
         algorithm and have it run on a real data stream, say a network of computers. Under the assumption that there is a natural behavior of the network (similar to say energy consumption
         in an energy network: In the evening everbody goes home turns on the light, hence more activity in the evenings and less during daytime for private households), then a model for 
         the network can be built. And if we choose our parameters correctly we can be probably approximately sure (pun intended) that the result will be correct, and the model will be able 
