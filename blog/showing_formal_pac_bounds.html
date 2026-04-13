@@ -494,16 +494,15 @@
         Now this is all nice and well, but one can note that we don't have explicit guarantees, and therefore the whole concept is shaky at best. While I do acknowledge the limitations of the approach, 
         I briefly want to address the rightfully critical mind's concerns. The first thing I want to note is the following: Pretty much all of contemporary ML algorithms run on the same assumptions.
         I do know that there is foundational work on the mathematical framework of deep learning (see e.g. works of <a href="https://web.cs.ucla.edu/~qgu/" target="_blank">this interesting scholar</a>, 
-        e.g. a publication on <a href="https://arxiv.org/abs/2202.06526" target="_blank">benign overfitting</a>), but regardless of that, analyses normally focus on small models only thus far.
-        That is, the theoretical bounds that works come up with do not hold for the extremely large models that have popped up over the past years. The casual approach is still
-        to train and hope for the best through empirical evaluation. 
+        e.g. a publication on <a href="https://arxiv.org/abs/2202.06526" target="_blank">benign overfitting</a>), but regardless of that, analyses normally focus on small models only so far.
+        In other words, these theoretical bounds do not hold for the extremely large models that have popped up over the past years. They might be discovered some day, but for now the common approach is 
+        still to simply train and cushion against the worst cases through empirical testing.
       </p>
 
       <p>
-        A second argument can be made just by studying 'classical' algorithmic design. For instance, for complex problems often heuristics in the form of greedy algorithms have to employed. Other 
-        times, randomized algorithms are used. For instance, Karger's algorithm for the min-cut problem on graphs is a classical example in a good curriculum to show that simple algorithms can elegantly achieve 
-        desired results. The min-cut problem essentially states as the following. Given a graph ($V$, $E$), find two partitions $G$, $H$, s.t. $G \cup H = V$ and that the set of edges crossing the two sets are 
-        minimal.
+        A second argument can be made just by studying 'classical' algorithmic design. For instance, for complex problems often approximate or randomized algorithms are used. For instance, Karger's algorithm for 
+        the min-cut problem on graphs is a classical example in a good curriculum to show that simple algorithms can elegantly achieve desired results. The min-cut problem essentially states as the following. 
+        Given a graph ($V$, $E$), find two partitions $G$, $H$, s.t. $G \cup H = V$ and that the set of edges crossing the two sets are minimal.
       </p>
 
       <figure>
@@ -540,7 +539,7 @@
       </p>
 
       <p>
-        The benefits of this algorithm are clearly its simplicity and elegant math, not its practicality, which is mostly why it is academic in nature. There exist deterministic solutions solving the same problem in better 
+        The benefits of this algorithm are clearly its simplicity and elegant math, not its practicality, justifying its academic nature. There exist deterministic solutions solving the same problem in better 
         asymptotic time. However, sometimes we do not have this luxury and need to resort to randomized algorithms that do not always give the best solution, but give it only with a certain probability. This example was 
         to show that algorithms that do not always find the optimal solution do have a legitimate place in the overarching toolbox of algorithms. In fact, many algorithms inside of the very computers we use are not 
         optimal, but good enough. Optimal caching and the Bankers algorithm for instance both rely on knowlede of the future, clearly a real world contraint, which is why the clever engineers who designed our systems cooked up 
@@ -548,8 +547,8 @@
       </p>
 
       <p>
-        In our algorithm however we can either use PAC-bounds, or accept that guarantees exist, but in the real world just run the algorithm and accept that the solution might not be the optimal solution, but good enough for our 
-        purposes. And this is something we can control by understanding the algorithm and its limits, and by setting our hyperparameters according to our needs.
+        In our algorithm however we can either use PAC-bounds, or simply note that guarantees exist while simply running the algorithm and accepting that the solution might not be the optimal solution. But it still might be 
+        good enough for our purposes. And this, i.e. the notion of what is good enough, is something we can control by understanding the algorithm and its limits, and by setting our hyperparameters according to our needs.
       </p>
     </div>
 
