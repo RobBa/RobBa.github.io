@@ -534,7 +534,7 @@
       <p>
         It is clearly sleek and elegant in its pseudocode, and so is the mathematical analysis. Because we are not guaranteed to find the correct solution the algorithm is normally run multiple times, and
         the solution which minimizes crossing edges is the correct solution. If we have $n$ nodes and do $N$ trials, then the probability of not finding the optimal solution (the true minimum), i.e. $P[all \text{ } trials \text{ } fail]$, is bounded
-        by $$P[all \text{ } trials \text{ } fail] \leq (1-\frac{1}{n^2})^N.$$ Looking awfully familiar with $$\lim_{n \rightarrow \infty} (1-\frac{x}{n})^n=e^x$$ we can perform e.g. $N=n^2$ trials, resulting in a 
+        by $$P[all \text{ } trials \text{ } fail] \leq \left(1-\frac{1}{n^2}\right)^N.$$ Looking awfully familiar with $$\lim_{n \rightarrow \infty} \left(1-\frac{x}{n}\right)^n=e^x$$ we can perform e.g. $N=n^2$ trials, resulting in a 
         false solution bounded with probability $$P[all \text{ } trials \text{ } fail] \leq \frac{1}{e}.$$
         Or alternatively we perform $N=n^2log(n)$ trials to get the even smoother bound $$P[all \text{ } trials \text{ } fail] \leq \frac{1}{n}.$$
       </p>
