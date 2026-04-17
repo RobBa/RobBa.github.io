@@ -53,6 +53,9 @@
             <a href="#streaming-state-machines-2">Learning state machines from data streams: A generic strategy and an improved heuristic</a>
           </li>
           <li>
+            <a href="#pac-learning-pdfa">PAC learning PDFA from data streams</a>
+          </li>
+          <li>
             <a href="#database-assisted-ml">Database-Assisted State Machine Learning</a>
           </li>
           <li>
@@ -189,12 +192,11 @@
         R. Baumgartner, S. Verwer<br>
         Published: International Conference for Grammatical Inference 2023, Rabat, Morocco<br>
         Link: <a href="https://proceedings.mlr.press/v217/" target="_blank">https://proceedings.mlr.press/v217/</a><br>
-        Extended version: <a href="https://arxiv.org/abs/2604.02244" target="_blank">https://arxiv.org/abs/2604.02244</a>
       </p>
 
       <p>
         Continuing our work 'Learning state machines via efficient hashing of future traces', we 
-        improve on it in the following ways:
+        improve on it in the following two ways:
       </p>
 
       <ul>
@@ -214,13 +216,6 @@
           sample size can be potentially huge, and the decisions can still be wrong. We opt for a different approach,
           where we enable the search routine to reconsider its decisions.
         </li>
-        <li>
-          <b>Mathematical proof of convergence/PAC-bounds (Extended version)</b>: Since our algorithm learns statistically from data
-          that is statistically generated as well, we cannot give a formal proof of correctness without making unrealistic
-          assumptions. However, we can employ the <a href="https://en.wikipedia.org/wiki/Probably_approximately_correct_learning" target="_blank">
-          PAC-framework</a> to give statistical guarantees on the learning algorithm. We provide this work with a thorough mathematical analysis 
-          showing formal PAC bounds. There is a blogpost outlining the proof on <a href="../blog/showing_formal_pac_bounds.html">this homepage</a>. 
-        </li>
       </ul>
 
       <figure>
@@ -232,6 +227,51 @@
       >
       <figcaption>
         Partial results of the publication, summarized as box-plots. For the full picture please consult the publication.
+      </figcaption>
+      </figure>
+
+    </div>
+
+    <br>
+
+    <div id="pac-learning-pdfa" class="article-text-div">
+      <h2>PAC learning PDFA from data streams</h2>
+
+      <p>
+        R. Baumgartner, S. Verwer<br>
+        Published: arXiv (Extended version of previous publication)<br>
+        Link: <a href="https://arxiv.org/abs/2604.02244" target="_blank">https://arxiv.org/abs/2604.02244</a>
+      </p>
+
+      <p>
+        This is an extended version of our previous publication 
+        <a href="#streaming-state-machines-2">
+          Learning state machines from data streams...
+        </a>.
+        We supply the algorithm with a runtime analysis, a theoretical comparison with a similar method, as well as a 
+        <b>mathematical proof of convergence/PAC-bounds</b>: Since the algorithm learns statistically from data
+        that is draw from an unknown distribution, we cannot give a formal proof of correctness without making unrealistic
+        assumptions. However, we can employ the <a href="https://en.wikipedia.org/wiki/Probably_approximately_correct_learning" target="_blank">
+        PAC-framework</a> to give statistical guarantees on the learning algorithm. We provide this work with a thorough mathematical analysis 
+        showing formal PAC bounds.
+      </p>
+
+      <p>
+        There is a blogpost outlining the proof in my <a href="../blog/showing_formal_pac_bounds.html">blog</a>. 
+      </p>
+
+      <figure>
+      <img 
+      id="pac-bounds-cms-to-test"
+      class="blog-image" 
+      src="./images/cms-to-statistical-test.png" 
+      alt="CMS to statistical test">
+      <figcaption>
+        We need to prove that the statistical test works correctly, and under what conditions we can guarantee no mistakes are made.
+        From there we need to generalize onto the whole graph. More details in 
+        <a href="../blog/showing_formal_pac_bounds.html">
+          this blogpost
+        </a>.
       </figcaption>
       </figure>
 

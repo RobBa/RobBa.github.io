@@ -23,3 +23,15 @@
 #res-preprocessing-in-cybersecurity {
     max-width: 700px;
 }
+
+#pac-bounds-cms-to-test {
+    width: 60%;
+    max-width: 500px;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    #pac-bounds-cms-to-test {
+        width: 80%;
+        max-width: 500px;
+    }
+}
