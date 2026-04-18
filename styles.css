@@ -51,6 +51,10 @@ body {
     color: lightskyblue;
 }
 
+.ai {
+  color: lightskyblue;
+}
+
 img {
     display: block;
     margin-left: auto;
@@ -107,7 +111,8 @@ footer {
     justify-content: flex-end;
 }
 
-.footer-div .bi {
+.footer-div .bi,
+.footer-div .ai {
     color: white;
     font-size: 1.5rem;
 }
@@ -262,6 +267,7 @@ figcaption {
 .social-media-div {
     display: flex;
     justify-content: center;
+    align-items: center;
 }
 
 .social-media-div i {
