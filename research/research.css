@@ -25,13 +25,13 @@
 }
 
 #pac-bounds-cms-to-test {
-    width: 60%;
+    width: 45%;
     max-width: 500px;
 }
 
 @media (hover: none) and (pointer: coarse) {
     #pac-bounds-cms-to-test {
-        width: 80%;
+        width: 60%;
         max-width: 500px;
     }
 }
