@@ -1,43 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-
-  <head>
-    <meta charset="utf-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-    <title>Research | Robert Baumgartner</title>
-    <!-- for icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" 
-      rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" 
-      crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
-
-    <!-- the buttons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" href="../styles.css">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com"> 
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> 
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
-
-    <script defer src="../code/scrolling.js"></script>
-  </head>
-
-  <body>
-
-    <nav class="menu">
-      <a href="../index.html" class="idxelement">
-        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Home</button>
-      </a>
-      <a href="./" class="idxelement">
-        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Research</button>
-      </a>
-      <a href="../blog/" class="idxelement">
-        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Blog</button>
-      </a>
-    </nav>
+---
+layout: default
+title: Research
+section: Research
+nav_active: research
+---
 
     <div class="article-content-div">
       <h2>Content</h2>
@@ -85,21 +51,21 @@
       </h2>
 
       <p>
-        In simple terms, <b>State Machines are discrete event systems</b>. They consist of discrete states, 
+        In simple terms, <b>State Machines are discrete event systems</b>. They consist of discrete states,
         transitions in between those states, and events triggering those transitions. Below is an images
-        of a very simple state machine, consisting of two states and two simple events 'a' and 'b' triggering 
-        the transitions. In addition to the described above the transitions are also associated with 
-        transition probabilities, making this particular state machine a probabilistic state machine. 
+        of a very simple state machine, consisting of two states and two simple events 'a' and 'b' triggering
+        the transitions. In addition to the described above the transitions are also associated with
+        transition probabilities, making this particular state machine a probabilistic state machine.
       </p>
 
       <figure>
-        <img 
-          id="pdfa-image" 
-          src="./images/pdfa.png" 
-          alt="pdfa" 
+        <img
+          id="pdfa-image"
+          src="./images/pdfa.png"
+          alt="pdfa"
           height="50%">
         <figcaption>
-          Simple example of a (probabilistic) state machine. Transitions are labeled with event and associated 
+          Simple example of a (probabilistic) state machine. Transitions are labeled with event and associated
           probability.
         </figcaption>
       </figure>
@@ -107,34 +73,34 @@
       <p>
         <b>What can we do with state machines?</b> State machines have many applications and can be used wherever
         a discrete event system exists. The classic illustration example is a coffee machine. For instance, we can
-        have take the states 'No water', 'No beans', 'Ready', and 'Coffee brewing'. 
-        Upon starting the machine it goes into default state, checking whether water is there. If not, go into 
-        state 'No water' and display a warning. Once water is there, do the same with the beans. And only when 
-        water and beans are there a selection is possible, marked by state 'Ready', after which we transition 
+        have take the states 'No water', 'No beans', 'Ready', and 'Coffee brewing'.
+        Upon starting the machine it goes into default state, checking whether water is there. If not, go into
+        state 'No water' and display a warning. Once water is there, do the same with the beans. And only when
+        water and beans are there a selection is possible, marked by state 'Ready', after which we transition
         into state 'Coffee brewing'. A finished and brewed coffee then triggers another check for recourses,
         either landing in state 'No water', 'No beans', or 'Ready', meaning the whole cycle repeats.
       </p>
 
       <p>
-        Well, that example works, but it is so simple. <b>Why would I do the work to design a state machine in first place?</b> 
-        Simple state machines are mostly a domain of smaller systems. For example, 
-        controllers in embedded system design are often first modeled as a state machine before translated into 
-        code, adding a layer of code security on critical applications. The interested learner is referred to 
+        Well, that example works, but it is so simple. <b>Why would I do the work to design a state machine in first place?</b>
+        Simple state machines are mostly a domain of smaller systems. For example,
+        controllers in embedded system design are often first modeled as a state machine before translated into
+        code, adding a layer of code security on critical applications. The interested learner is referred to
         <a href="https://www.udemy.com/course/embedded-system-design-using-uml-state-machines/" target="_blank">
-        this excellent course</a>. An advantage of that method is also that other techniques such as model checking can 
-        be employed to ensure code testing. A book recommended by a former instructor is the 
+        this excellent course</a>. An advantage of that method is also that other techniques such as model checking can
+        be employed to ensure code testing. A book recommended by a former instructor is the
         <a href="https://mitpress.mit.edu/9780262026499/principles-of-model-checking/" target="_blank">Principles of Model Checking</a>.
       </p>
 
       <p>
-        <b>What if I have something that is more complex than a controller?</b> In cases where a system is too large 
-        to be designed by hand, or where we want to understand an existing system, we have to employ automatic 
-        algorithms to infer those state machines for us. This is called <b>State Machine Learning</b>, and it comes in 
-        two flavors: Active and passive learning. In <b>active learning</b>, we have access to an existing 
-        system, and we generate inputs to ask the system for its output. A downside of this method is that we need 
-        access to the system, and we need to be able to reset it to a default state, making learning potentially very 
-        costly. On the contrary, if we do not have access to the system, but instead already have execution traces, 
-        <b>such as software logs</b>, we can use <b>passive learning</b>. This method of learning simple aims to 
+        <b>What if I have something that is more complex than a controller?</b> In cases where a system is too large
+        to be designed by hand, or where we want to understand an existing system, we have to employ automatic
+        algorithms to infer those state machines for us. This is called <b>State Machine Learning</b>, and it comes in
+        two flavors: Active and passive learning. In <b>active learning</b>, we have access to an existing
+        system, and we generate inputs to ask the system for its output. A downside of this method is that we need
+        access to the system, and we need to be able to reset it to a default state, making learning potentially very
+        costly. On the contrary, if we do not have access to the system, but instead already have execution traces,
+        <b>such as software logs</b>, we can use <b>passive learning</b>. This method of learning simple aims to
         generate a state machine model from the set of execution traces that we give to the algorithm. A downside of
         this method is that it is highly dependent on the quality of the existing data, and of course on its vastness.
       </p>
@@ -144,7 +110,7 @@
 
     <div id="streaming-state-machines-1" class="article-text-div">
       <h2>Learning state machines via efficient hashing of future traces</h2>
-      
+
       <p>
         R. Baumgartner, S. Verwer<br>
         Published: LearnAUT 2022, Paris, France<br>
@@ -152,28 +118,28 @@
       </p>
 
       <p>
-        There are many works on learning state machines from existing data. However, few works deal with the 
-        modern problem of learning from data streams, which arise for example in servers that should not be 
-        interrupted, systems that generate large amounts of data, and other kinds of systems that run 
-        day and night. To infer state machines from these kinds of systems we have to design special kinds of 
-        algorithms, that enable the state machine learning algorithms to continuously learn and update a 
-        model. Additionally, these kinds of algorithms need to be able to compress information if necessary, 
+        There are many works on learning state machines from existing data. However, few works deal with the
+        modern problem of learning from data streams, which arise for example in servers that should not be
+        interrupted, systems that generate large amounts of data, and other kinds of systems that run
+        day and night. To infer state machines from these kinds of systems we have to design special kinds of
+        algorithms, that enable the state machine learning algorithms to continuously learn and update a
+        model. Additionally, these kinds of algorithms need to be able to compress information if necessary,
         since the data stream can be infinite at the worst.
       </p>
 
       <p>
-        To tackle these challenges we designed a simple algorithm, with two main ideas: The first is the 
-        <b>heuristic used to identify states and transitions</b>. In order to compress information we 
+        To tackle these challenges we designed a simple algorithm, with two main ideas: The first is the
+        <b>heuristic used to identify states and transitions</b>. In order to compress information we
         summarize the stream of data in the Count-Min-Sketch data structure. These summaries are then used
         to find statistical patterns, subsequently used to identify the states. The second idea is a
-        <b>routine that we can use to periodically output state machines</b>. We opted for a simple routine that 
+        <b>routine that we can use to periodically output state machines</b>. We opted for a simple routine that
         periodically saves the current model, while not interrupting the learning process.
-        We compare our method with a well-known method to show that it is doing reasonably well, given that 
+        We compare our method with a well-known method to show that it is doing reasonably well, given that
         it works with compressed, i.e. not full, information.
       </p>
 
       <figure>
-        <img 
+        <img
         id="streaming1-image"
         src="./images/streaming_1_res.jpg"
         width="80%"
@@ -196,7 +162,7 @@
       </p>
 
       <p>
-        Continuing our work 'Learning state machines via efficient hashing of future traces', we 
+        Continuing our work 'Learning state machines via efficient hashing of future traces', we
         improve on it in the following two ways:
       </p>
 
@@ -205,13 +171,13 @@
           <b>Better data compression</b>: As already mentioned, we use this Count-Min-Sketches structure to compress information.
           However, we can further improve on this by using appropriate hashing-algorithms to compress
           similar information together. We use <a href="https://en.wikipedia.org/wiki/Locality-sensitive_hashing" target="_blank">
-          Locality-sensitive_hashing</a> with the metric of choice being the Jaccard-distance. This approach 
+          Locality-sensitive_hashing</a> with the metric of choice being the Jaccard-distance. This approach
           also saves us run-time.
         </li>
         <li>
-          <b>Better learning routine</b>: The previous routine was geared towards outputting a model periodically. 
+          <b>Better learning routine</b>: The previous routine was geared towards outputting a model periodically.
           While this helps us having models without interrupting the system that is being inferred, mistakes the algorithm
-          makes at early stages due to having not seen enough data can lead to even more mistakes in later stages. 
+          makes at early stages due to having not seen enough data can lead to even more mistakes in later stages.
           <a href="https://proceedings.mlr.press/v21/balle12a.html" target="_blank">Balle et al.</a> solve this problem by first
           mathematically determining a sample size that is deemed safe enough before making decisions. However, this
           sample size can be potentially huge, and the decisions can still be wrong. We opt for a different approach,
@@ -220,10 +186,10 @@
       </ul>
 
       <figure>
-      <img 
-        id="streaming2-image" 
-        src="./images/streaming_compared.png" 
-        alt="Results of our work 'Learning state machines from data streams: A generic strategy and an improved heuristic'" 
+      <img
+        id="streaming2-image"
+        src="./images/streaming_compared.png"
+        alt="Results of our work 'Learning state machines from data streams: A generic strategy and an improved heuristic'"
         width="70%"
       >
       <figcaption>
@@ -245,31 +211,31 @@
       </p>
 
       <p>
-        This is an extended version of our previous publication 
+        This is an extended version of our previous publication
         <a href="#streaming-state-machines-2">
           Learning state machines from data streams...
         </a>.
-        We supply the algorithm with a runtime analysis, a theoretical comparison with a similar method, as well as a 
+        We supply the algorithm with a runtime analysis, a theoretical comparison with a similar method, as well as a
         <b>mathematical proof of convergence/PAC-bounds</b>: Since the algorithm learns statistically from data
         that is draw from an unknown distribution, we cannot give a formal proof of correctness without making unrealistic
         assumptions. However, we can employ the <a href="https://en.wikipedia.org/wiki/Probably_approximately_correct_learning" target="_blank">
-        PAC-framework</a> to give statistical guarantees on the learning algorithm. We provide this work with a thorough mathematical analysis 
+        PAC-framework</a> to give statistical guarantees on the learning algorithm. We provide this work with a thorough mathematical analysis
         showing formal PAC bounds.
       </p>
 
       <p>
-        There is a blogpost outlining the proof in my <a href="../blog/showing_formal_pac_bounds.html">blog</a>. 
+        There is a blogpost outlining the proof in my <a href="../blog/showing_formal_pac_bounds.html">blog</a>.
       </p>
 
       <figure>
-      <img 
+      <img
       id="pac-bounds-cms-to-test"
-      class="blog-image" 
-      src="./images/cms-to-statistical-test.png" 
+      class="blog-image"
+      src="./images/cms-to-statistical-test.png"
       alt="CMS to statistical test">
       <figcaption>
         We need to prove that the statistical test works correctly, and under what conditions we can guarantee no mistakes are made.
-        From there we need to generalize onto the whole graph. More details in 
+        From there we need to generalize onto the whole graph. More details in
         <a href="../blog/showing_formal_pac_bounds.html">
           this blogpost
         </a>.
@@ -291,20 +257,20 @@
 
       <p>
         In this work we take another view on the problem of limited memory. To overcome the limitations we <b>use a database
-        to store the data</b>, and subsequently employ <b>active learning to build a state machine</b> from the data that is being 
-        stored in the database. We show that this approach is capable of reducing working memory and reduce the amount of 
-        data used as input to the algorithm by employing targeted queries, when contrasted with classic passive learning 
+        to store the data</b>, and subsequently employ <b>active learning to build a state machine</b> from the data that is being
+        stored in the database. We show that this approach is capable of reducing working memory and reduce the amount of
+        data used as input to the algorithm by employing targeted queries, when contrasted with classic passive learning
         approaches.
       </p>
 
       <figure>
-      <img 
-        id="res-daalder" 
-        src="./images/res_daalder.png" 
-        alt="Results of our work 'Database-Assisted State Machine Learning'" 
+      <img
+        id="res-daalder"
+        src="./images/res_daalder.png"
+        alt="Results of our work 'Database-Assisted State Machine Learning'"
         width="80%">
         <figcaption>
-          Comparison of working memory footprint of the method with a baseline. 
+          Comparison of working memory footprint of the method with a baseline.
           Figure generated by <a href="https://hielkewalinga.nl/" target="_blank">H. Walinga</a>.
         </figcaption>
       </figure>
@@ -323,22 +289,22 @@
 
       <p>
         Probabilistic state machines have the potential to be used as <b>surrogate models for language models</b>, where they
-        provide a reverse-engineered and visualizable model whose output mimics that of the language model. Recent 
-        works explore the possibilities of how to extract those surrogate models from neural networks functioning as 
-        language models. In this work we design an <b>algorithm to extract probabilistic state machines</b> from a given 
+        provide a reverse-engineered and visualizable model whose output mimics that of the language model. Recent
+        works explore the possibilities of how to extract those surrogate models from neural networks functioning as
+        language models. In this work we design an <b>algorithm to extract probabilistic state machines</b> from a given
         language model and test our approach on networks trained on public datasets. We further provide proof
         of correctness of our algorithm.
       </p>
 
       <figure>
-        <img 
-          id="distilled-model-hdfs" 
-          src="./images/hdfs_model.png" 
-          alt="An example of a distilled surrogate model state machine" 
+        <img
+          id="distilled-model-hdfs"
+          src="./images/hdfs_model.png"
+          alt="An example of a distilled surrogate model state machine"
           width="80%">
         <figcaption>
           A example of an extracted state machine model. In our publication we exemplify how
-          the extracted model can be used to debug the neural network, as well as predicting faults in the data that 
+          the extracted model can be used to debug the neural network, as well as predicting faults in the data that
           the language model was trained from.
         </figcaption>
       </figure>
@@ -356,23 +322,22 @@
       </p>
 
       <p>
-        This work presents a variation of our algorithm presented in 'PDFA Distillation with Error Bound Guarantees'. 
+        This work presents a variation of our algorithm presented in 'PDFA Distillation with Error Bound Guarantees'.
         This variant of the algorithm <b>infers transition probabilities</b> to build a model from the probability
         that a series of events occur. This enables the algorithm to work under different constraints. Proof of
         convergence of the inferred probabilities is provided.
       </p>
 
-
       <figure>
-        <img 
-          id="res-pdfa-with-prob" 
-          src="./images/res_pdfa_with_prob.png" 
-          alt="Results of our work 'PDFA Distillation via String Probability Queries'" 
+        <img
+          id="res-pdfa-with-prob"
+          src="./images/res_pdfa_with_prob.png"
+          alt="Results of our work 'PDFA Distillation via String Probability Queries'"
           width="100%">
         <figcaption>
-          Results on a dataset modeled for the recent 
-          <a href="https://remieyraud.github.io/TAYSIR/" target="_blank">TAYSIR competition</a>, contrasting with the actual 
-          winner of the competition. For more information consult the publication.  
+          Results on a dataset modeled for the recent
+          <a href="https://remieyraud.github.io/TAYSIR/" target="_blank">TAYSIR competition</a>, contrasting with the actual
+          winner of the competition. For more information consult the publication.
         </figcaption>
       </figure>
     </div>
@@ -394,25 +359,25 @@
 
       <p>
         In this unpublished work we originally explored machine learning algorithms to raise better alerts when
-        cyberattacks happen. Our algorithms were supposed to be working on the Netflow-capture level within 
-        a network. However, we quickly learned that the algorithm had much less of an impact on our detection 
+        cyberattacks happen. Our algorithms were supposed to be working on the Netflow-capture level within
+        a network. However, we quickly learned that the algorithm had much less of an impact on our detection
         performances compared with how we preprocessed the data. This has led us to instead investigate proper
-        preprocessing techniques, resulting in a <b>concrete pipeline and subsequent ablation studies</b>, with which 
-        we empirically show the impact of each of the preprocessing steps. 
+        preprocessing techniques, resulting in a <b>concrete pipeline and subsequent ablation studies</b>, with which
+        we empirically show the impact of each of the preprocessing steps.
       </p>
 
       <p>
         We did our study on multiple datasets and with multiple machine learning methods. In the end the
         preprocessing method performed best with a simple <a href="https://en.wikipedia.org/wiki/Autoencoder" target="_blank">
         autoencoder model</a>, which resulted in strong performance. The publication will be linked later,
-        perhaps after a simple arXiv upload. 
+        perhaps after a simple arXiv upload.
       </p>
 
       <figure>
-        <img 
-          id="res-preprocessing-in-cybersecurity" 
-          src="./images/preprocess_results.png" 
-          alt="Results of our work on preprocessing data for ML in cybersecurity" 
+        <img
+          id="res-preprocessing-in-cybersecurity"
+          src="./images/preprocess_results.png"
+          alt="Results of our work on preprocessing data for ML in cybersecurity"
           width="100%">
         <figcaption>
           Some results of the paper.
@@ -420,23 +385,3 @@
       </figure>
 
   </div>
-
-  <footer>
-      <div class="footer-div footer-left">
-          <b>Research</b>
-      </div>
-      <div class="footer-div">
-        <button class="btn" onclick="scrollToTop()"><i class="fa fa-house" aria-hidden="true">Scroll Up</i></button>
-      </div>
-      <div class="footer-div footer-right">
-          <b>Follow me: &nbsp;</b>
-          <a href="https://github.com/RobBa" target="_blank"><i class="bi bi-github"></i></a>
-          <a href="https://de.linkedin.com/in/robertbaumg" target="_blank"><i class="bi bi-linkedin"></i></a>
-          <a href="https://scholar.google.com/citations?user=_Ii4Of0AAAAJ&hl=en" target="_blank"><i class="ai ai-google-scholar"></i></a>
-          <a href="https://instagram.com/r_drops_photos?igshid=OGQ5ZDc2ODk2ZA==" target="_blank"><i class="bi bi-instagram"></i></a>
-      </div>
-  </footer>
-
-  </body>
-
-</html>

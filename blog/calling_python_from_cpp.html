@@ -1,47 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-
-  <head>
-    <meta charset="utf-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-    <title>Calling Python from C++ | Robert Baumgartner</title>
-    <!-- for icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" 
-      rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" 
-      crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
-
-    <!-- the buttons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" href="../styles.css">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com"> 
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> 
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
-
-    <script defer src="../code/scrolling.js"></script>
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script>hljs.highlightAll();</script>
-  </head>
-
-  <body>
-    <nav class="menu">
-      <a href="../index.html" class="idxelement">
-        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Home</button>
-      </a>
-      <a href="../research/" class="idxelement">
-        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Research</button>
-      </a>
-
-      <a href="./" class="idxelement">
-        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Blog</button>
-      </a>
-    </nav>
+---
+layout: default
+title: Calling Python scripts from within C++
+section: Python from C++
+highlight: true
+---
 
     <br>
 
@@ -87,44 +49,44 @@
     <div id="introduction-python-cpp" class="article-text-div">
 
       <h2>Introduction</h2>
-      
+
       <p>
-        In this article we explore how to call Python scripts from within C++ code, and how to 
-        send arguments and receive arguments back to C++. I have used this technique for some 
-        algorithmic implementations when I coded up the active learning library for the 
-        <a href="https://github.com/tudelft-cda-lab/FlexFringe" target="_blank">Flexfringe-tool</a>. 
+        In this article we explore how to call Python scripts from within C++ code, and how to
+        send arguments and receive arguments back to C++. I have used this technique for some
+        algorithmic implementations when I coded up the active learning library for the
+        <a href="https://github.com/tudelft-cda-lab/FlexFringe" target="_blank">Flexfringe-tool</a>.
       </p>
 
       <p>
-        In that implementation (currently found through source/active_learning) I once coded up 
+        In that implementation (currently found through source/active_learning) I once coded up
         algorithms to infer surrogate automata from neural networks. The flexfringe tool was written
-        in C++, however, writing a good and flexible inference framework for the neural networks 
-        including all the data management seemed intimidating, especially given how assumptions about 
+        in C++, however, writing a good and flexible inference framework for the neural networks
+        including all the data management seemed intimidating, especially given how assumptions about
         how data is being dished out changes quickly from dataset to dataset.
       </p>
 
       <p>
-        For applications like data science and machine learning Python simply remains king due to 
-        its flexibility and its ability to write relatively complex code with a few lines of code. 
-        Thus I decided to give my application some generic C++ interfaces, and leave the brunt of 
-        the neural network and data management in Python scripts. This way one only has to know which 
+        For applications like data science and machine learning Python simply remains king due to
+        its flexibility and its ability to write relatively complex code with a few lines of code.
+        Thus I decided to give my application some generic C++ interfaces, and leave the brunt of
+        the neural network and data management in Python scripts. This way one only has to know which
         C++ to use, and then adapt the Python script's input and output to the C++ interface.
       </p>
 
       <p>
         In this article you will learn how I did this, and therefore also a bit about CPython.
-        You will also hopefully learn a technique to make your life easier or build better systems. 
+        You will also hopefully learn a technique to make your life easier or build better systems.
         So let's dive in.
       </p>
 
       <figure>
-      <img 
+      <img
       id="calling-network-from-cpp"
-      class="blog-image" 
-      src="./calling_python_from_cpp/network_calls.png" 
+      class="blog-image"
+      src="./calling_python_from_cpp/network_calls.png"
       alt="Calling Python script from flexfringe">
       <figcaption>Simplified control flow of the application</figcaption>
-      </figure> 
+      </figure>
 
     </div>
 
@@ -133,68 +95,68 @@
     <div id="cpython-primer" class="article-text-div">
 
       <h2>CPython</h2>
-      
+
       <p>
-        I will give a small primer on CPython that will be enough to understand all the contents of 
-        this article. For a more thorough discussion please refer to 
+        I will give a small primer on CPython that will be enough to understand all the contents of
+        this article. For a more thorough discussion please refer to
         the <a href="https://docs.python.org/3/c-api/index.html" target="_blank">official documentation</a>.
       </p>
 
       <p>
-        <b>But what is CPython?</b> We already know that Python is an interpreter language. That 
-        means that unlike e.g. a C++ program a Python-script does not need to get compiled first 
+        <b>But what is CPython?</b> We already know that Python is an interpreter language. That
+        means that unlike e.g. a C++ program a Python-script does not need to get compiled first
         to be run on a machine. Instead, it will be translated into platform agnostic bytecode, and
         that bytecode will be executed by a piece of software called the Python interpreter. The Python
-        interpreter is usually implemented in C using its own library. We call this standard 
-        implementation of Python CPython. For the interested reader I have outlined the Python 
-        execution path below. 
+        interpreter is usually implemented in C using its own library. We call this standard
+        implementation of Python CPython. For the interested reader I have outlined the Python
+        execution path below.
       </p>
 
       <p>
         The rough execution flow when running a Python script is outlined
         in the figure below. At first a parser runs over the Python script. It tokenizes the script
-        and generates an abstract syntax tree (AST), that serves the compiler as input. The compiler 
+        and generates an abstract syntax tree (AST), that serves the compiler as input. The compiler
         translates the AST into bytecode, something that looks similar to assembly code, and caches
         the bytecode into .pyc files for a faster warmup next time the script is executed again.
         Lastly, the Python interpreter reads in the bytecode and executes it.
       </p>
 
       <figure>
-      <img 
+      <img
       id="python-execution-path"
-      class="blog-image" 
-      src="./calling_python_from_cpp/python_execution.png" 
+      class="blog-image"
+      src="./calling_python_from_cpp/python_execution.png"
       alt="Python execution path">
       <figcaption>Steps to run a Python-script</figcaption>
-      </figure> 
+      </figure>
     </div>
 
     <br>
-    
+
     <div id="setting-up-cpp-python-project" class="article-text-div">
       <h2>Setting up the project and importing the Python script</h2>
 
       <p>
         The basis for any object in CPython is the PyObject. We get access to this datatype by first
         including Python.h. To do so we have to tell the preprocessor where to find the Python includes.
-        In CMake this is done via <code>find_package(PythonLibs REQUIRED)</code>, and a subsequent 
+        In CMake this is done via <code>find_package(PythonLibs REQUIRED)</code>, and a subsequent
         <code>include_directories(${PYTHON_INCLUDE_DIRS})</code>. I note that I had trouble with this
-        on a new Apple-native-CPU MacBook, I refer to the CMake of Flexfringe in case that this is 
+        on a new Apple-native-CPU MacBook, I refer to the CMake of Flexfringe in case that this is
         what you are using. The CPython documentation further recommends us to copy-paste the line
         <code>#define PY_SSIZE_T_CLEAN</code> before including the Python header.
       </p>
 
       <p>
-        Once we have access to the Python headers we first have to run <code>Py_Initialize();</code>. 
+        Once we have access to the Python headers we first have to run <code>Py_Initialize();</code>.
         This line of code simply starts the Python interpreter, so we can issue
-        our first commands to the interpreter via <code>PyRun_SimpleString();</code>. I used this 
-        command to first import the os- and sys-modules in Python, so that I could manipulate the 
-        syspath of the interpreter to make sure it actually finds and can include my Python script 
+        our first commands to the interpreter via <code>PyRun_SimpleString();</code>. I used this
+        command to first import the os- and sys-modules in Python, so that I could manipulate the
+        syspath of the interpreter to make sure it actually finds and can include my Python script
         that I want to read from and write to. In my implementation this looked like the following:
       </p>
 
       <p>
-      <pre><code class="language-cpp">// init 
+      <pre><code class="language-cpp">// init
 Py_Initialize();<br>
 PyRun_SimpleString("import sys");<br>
 PyRun_SimpleString("import os");<br>
@@ -212,7 +174,7 @@ PyRun_SimpleString(cmd.str().c_str());<br>
       </p>
 
       <p>
-        We can now import the Python module and gain access to it, but first we need to understand 
+        We can now import the Python module and gain access to it, but first we need to understand
         how ownership and error handling work in CPython.
       </p>
     </div>
@@ -223,76 +185,76 @@ PyRun_SimpleString(cmd.str().c_str());<br>
       <h2>Ownership rules and error handling in CPython</h2>
 
       <p>
-        To understand the ownership rules we first have to have a look at the PyObject-type. In the 
+        To understand the ownership rules we first have to have a look at the PyObject-type. In the
         <a href="https://github.com/python/cpython/blob/main/Include/pytypedefs.h" target="_blank">
-          official source code</a> of CPython we find the typedef 
-        <code>typedef struct _object PyObject;</code>. Investigating the 
+          official source code</a> of CPython we find the typedef
+        <code>typedef struct _object PyObject;</code>. Investigating the
         <a href="https://github.com/python/cpython/blob/main/Include/object.h" target="_blank">
           _object struct</a> we find the following two properties:
-        
+
         <ul>
           <li><code>Py_ssize_t ob_refcnt; // could also have a different data type depending on flags</code></li>
           <li><code>PyTypeObject *ob_type;</code></li>
         </ul>
 
-        For us these two are interesting, as they reveal how CPython distinguishes between different data 
+        For us these two are interesting, as they reveal how CPython distinguishes between different data
         types, as well as the main idea of ownership, namely by reference counting. At runtime
-        the Python interpreter only sees a struct of type _object, masked through typedef PyObject. 
-        And since a C struct can be thought of as an ordered container of bits it knows exactly where 
+        the Python interpreter only sees a struct of type _object, masked through typedef PyObject.
+        And since a C struct can be thought of as an ordered container of bits it knows exactly where
         the reference count and the data type are stored.
       </p>
 
       <p>
-        The <b>rules for reference counts</b> can also be neatly found in the 
-        <a href="https://docs.python.org/3/c-api/intro.html#objects-types-and-reference-counts" 
-        target="_blank">CPython documentation</a>. Interesting for us is the rule to "never declare an 
+        The <b>rules for reference counts</b> can also be neatly found in the
+        <a href="https://docs.python.org/3/c-api/intro.html#objects-types-and-reference-counts"
+        target="_blank">CPython documentation</a>. Interesting for us is the rule to "never declare an
         automatic or static variable of type PyObject", because all PyObjects are allocated on the heap.
-        For us this means that we should always call a native CPython function when creating a 
-        CPython-object. Apart from that we want to point our attention towards the two macros 
+        For us this means that we should always call a native CPython function when creating a
+        CPython-object. Apart from that we want to point our attention towards the two macros
         <code>Py_INCREF(PyObject* p)</code> and <code>Py_DECREF(PyObject* p)</code>. Here, Py_INCREF()
         simply increases the reference count for the given object by one. Py_DECREF() decreases
-        the reference count by one, checks if it reached zero, and calls the deallocator function 
-        of the object if necessary, the CPython equivalent of a destructor in C++. For instance, 
-        the deallocator of a Python list makes sure that objects that it holds get processed when the 
-        list goes out of scope. 
+        the reference count by one, checks if it reached zero, and calls the deallocator function
+        of the object if necessary, the CPython equivalent of a destructor in C++. For instance,
+        the deallocator of a Python list makes sure that objects that it holds get processed when the
+        list goes out of scope.
       </p>
 
       <p>
-        Destruction of CPython objects works just as you'd expect then: Objects whose a reference count reaches 
+        Destruction of CPython objects works just as you'd expect then: Objects whose a reference count reaches
         zero are removed. Users who encountered cyclic owership used std::shared_ptr will recognize a problem here,
         which is solved by the garbage collector. It's job is to detect cycles and clean up objects participating in
-        in such when they are to be destroyed. C++ returns the responsibility of cleaning up cyclic ownership to the 
+        in such when they are to be destroyed. C++ returns the responsibility of cleaning up cyclic ownership to the
         programmer via a std::weak_ptr.
       </p>
 
       <p>
-        Because of the above we can say that the reference count is a proxy for ownership to an object. A 
-        caller receiving an object increases its count by one, and once it relinquishes ownership it 
-        decreases the count by one again. Pitfalls arise when functions 'steal' references. A notable 
+        Because of the above we can say that the reference count is a proxy for ownership to an object. A
+        caller receiving an object increases its count by one, and once it relinquishes ownership it
+        decreases the count by one again. Pitfalls arise when functions 'steal' references. A notable
         example mentioned in the documentation are <code>PyList_SetItem()</code> and
         <code>PyTuple_SetItem()</code>. These two populate a list or tuple in Python with objects,
-        assuming that ownership is handed from the caller to the list or tuple respectively. On the 
-        contrary, <code>PyList_GetItem()</code> does not pass ownership to the caller, while 
+        assuming that ownership is handed from the caller to the list or tuple respectively. On the
+        contrary, <code>PyList_GetItem()</code> does not pass ownership to the caller, while
         <code>PySequence_GetItem()</code> does. It is therefore important to read the documentation
         of the function whenever in doubt, or risk segfaults or memory-leaks.
       </p>
-      
+
       <p>
-        <b>Error handling</b> is much simpler to understand than reference counting: Exception-states are 
-        stored on a per-thread basis, and the occurence of an exception can be checked via 
+        <b>Error handling</b> is much simpler to understand than reference counting: Exception-states are
+        stored on a per-thread basis, and the occurence of an exception can be checked via
         <code>PyErr_Occurred()</code>. Additionally, typically functions of the CPython-API will
-        have a return value. Usually, the return value can be checked on <code>NULL</code>, 
+        have a return value. Usually, the return value can be checked on <code>NULL</code>,
         which typically indicates that an error occured.
       </p>
 
       <figure>
-      <img 
+      <img
       id="memory-management-cpp-vs-cpython"
-      class="blog-image" 
-      src="./calling_python_from_cpp/cpp_vs_python.png" 
+      class="blog-image"
+      src="./calling_python_from_cpp/cpp_vs_python.png"
       alt="C++ vs CPython memory model">
       <figcaption>Contrasting ownership and memory management of C++ and CPython</figcaption>
-      </figure> 
+      </figure>
 
     </div>
 
@@ -303,14 +265,14 @@ PyRun_SimpleString(cmd.str().c_str());<br>
 
       <p>
         Now that we understand memory-management and error handling, we can load our Python code
-        into our C++ program. To do so, first we need to load the Python module. We first translate 
-        our <code>std::string PYTHON_MODULE_NAME; // the full path</code> into a PyObject via 
+        into our C++ program. To do so, first we need to load the Python module. We first translate
+        our <code>std::string PYTHON_MODULE_NAME; // the full path</code> into a PyObject via
         <code>PyObject* p_name = PyUnicode_FromString(PYTHON_MODULE_NAME.c_str());</code>.
         We want to perform error checking: <code>if (p_name == NULL){//handle error}</code>.
-        We then import the module via <code>PyObject* p_module = PyImport_Import(p_name);</code>, 
-        and we do error checking again. Next we want to get a function pointer for our 
-        Python function. We assume the following function (a function that actually exists 
-        <a href="https://github.com/tudelft-cda-lab/FlexFringe/tree/main/source/active_learning/system_under_learning/neural_network_suls" 
+        We then import the module via <code>PyObject* p_module = PyImport_Import(p_name);</code>,
+        and we do error checking again. Next we want to get a function pointer for our
+        Python function. We assume the following function (a function that actually exists
+        <a href="https://github.com/tudelft-cda-lab/FlexFringe/tree/main/source/active_learning/system_under_learning/neural_network_suls"
         target="_blank">in our code</a>, and that we use to query the output of neural networks):
       </p>
 
@@ -322,10 +284,10 @@ PyRun_SimpleString(cmd.str().c_str());<br>
       <br>
 
       <p>
-        We can load this function as a function pointer via <code>PyObject* query_func = 
-        PyObject_GetAttrString(p_module, "do_query");</code>. This time we also want to 
+        We can load this function as a function pointer via <code>PyObject* query_func =
+        PyObject_GetAttrString(p_module, "do_query");</code>. This time we also want to
         make sure that we actually do have a function, therefore we do an extra check. For brevity
-        purposes here is an example for the full error handling of this call (obviously there 
+        purposes here is an example for the full error handling of this call (obviously there
         is some boilerplate in CPython):
       </p>
 
@@ -346,30 +308,30 @@ if (query_func == NULL || !PyCallable_Check(query_func)) {<br>
 
       <p>
         Lastly we want to call the Python script and translate its return value back into a C++
-        native array in the form of an <code>std::vector&lt;int&gt;</code>. Assume we have a 
-        C++ list <code>vector&lt;int&gt; cpp_list;</code>, and we want to send it. Firstly 
-        we need to create a new <a href="https://docs.python.org/3/c-api/list.html" target="_blank">Python list</a>: 
-        <code>PyObject* p_list = PyList_New(cpp_list.size())</code>. We then have to use 
-        <code>PyList_SET_ITEM()</code> to populate the newly allocated Python-list, where we 
-        first need to thoroughly translate each value of our C++ list into a PyObject via 
+        native array in the form of an <code>std::vector&lt;int&gt;</code>. Assume we have a
+        C++ list <code>vector&lt;int&gt; cpp_list;</code>, and we want to send it. Firstly
+        we need to create a new <a href="https://docs.python.org/3/c-api/list.html" target="_blank">Python list</a>:
+        <code>PyObject* p_list = PyList_New(cpp_list.size())</code>. We then have to use
+        <code>PyList_SET_ITEM()</code> to populate the newly allocated Python-list, where we
+        first need to thoroughly translate each value of our C++ list into a PyObject via
         <code>PyLong_FromLong()</code>.
       </p>
 
       <p>
-        Once that it done we can call our function via 
+        Once that it done we can call our function via
         <code>PyObject_CallOneArg()</code> and get the argument back as a PyObject-pointer,
         as per usual. The CPython-API provides multiple functions for calling Python methods,
-        out of which the one with the most fitting signature should be used. For us, since we had only one 
-        argument, this one was the best. A list of all the possible function calls can be found on 
+        out of which the one with the most fitting signature should be used. For us, since we had only one
+        argument, this one was the best. A list of all the possible function calls can be found on
         <a href="https://docs.python.org/3/c-api/call.html#object-calling-api" target="_blank">
         the documentation</a>.
       </p>
 
       <p>
-        Once we received our result we want to do some error checking, and subsequently translate it back to 
+        Once we received our result we want to do some error checking, and subsequently translate it back to
         our C++ vector format. We also have to remember to free the space occupied by our code holding the
         newly created Python objects that we used as calling arguments, and whose ownership was transferred to
-        us from the Python script. The code snippet below exemplary shows how all this is done. For brevity 
+        us from the Python script. The code snippet below exemplary shows how all this is done. For brevity
         purposes we omit the error checking when translating our vector to a Python list and back.
       </p>
 
@@ -380,7 +342,7 @@ for(int i=0; i&lt;cpp_list.size(); i++){<br>
 &nbsp; &nbsp; // some error checking here<br>
 &nbsp; &nbsp; PyList_SET_ITEM(p_list, i, p_int); // this function does no error checking<br>
 }
-        
+
 // step 2: call function and check for errors<br>
 PyObject* p_result = PyObject_CallOneArg(query_func, p_list);<br>
 if (p_result == NULL || !PyList_Check(p_result)){ // PyList_Check() to see if we got expected return type<br>
@@ -397,7 +359,7 @@ for(int i=0; i&lt;query_traces.size(); i++){<br>
 &nbsp; &nbsp; // you can check the output p_type here for additional code safety<br>
 &nbsp; &nbsp; res[i] = PyLong_AsLong(p_type); // we expect int-values from Python <br>
 }<br>
-                
+
 // step 4: free up space to avoid memory leaks<br>
 Py_DECREF(p_list);<br>
 Py_DECREF(p_result);
@@ -408,15 +370,15 @@ Py_DECREF(p_result);
       <h2>Multithreading</h2>
 
       <p>
-        While the above works well in most of the cases it omits one critical use case: <b>What if multiple 
-        threads want to access the Python interpreter at the same time?</b> The answer is that in general the 
-        Python interpreter is not thread safe. For instance, when accessing the same recourses and there is 
-        a write operation involved, race conditions can occur. Race conditions can also occur on ownership 
+        While the above works well in most of the cases it omits one critical use case: <b>What if multiple
+        threads want to access the Python interpreter at the same time?</b> The answer is that in general the
+        Python interpreter is not thread safe. For instance, when accessing the same recourses and there is
+        a write operation involved, race conditions can occur. Race conditions can also occur on ownership
         itself, leading to false reference counts, hecne memory leaks or segfaults.
       </p>
 
       <p>
-        The solution Python proposes is the Global Interpreter Lock (GIL). In our example, when calling the 
+        The solution Python proposes is the Global Interpreter Lock (GIL). In our example, when calling the
         script, holding the GIL would look like this:
       </p>
 
@@ -430,32 +392,32 @@ Py_DECREF(p_result); <br>
 </code></pre>
 
       <p>
-        The experienced programmer will immediately see two caveats in this design: Firstly, we process the 
-        result after releasing the lock. This design assumes that the calling thread is the owner of result 
-        now. In our example in the beginning result is a return value of a function call, therefore it this 
-        design is safe. But in case the Python script or some other instance holds a reference to exactly the 
+        The experienced programmer will immediately see two caveats in this design: Firstly, we process the
+        result after releasing the lock. This design assumes that the calling thread is the owner of result
+        now. In our example in the beginning result is a return value of a function call, therefore it this
+        design is safe. But in case the Python script or some other instance holds a reference to exactly the
         same object we incur race conditions, therefore need to process the result before releasing the lock.
       </p>
-        
+
       <p>
-        Secondly, the multithreading runs only in the C++ code we're using, but only one thread per time is allowed 
-        to access the interpreter. This means that true parallelism is not possible on the Python side with this 
-        design. And while one process can 
-        hold multiple Python interpreters, they share the same GIL as of 
+        Secondly, the multithreading runs only in the C++ code we're using, but only one thread per time is allowed
+        to access the interpreter. This means that true parallelism is not possible on the Python side with this
+        design. And while one process can
+        hold multiple Python interpreters, they share the same GIL as of
         <a href="https://docs.python.org/3.12/c-api/init.html#thread-state-and-the-global-interpreter-lock"
          target="_blank">
           Python 3.12
-        </a>. According to the documentation, the functions <code>PyGILState_Ensure()</code> and 
-        <code>PyGILState_Release()</code> do not work well when multiple interpreters exist within the 
+        </a>. According to the documentation, the functions <code>PyGILState_Ensure()</code> and
+        <code>PyGILState_Release()</code> do not work well when multiple interpreters exist within the
         same process, meaning that true parallelism can only be reached via actual multiprocessing.
       </p>
-      
+
       <p>
-        To solve the problem above, <code>PyGILState_Ensure()</code> and <code>PyGILState_Release()</code> 
+        To solve the problem above, <code>PyGILState_Ensure()</code> and <code>PyGILState_Release()</code>
         were move to the Legacy API in the newest Python release as of today,
-        <a href="https://docs.python.org/3/c-api/threads.html"  target="_blank">Python 3.14.3</a>, 
-        and newer functions have been introduced to solve the conundrum. I will leave it up to the 
-        reader to get familiar with them if needed, at this point it is sufficient to know that updates exist to 
+        <a href="https://docs.python.org/3/c-api/threads.html"  target="_blank">Python 3.14.3</a>,
+        and newer functions have been introduced to solve the conundrum. I will leave it up to the
+        reader to get familiar with them if needed, at this point it is sufficient to know that updates exist to
         solve the problem of parallelism.
       </p>
 
@@ -465,32 +427,12 @@ Py_DECREF(p_result); <br>
       <h2>Summary</h2>
 
       <p>
-        That concludes our brief tutorial. We touched upon various topics and aspects of safely calling 
-        Python code from within C++, such as compilation, memory management, error handling, initialization and the 
-        CPython calling API, and multithreading. This enables us to play out the strengths of both languages. 
-        For a thorough example of how I used this technique I refer to 
-        <a href="https://github.com/tudelft-cda-lab/FlexFringe/tree/main/source/active_learning/system_under_learning/neural_network_suls" 
-        target="_blank">this project</a>. For feedback or questions please do not hesitate to contact me, e.g. 
+        That concludes our brief tutorial. We touched upon various topics and aspects of safely calling
+        Python code from within C++, such as compilation, memory management, error handling, initialization and the
+        CPython calling API, and multithreading. This enables us to play out the strengths of both languages.
+        For a thorough example of how I used this technique I refer to
+        <a href="https://github.com/tudelft-cda-lab/FlexFringe/tree/main/source/active_learning/system_under_learning/neural_network_suls"
+        target="_blank">this project</a>. For feedback or questions please do not hesitate to contact me, e.g.
         via <a href="https://de.linkedin.com/in/robertbaumg" target="_blank">LinkedIn</a>.
       </p>
     </div>
-
-    <footer>
-        <div class="footer-div footer-left">
-            <b>Python from C++</b>
-        </div>
-        <div class="footer-div">
-          <button class="btn" onclick="scrollToTop()"><i class="fa fa-house" aria-hidden="true">Scroll Up</i></button>
-        </div>
-        <div class="footer-div footer-right">
-            <b>Follow me: &nbsp;</b>
-            <a href="https://github.com/RobBa" target="_blank"><i class="bi bi-github"></i></a>
-            <a href="https://de.linkedin.com/in/robertbaumg" target="_blank"><i class="bi bi-linkedin"></i></a>
-            <a href="https://scholar.google.com/citations?user=_Ii4Of0AAAAJ&hl=en" target="_blank"><i class="ai ai-google-scholar"></i></a>
-            <a href="https://instagram.com/r_drops_photos?igshid=OGQ5ZDc2ODk2ZA==" target="_blank"><i class="bi bi-instagram"></i></a>
-        </div>
-    </footer>
-
-  </body>
-
-</html>

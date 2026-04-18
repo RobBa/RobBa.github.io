@@ -1,54 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-
-  <head>
-    <meta charset="utf-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-    <title>Proving PAC Bounds | Robert Baumgartner</title>
-    <!-- for icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" 
-      rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" 
-      crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
-
-    <!-- the buttons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" href="../styles.css">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com"> 
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> 
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
-
-    <script defer src="../code/scrolling.js"></script>
-
-    <script>
-      window.MathJax = {
-        tex: {
-          inlineMath: [['$', '$'], ['\\(', '\\)']],
-          displayMath: [['$$', '$$'], ['\\[', '\\]']]
-        }
-      };
-    </script>
-
-    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js"></script>
-  </head>
-
-  <body>
-    <nav class="menu">
-      <a href="../index.html" class="idxelement">
-        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Home</button>
-      </a>
-      <a href="../research/" class="idxelement">
-        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Research</button>
-      </a>
-
-      <a href="./" class="idxelement">
-        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Blog</button>
-      </a>
-    </nav>
+---
+layout: default
+title: Proving formal PAC-bounds
+section: PAC-bounds
+mathjax: true
+---
 
     <br>
 
@@ -89,47 +44,47 @@
     <div id="introduction-proving-pac-bounds" class="article-text-div">
 
       <h2>Introduction</h2>
-      
+
       <p>
         In our publication <a href="https://proceedings.mlr.press/v217/baumgartner23a.html" target="_blank">
             Learning state machines from data streams: A generic strategy and an improved heuristic
-        </a> we introduced an algorithm learning probabilistic automata from data streams. Probabilistic 
-        means that parsing the automaton with a string will yield its probability to occur, information 
-        that is interesting when identifying rare events of the data stream. Rare events are intesting 
-        in the domain of anomaly detection and can e.g. pose network threats on a network or rare 
+        </a> we introduced an algorithm learning probabilistic automata from data streams. Probabilistic
+        means that parsing the automaton with a string will yield its probability to occur, information
+        that is interesting when identifying rare events of the data stream. Rare events are intesting
+        in the domain of anomaly detection and can e.g. pose network threats on a network or rare
         execution traces in software systems.
       </p>
 
       <p>
-        However, a problem of the algorithm is how to know how close its estimates actually are 
-        to the real distribution. Statistics tells us that the more samples we gather 
+        However, a problem of the algorithm is how to know how close its estimates actually are
+        to the real distribution. Statistics tells us that the more samples we gather
         <a href="https://en.wikipedia.org/wiki/Central_limit_theorem">the more certain we can be about
-        our predictions</a>. Therefore, the more samples a node in our automaton sees the more likely 
+        our predictions</a>. Therefore, the more samples a node in our automaton sees the more likely
         its predicted probabilities will resemble the true probabilities, but we can never be certain.
         This is a problem inherent to machine learning frameworks and has been studied by famous statisticians
         such as Vladimir Vapnik and Alexey Chervonenkis, who are famous for their VC-dimension, a concept of
-        <a href="https://www.mit.edu/~6.454/www_spring_2001/emin/slt.pdf">statistical learning theory</a>. 
+        <a href="https://www.mit.edu/~6.454/www_spring_2001/emin/slt.pdf">statistical learning theory</a>.
       </p>
 
       <p>
-        Another approach to estimate the learning capacity of a statistical learner is a formal proof of 
-        PAC-bounds (PAC=Probably Approximately Correct). We take this approach to show the correctness 
-        of our algorithm in the extended version of our publication, found 
+        Another approach to estimate the learning capacity of a statistical learner is a formal proof of
+        PAC-bounds (PAC=Probably Approximately Correct). We take this approach to show the correctness
+        of our algorithm in the extended version of our publication, found
         <a href="https://arxiv.org/pdf/2604.02244" target="_blank">
           here
-        </a>. However, because the proof is long and has lots of mathematical details I outline its main ideas 
-        and steps in this blog post. For simplicity I use the same notation as in the paper, thus this blogpost 
-        is a complemetary piece to the original proof. With that said, let's dive in with the definition of 
+        </a>. However, because the proof is long and has lots of mathematical details I outline its main ideas
+        and steps in this blog post. For simplicity I use the same notation as in the paper, thus this blogpost
+        is a complemetary piece to the original proof. With that said, let's dive in with the definition of
         PAC-bounds and why we use them.
       </p>
 
       <figure>
-        <img 
-        id="pac-bounds-pdfa-example" 
-        src="./showing_fomal_pac_bounds/hdfs_model.png" 
+        <img
+        id="pac-bounds-pdfa-example"
+        src="./showing_fomal_pac_bounds/hdfs_model.png"
         alt="Example PDFA">
         <figcaption>
-          Example of a model we once learned. Traversing the graph yields probabilities of related events 
+          Example of a model we once learned. Traversing the graph yields probabilities of related events
           happening, and we want to error bound these probabilities, making sure that the result is correct.
         </figcaption>
       </figure>
@@ -138,47 +93,47 @@
     <div id="pac-bounds" class="article-text-div">
 
       <h2>Definition of PAC-bounds</h2>
-      
+
       <p>
-        Why proving PAC-bounds? Usually when developing algorithms the developer will provide a proof 
-        of correctness. This is a formal proof using mathematical methods showing that an algorithm 
+        Why proving PAC-bounds? Usually when developing algorithms the developer will provide a proof
+        of correctness. This is a formal proof using mathematical methods showing that an algorithm
         outputs the correct result for each input that it is designed for. In other words, a proof
-        of correctness shows that an algorithm works and gives correct output.However, many algorithms, 
-        including many machine learning algorithms, rely on statistics, and there is no such thing as a 
-        correct input and a corresponding correct output. Therefore, proofs of correctness are hard to 
+        of correctness shows that an algorithm works and gives correct output.However, many algorithms,
+        including many machine learning algorithms, rely on statistics, and there is no such thing as a
+        correct input and a corresponding correct output. Therefore, proofs of correctness are hard to
         define for such algorithms.
       </p>
 
       <p>
-        PAC-bounds aim to close this gap. They are a statistical framework that provides statistical guarantees 
-        on the goodness of the approximation quality a learning algorithm can achieve, given it sees enough samples. 
-        More formally, the definition of PAC-bounds are as follows: 
+        PAC-bounds aim to close this gap. They are a statistical framework that provides statistical guarantees
+        on the goodness of the approximation quality a learning algorithm can achieve, given it sees enough samples.
+        More formally, the definition of PAC-bounds are as follows:
       </p>
 
       <p>
-        <b>Definition:</b> The Probably Approximately Correct (PAC) learning framework is 
-        a framework to analyze machine learning algorithms. Formally, we are given a class of distributions 
-        $\mathcal{D}$ over some set $X$, where $X$ remains fixed. A machine learning algorithm then PAC-learns 
-        $\mathcal{D}$ if for each $\delta>0$ and each $\epsilon > 0$ the algorithm takes $S(\frac{1}{\epsilon}, 
-        \frac{1}{\delta}, |D|)$ i.i.d. drawn samples from a $D \in \mathcal{D}$ and returns a hypothesis $H$ s.t. 
-        $L_1(D, H) \leq \epsilon$. In this notation, $|D|>0$ is a measure of complexity over $\mathcal{D}$. We 
-        say a PAC learner is efficient if $S( \cdot )$ and $T( \cdot )$ are polynomial in all their respective 
+        <b>Definition:</b> The Probably Approximately Correct (PAC) learning framework is
+        a framework to analyze machine learning algorithms. Formally, we are given a class of distributions
+        $\mathcal{D}$ over some set $X$, where $X$ remains fixed. A machine learning algorithm then PAC-learns
+        $\mathcal{D}$ if for each $\delta>0$ and each $\epsilon > 0$ the algorithm takes $S(\frac{1}{\epsilon},
+        \frac{1}{\delta}, |D|)$ i.i.d. drawn samples from a $D \in \mathcal{D}$ and returns a hypothesis $H$ s.t.
+        $L_1(D, H) \leq \epsilon$. In this notation, $|D|>0$ is a measure of complexity over $\mathcal{D}$. We
+        say a PAC learner is efficient if $S( \cdot )$ and $T( \cdot )$ are polynomial in all their respective
         parameters.
       </p>
 
       <p>
-        $L_1$ in this definition is the $L_1$-distance, which is a measure for the 
-        maximum sum of errors the output $H$ produces when compared with $D$. This definition essentially tells us 
-        that if we have a PAC-learner, and we let it learn a problem, then the learner learns the target distribution 
-        $D$ with a maximum sum of errors of $\epsilon$, for any chosen maximum error $\epsilon$, with a probability 
-        $1-\delta$, if samples are provided i.i.d. from the target distribution. Pretty cool I'd say. 
+        $L_1$ in this definition is the $L_1$-distance, which is a measure for the
+        maximum sum of errors the output $H$ produces when compared with $D$. This definition essentially tells us
+        that if we have a PAC-learner, and we let it learn a problem, then the learner learns the target distribution
+        $D$ with a maximum sum of errors of $\epsilon$, for any chosen maximum error $\epsilon$, with a probability
+        $1-\delta$, if samples are provided i.i.d. from the target distribution. Pretty cool I'd say.
       </p>
 
       <figure>
-      <img 
+      <img
       id="pac-bounds-graph"
-      class="blog-image" 
-      src="./showing_fomal_pac_bounds/pac-bounds-graph.png" 
+      class="blog-image"
+      src="./showing_fomal_pac_bounds/pac-bounds-graph.png"
       alt="Concept of how we will show the bounds">
       <figcaption>Steps for proof of PAC-bounds, from bottom to top.</figcaption>
       </figure>
@@ -187,59 +142,58 @@
 
     <div id="pac-bounds-cms" class="article-text-div">
       <h2>Bounds on Count-Min-Sketches</h2>
-      
+
       <p>
-        In order to show formal PAC-bounds we have to build them from the ground up, as shown in the figure above. 
-        We have to start with the smallest unit of operation in our algorithm, show that we can probabilistically bound the error 
-        they produce, and move it up layer by layer until we cover the whole algorithm. In our publication we chose Count-Min-Sketches 
+        In order to show formal PAC-bounds we have to build them from the ground up, as shown in the figure above.
+        We have to start with the smallest unit of operation in our algorithm, show that we can probabilistically bound the error
+        they produce, and move it up layer by layer until we cover the whole algorithm. In our publication we chose Count-Min-Sketches
         (CMS) as the most basic data structure. Hence, we first have to show that the CMS and the operations we perform on them are bounded.
         We store samples distributions in the CMS and test with the Hoeffding-bound whether the two sampled distributions are
         equal or not. If the sampled distribution satisfies
 
         <br>
-        
+
         $$\left| \frac{\hat{c}_{\sigma_{q_1}}}{n_{q_1}} - \frac{\hat{c}_{\sigma_{q_2}}}{n_{q_2}} \right| > \sqrt{\frac{1}{2}log
         \left(\frac{2}{\alpha}\right)}\left(\frac{1}{\sqrt{n_{q_1}}}+\frac{1}{\sqrt{n_{q_2}}}\right),$$
 
-        
-        then the two distributions are considered equal. When using CMS it needs to be noted that the data structure 
+
+        then the two distributions are considered equal. When using CMS it needs to be noted that the data structure
         works similar to a multimap. But unlike a multimap it does not return exact counts, instead approximate counts. It is thus
         a memory saving data structure to count elements of a data stream, where the cardinality of elements to store is either unknown before
-        runtime, or simply too large. Hence, when drawing sampled statistics from a CMS we get an induced error from estimating the sampled counts. 
+        runtime, or simply too large. Hence, when drawing sampled statistics from a CMS we get an induced error from estimating the sampled counts.
       </p>
 
       <p>
         Since only the left hand side of the Hoeffding-bound depends on the statistics we draw, and the right hand side is only dependent
-        on the total size of samples it suffices to show that the left hand side is error bounded. If the error on the left hand side is 
-        zero, the sampled frequencies are the real ones and the approximation effect of the CMS is zero. We can make two kinds of mistakes 
+        on the total size of samples it suffices to show that the left hand side is error bounded. If the error on the left hand side is
+        zero, the sampled frequencies are the real ones and the approximation effect of the CMS is zero. We can make two kinds of mistakes
         here: We can overestimate or underestimate the true value on the left hand side of the equation. We start bounding the overestimation:
       </p>
 
       <br>
 
       <p>
-        <b>Theorem 1:</b> Given the parameters ($\beta$, $\gamma$), and given two CMS whose width $w$ and depth $d$ of a CMS assume 
-        $w=\left\lceil{\frac{e}{\beta}}\right\rceil$ and $d=\left\lceil{\ln \frac{1}{\gamma}}\right\rceil$. The error on the left hand 
+        <b>Theorem 1:</b> Given the parameters ($\beta$, $\gamma$), and given two CMS whose width $w$ and depth $d$ of a CMS assume
+        $w=\left\lceil{\frac{e}{\beta}}\right\rceil$ and $d=\left\lceil{\ln \frac{1}{\gamma}}\right\rceil$. The error on the left hand
         side of the Hoeffding-test is upper-bounded by $\beta$ with probability at least $1-2\gamma$.
       </p>
 
       <br>
 
-
       <p>In order to proof the theorem we start with the error bounds on the CMS given by the
         <a href="https://dsf.berkeley.edu/cs286/papers/countmin-latin2004.pdf" target="_blank">
-          original authors of the data structure 
+          original authors of the data structure
         </a>, and we define a new random variable from their approach using indicator variables. Subsequently we use the Markov bound
         $$ P(X>a) \leq \frac{E(X)}{a} $$
-        to bound the random variable, showing that the divergence from the expectation value of the left hand side of the Hoeffding test above 
-        is bounded. However, this proof only works when the left hand side's term before taking the absolute value is larger than or equal to 
+        to bound the random variable, showing that the divergence from the expectation value of the left hand side of the Hoeffding test above
+        is bounded. However, this proof only works when the left hand side's term before taking the absolute value is larger than or equal to
         zero. Next we bound the case of underestimating the left hand side:
       </p>
 
       <br>
 
       <p>
-        <b>Theorem 2:</b> With a probability of at least $1-2\gamma$ the left hand side of the Hoeffding-test with CMS is not underestimated by an offset 
+        <b>Theorem 2:</b> With a probability of at least $1-2\gamma$ the left hand side of the Hoeffding-test with CMS is not underestimated by an offset
         larger than $\beta$.
       </p>
 
@@ -259,17 +213,17 @@
       </p>
 
       <figure>
-      <img 
+      <img
       id="pac-bounds-cms-to-test"
-      class="blog-image" 
-      src="./showing_fomal_pac_bounds/cms-to-statistical-test.png" 
+      class="blog-image"
+      src="./showing_fomal_pac_bounds/cms-to-statistical-test.png"
       alt="CMS to statistical test">
       <figcaption>Comparing two states. Each state has one CMS, through which we can retrieve a sampled distribution
-        over input words. The two distributions are then compared through a statistical test. Mistakes can happen in the 
+        over input words. The two distributions are then compared through a statistical test. Mistakes can happen in the
         statistical test and in retrieving the sampled distributions.
       </figcaption>
       </figure>
-      
+
     </div>
 
     <br>
@@ -278,18 +232,18 @@
       <h2>Bounds on statistical test</h2>
 
       <p>
-        Having bound the error on the CMS data structure, knowing what can happen when we approximate the sampled distributions, rather than having the actual one, 
+        Having bound the error on the CMS data structure, knowing what can happen when we approximate the sampled distributions, rather than having the actual one,
         we can move toward seeing what happens when we want to perform the actual statistical test on them. We will also have to reason about
         how many samples to read in order to get good statistics in first place. We start with wondering about how many samples to read for a state to even get created.
         The following theorem gives us no precise answer, but an intuition of how data samples from the data stream propagate through the tree representing the unmerged
-        automaton:  
+        automaton:
       </p>
 
       <br>
 
       <p>
-        <b>Theorem 3:</b> Given batch-size $B$, upper bound on state $n$, and $p_{min}$ the minimum transition probability 
-        $\lambda_{min}=\min_{i, j} \lambda(q_i, a_j)$. The algorithm reads $\mathcal{O}(nBN_{max})$ samples from the stream, where 
+        <b>Theorem 3:</b> Given batch-size $B$, upper bound on state $n$, and $p_{min}$ the minimum transition probability
+        $\lambda_{min}=\min_{i, j} \lambda(q_i, a_j)$. The algorithm reads $\mathcal{O}(nBN_{max})$ samples from the stream, where
         $\mathbb{E}[|\lambda(q', a')|] = N_{max} \cdot \lambda_{min}$, with $q', a'$ chosen s.t. $\lambda_{min}=\lambda(q', a')$.
       </p>
 
@@ -297,19 +251,19 @@
 
       <p>
         Here, $n$ is an upper bound on the states that are expected of the final automaton (technically we do not need this)
-        in a practical scenario, but we need it to show PAC-bounds, see 
+        in a practical scenario, but we need it to show PAC-bounds, see
         <a href="https://www.cs.ox.ac.uk/people/paul.goldberg/papers/alt05.pdf" target="_blank">
           this publication
         </a>
-        by Palmer and Goldberg (which has greatly served as a guideline for me while constructing my own proof). What this means essentially is that 
-        we know that there must a minimum non-zero transition probability within the automaton. Once we know that transition probability we can define an 
-        expected constant proportional to the inverse of the minimum probability, and then the maximum number of expected samples grows linearly in 
-        the number of states and the batch size. While not needed for the remainder, it is still nice to know that we can bound how many i.i.d. samples 
-        the algorithm needs. The proof follows again via the Markov bound and proof by induction. 
+        by Palmer and Goldberg (which has greatly served as a guideline for me while constructing my own proof). What this means essentially is that
+        we know that there must a minimum non-zero transition probability within the automaton. Once we know that transition probability we can define an
+        expected constant proportional to the inverse of the minimum probability, and then the maximum number of expected samples grows linearly in
+        the number of states and the batch size. While not needed for the remainder, it is still nice to know that we can bound how many i.i.d. samples
+        the algorithm needs. The proof follows again via the Markov bound and proof by induction.
       </p>
 
       <p>
-        With that in mind we move on bounding the probability of 
+        With that in mind we move on bounding the probability of
         making a mistake in the statistical test. An error can either be a false reject (should merge those two states, but choose not to), or a false accept
         (should not merge those two states, but actually choose to merge). We first look at the probability of a false reject when the CMS are correct:
       </p>
@@ -317,7 +271,7 @@
       <br>
 
       <p>
-        <b>Theorem 4:</b> Given the Hoeffding-test as defined earlier, and assuming no collisions happened in the CMS, then the probability  of a false reject 
+        <b>Theorem 4:</b> Given the Hoeffding-test as defined earlier, and assuming no collisions happened in the CMS, then the probability  of a false reject
         is kept below $2\alpha$.
       </p>
 
@@ -335,47 +289,47 @@
       <br>
 
       <p>
-        <b>Definition 1:</b> We call two distributions $D_1$ and $D_2$ $\mu$-distinguishable when $L_{\infty}^p(D_1, D_2) \geq \mu$. We call a PDFA $T$ $\mu$-distinguishable when 
-        $\forall q_1, q_2\in T: L_{\infty}^p\left(D_{q1}, D_{q2}\right) \geq \mu$. 
+        <b>Definition 1:</b> We call two distributions $D_1$ and $D_2$ $\mu$-distinguishable when $L_{\infty}^p(D_1, D_2) \geq \mu$. We call a PDFA $T$ $\mu$-distinguishable when
+        $\forall q_1, q_2\in T: L_{\infty}^p\left(D_{q1}, D_{q2}\right) \geq \mu$.
       </p>
 
       <br>
 
       <p>
-        This definition simply tells us that we use a threshold, and if the maximum distance is larger than it we say the distributions are not the same. We call this threshold 
-        $\mu$, and we want it to be the maximum induced distance between two distributions. Now with that definition we can go to the following, more interesting theorem 
+        This definition simply tells us that we use a threshold, and if the maximum distance is larger than it we say the distributions are not the same. We call this threshold
+        $\mu$, and we want it to be the maximum induced distance between two distributions. Now with that definition we can go to the following, more interesting theorem
         about the bound for a false accept:
       </p>
 
       <br>
 
       <p>
-        <b>Theorem 5:</b> Assuming the target PDFA we are trying to learn is $\mu$-distinguishable, there exists a minimum sample size $m_0$ per state such that the probability 
+        <b>Theorem 5:</b> Assuming the target PDFA we are trying to learn is $\mu$-distinguishable, there exists a minimum sample size $m_0$ per state such that the probability
         of a false accept per state-pair is bounded by $\frac{\delta'}{2n^2|\Sigma|^2}$ under the assumption of no collisions.
       </p>
 
       <br>
 
       <p>
-        Assuming that the target PDFA is $\mu$-distinguishable is a reasonable assumption and a simple mathemcatical formulation. The proof for this theorem follows by first 
-        modeling the variance term using the indicator variables used earlier too, and then bounding it using Cauchy-Schwarz. Subsequently using the Chebychev-Cantelly inequality 
+        Assuming that the target PDFA is $\mu$-distinguishable is a reasonable assumption and a simple mathemcatical formulation. The proof for this theorem follows by first
+        modeling the variance term using the indicator variables used earlier too, and then bounding it using Cauchy-Schwarz. Subsequently using the Chebychev-Cantelly inequality
         for the lower tail
 
         $$P(X - \mathbb{E}[X] \leq -\lambda) \leq \frac{Var(X)}{Var(X) + \lambda^2},$$
 
-        with $Var(X)$ being the variance we earlier bounded, we get the result using a clever substitute for $\lambda$. 
+        with $Var(X)$ being the variance we earlier bounded, we get the result using a clever substitute for $\lambda$.
       </p>
 
       <p>
-        After that we have to 
-        move the CMS back into the picture. We already know that we can bound the error on the CMS, and we know what happens when they do not do any mistakes. The following theorems 
+        After that we have to
+        move the CMS back into the picture. We already know that we can bound the error on the CMS, and we know what happens when they do not do any mistakes. The following theorems
         describe what happens when they actually do make mistakes, starting with false accepts:
       </p>
 
       <br>
 
       <p>
-        <b>Theorem 6:</b> Given the Hoeffding-test and given two frequencies estimated via CMS, allowing for collisions. Then the probability of a false accept under an updated Hoeffding-bound 
+        <b>Theorem 6:</b> Given the Hoeffding-test and given two frequencies estimated via CMS, allowing for collisions. Then the probability of a false accept under an updated Hoeffding-bound
         $\sqrt{\frac{1}{2}log\left(\frac{2}{\alpha}\right)}\left(\frac{1}{\sqrt{m_1}}+\frac{1}{\sqrt{m_2}}\right) - \beta$ is bounded by $\frac{\delta_2'}{2n^2|\Sigma|^2}$.
       </p>
 
@@ -388,7 +342,7 @@
       <br>
 
       <p>
-        <b>Theorem 7:</b> Narrowing the Hoeffding-test via $\sqrt{\frac{1}{2}log\left(\frac{2}{\alpha}\right)}\left(\frac{1}{\sqrt{m_1}}+\frac{1}{\sqrt{m_2}}\right) - \beta$, the upper bound for 
+        <b>Theorem 7:</b> Narrowing the Hoeffding-test via $\sqrt{\frac{1}{2}log\left(\frac{2}{\alpha}\right)}\left(\frac{1}{\sqrt{m_1}}+\frac{1}{\sqrt{m_2}}\right) - \beta$, the upper bound for
         a false reject remains bounded by a maximum of $2\alpha$.
       </p>
 
@@ -405,7 +359,7 @@
 
       <p>
         Once we can bound the number of samples needed to perform statistical tests in a way that we can bound the minimum error, we have everything we need to follow Palmer and Goldberg
-        analogously. I will outline their main ideas in this last section of this post and refer again to 
+        analogously. I will outline their main ideas in this last section of this post and refer again to
         <a href="https://www.cs.ox.ac.uk/people/paul.goldberg/papers/alt05.pdf" target="_blank">
           their work
         </a> to give credits where credits are due. The first interesting statement is the following theorem:
@@ -414,8 +368,8 @@
       <br>
 
       <p>
-        <b>Theorem 8:</b> Let $A'$ be a PDFA whose states and transitions are a subset of those of $A$. $q_0$ is a state of $A'$. Suppose $q$ is a state of $A'$ but $\tau(q, \sigma)$ is not 
-        a state of $A'$. Let $S$ be an i.i.d. drawn sample from $D_A$, $|S|\geq \frac{8n^2|\Sigma|^2}{\epsilon^2}\ln \left( \frac{2n^2|\Sigma|^2}{\delta'} \right)$. Let $S_{q, a}(A')$ be the 
+        <b>Theorem 8:</b> Let $A'$ be a PDFA whose states and transitions are a subset of those of $A$. $q_0$ is a state of $A'$. Suppose $q$ is a state of $A'$ but $\tau(q, \sigma)$ is not
+        a state of $A'$. Let $S$ be an i.i.d. drawn sample from $D_A$, $|S|\geq \frac{8n^2|\Sigma|^2}{\epsilon^2}\ln \left( \frac{2n^2|\Sigma|^2}{\delta'} \right)$. Let $S_{q, a}(A')$ be the
         number of elements of $S$ of the forms $\sigma_1 a \sigma_2$, where $\tau(q_0, \sigma_1)=q$ and for all prefixes $\sigma_1'$ of $\sigma_1$: $\tau(q_0,\sigma_1')\in A$. Then
 
         \begin{equation}
@@ -426,21 +380,21 @@
       <br>
 
       <p>
-        This is a statement on how many samples need to be read by the algorithm to produce new states. The proof follows the Hoeffding-bound, and the number shows up again in the 
+        This is a statement on how many samples need to be read by the algorithm to produce new states. The proof follows the Hoeffding-bound, and the number shows up again in the
         chosen batch-size in the next theorem:
       </p>
 
       <br>
 
       <p>
-        <b>Theorem 9:</b> Let our algorithm read samples with a batch-size of 
-    
+        <b>Theorem 9:</b> Let our algorithm read samples with a batch-size of
+
           \[
           B \geq max\left(\frac{8n^2|\Sigma|^2}{\epsilon^2}\ln\left(\frac{2n^2|\Sigma|^2}{\delta'}\right), \frac{4m_0n|\Sigma|}{\epsilon}\right),
           \]
-    
-          then there exists $T'$ a subset of the transitions of $A$, and $Q'$ a subset of the states of $A$, s.t. $\sum_{(q, \sigma) \in T'} D_A(q, \sigma) + \sum_{q\in Q'}D_A(q)\leq \frac{\epsilon}{2}$, 
-          and with probability at least $1-\delta'$, every transition $(q, \sigma) \not \in T'$ in target automaton $A$ for which $D_A(q, \sigma) \geq \frac{\epsilon}{4n|\Sigma|}$, has a corresponding transition in 
+
+          then there exists $T'$ a subset of the transitions of $A$, and $Q'$ a subset of the states of $A$, s.t. $\sum_{(q, \sigma) \in T'} D_A(q, \sigma) + \sum_{q\in Q'}D_A(q)\leq \frac{\epsilon}{2}$,
+          and with probability at least $1-\delta'$, every transition $(q, \sigma) \not \in T'$ in target automaton $A$ for which $D_A(q, \sigma) \geq \frac{\epsilon}{4n|\Sigma|}$, has a corresponding transition in
           hypothesis automaton $H$, and every state $q\not\in Q'$ in target automaton $A$ for which $D_A(q)\geq \frac{\epsilon}{4n|\Sigma|}$, has a corresponding state in hypothesis automaton $H$.
       </p>
 
@@ -449,40 +403,40 @@
       <p>
         What this essentially means is that with a high probability we create states and transitions that are isomorphic to the target graph. Meaning our states and transitions are correct. The batch-size is intentionally
         chosen large, so that in each iteration of the algorithm at least one new state is created, i.e. the batch-size is intentionally engineered so that we can almost guarantee that a new state
-        will emerge. This also helps to bound the number of iterations the algorithm performs in relation with $n$ and $|\Sigma|$, so it also gives us runtime-guarantees. 
+        will emerge. This also helps to bound the number of iterations the algorithm performs in relation with $n$ and $|\Sigma|$, so it also gives us runtime-guarantees.
       </p>
 
       <figure>
-      <img 
+      <img
       id="pac-bounds-graph-traversal"
-      class="blog-image" 
-      src="./showing_fomal_pac_bounds/traverse-graph.png" 
+      class="blog-image"
+      src="./showing_fomal_pac_bounds/traverse-graph.png"
       alt="Tree with example trace">
-      <figcaption>Mini example of a tree before creating the graph from it with an example trace of states to be parsed. We need to be sure that each of the nodes has seen enough 
+      <figcaption>Mini example of a tree before creating the graph from it with an example trace of states to be parsed. We need to be sure that each of the nodes has seen enough
         data samples so that its sampled distributions and predicted probabilities can be error bound for our purposes.
       </figcaption>
       </figure>
-        
+
       <p>
         So now that we know we can bound the merge heuristic, and we can find the right states in the automaton, all that is missing is making sure that the transition probabilities are correct. Luckily, while differing in
         our merge heuristic and employing a different streaming framework, we estimate the outgoing probabilities analogous to Palmer and Goldberg, and our proof so far has layer the groundwork to follow their analysis on
-        the transition probabilities one on one. Thus we did not elaborate on this part in our paper, but instead again refer to 
+        the transition probabilities one on one. Thus we did not elaborate on this part in our paper, but instead again refer to
         <a href="https://www.cs.ox.ac.uk/people/paul.goldberg/papers/alt05.pdf" target="_blank">
           their work
-        </a>. The basic idea however is once again making sure that each state sees enough samples, so that errors on probabilities can be bound. 
-        For us in turn, all that is left is stitching it all together with the last theorem:   
+        </a>. The basic idea however is once again making sure that each state sees enough samples, so that errors on probabilities can be bound.
+        For us in turn, all that is left is stitching it all together with the last theorem:
       </p>
 
       <br>
 
       <p>
-        <b>Theorem 10:</b> Given a target PDFA $A$ and given our streaming strategy along with our merge heuristic. Given the required input parameters $L', n', \mu', \Sigma, \epsilon, \delta$, then for each 
+        <b>Theorem 10:</b> Given a target PDFA $A$ and given our streaming strategy along with our merge heuristic. Given the required input parameters $L', n', \mu', \Sigma, \epsilon, \delta$, then for each
         $L'\geq L$, $\mu' \leq \mu$, and $n' \geq n$ our framework returns a hypothesis automaton $H$ such that with probability at least $1-\delta$ the error is bounded by $L_1(H, A)\leq \epsilon$.
       </p>
 
       <br>
 
-      With this we can conclude that our learner indeed satisfies PAC-bounds, and throughout the analysis we showed what needs to be satisfied in order for the bounds to happen. However, our runtime of the algorithm  
+      With this we can conclude that our learner indeed satisfies PAC-bounds, and throughout the analysis we showed what needs to be satisfied in order for the bounds to happen. However, our runtime of the algorithm
       shows that our PAC-learner is not an efficient PAC-learner. The end of the paper section thus shows a modification of the algorithm that can be done
       when the sample size per sketch is sufficiently large, greatly simplifying our algorithm and improving runtime. We did not test this modification experimentally, but we consider it a great theoretical improvement
       that works on larger data sizes. We leave it up to the community to build on the idea.
@@ -492,28 +446,28 @@
       <h2>On non-optimal solutions</h2>
 
       <p>
-        Now this is all nice and well, but one can note that we don't have explicit guarantees, and therefore the whole concept is shaky at best. While I do acknowledge the limitations of the approach, 
+        Now this is all nice and well, but one can note that we don't have explicit guarantees, and therefore the whole concept is shaky at best. While I do acknowledge the limitations of the approach,
         I briefly want to address the rightfully critical mind's concerns. The first thing I want to note is the following: Pretty much all of contemporary ML algorithms run on the same assumptions.
-        I do know that there is foundational work on the mathematical framework of deep learning (see e.g. works of <a href="https://web.cs.ucla.edu/~qgu/" target="_blank">this interesting scholar</a>, 
+        I do know that there is foundational work on the mathematical framework of deep learning (see e.g. works of <a href="https://web.cs.ucla.edu/~qgu/" target="_blank">this interesting scholar</a>,
         e.g. a publication on <a href="https://arxiv.org/abs/2202.06526" target="_blank">benign overfitting</a>), but regardless of that, analyses normally focus on small models only so far.
-        In other words, these theoretical bounds do not hold for the extremely large models that have popped up over the past years. They might be discovered some day, but for now the common approach is 
+        In other words, these theoretical bounds do not hold for the extremely large models that have popped up over the past years. They might be discovered some day, but for now the common approach is
         still to simply train and cushion against the worst cases through empirical testing.
       </p>
 
       <p>
-        A second argument can be made just by studying 'classical' algorithmic design. For instance, for complex problems often approximate or randomized algorithms are used. For instance, Karger's algorithm for 
-        the min-cut problem on graphs is a classical example in a good curriculum to show that simple algorithms can elegantly achieve desired results. The min-cut problem essentially states as the following. 
+        A second argument can be made just by studying 'classical' algorithmic design. For instance, for complex problems often approximate or randomized algorithms are used. For instance, Karger's algorithm for
+        the min-cut problem on graphs is a classical example in a good curriculum to show that simple algorithms can elegantly achieve desired results. The min-cut problem essentially states as the following.
         Given a graph ($V$, $E$), find two partitions $G$, $H$, s.t. $G \cup H = V$ and that the set of edges crossing the two sets are minimal.
       </p>
 
       <figure>
-      <img 
+      <img
       id="pac-bounds-min-cut"
-      class="blog-image" 
-      src="./showing_fomal_pac_bounds/min-cut.png" 
+      class="blog-image"
+      src="./showing_fomal_pac_bounds/min-cut.png"
       alt="Example graph with a minimum-cut">
       <figcaption>
-        Example mini-graph with a minimum-cut solution. The min-cut separates the graph into two virtual components, connected through a minimum number of edges. Applications are e.g. finding vulnerabilities 
+        Example mini-graph with a minimum-cut solution. The min-cut separates the graph into two virtual components, connected through a minimum number of edges. Applications are e.g. finding vulnerabilities
         in one's system, say a distributed system, to make it more robust against fallouts.
       </figcaption>
       </figure>
@@ -521,7 +475,7 @@
       <br>
 
       <p>
-        The algorithm itself is random and does not guarantee an optimial solution. Instead it gives you only a few lines of pseudocode to describe it fully: <br> <br> 
+        The algorithm itself is random and does not guarantee an optimial solution. Instead it gives you only a few lines of pseudocode to describe it fully: <br> <br>
         <b>Karger's random contraction algorithm</b> <br>
         While there are more than two nodes/vertices do: <br>
         <ul>
@@ -534,66 +488,45 @@
       <p>
         It is clearly sleek and elegant in its pseudocode, and so is the mathematical analysis. Because we are not guaranteed to find the correct solution the algorithm is normally run multiple times, and
         the solution which minimizes crossing edges is the correct solution. If we have $n$ nodes and do $N$ trials, then the probability of not finding the optimal solution (the true minimum), i.e. $P[all \text{ } trials \text{ } fail]$, is bounded
-        by $$P[all \text{ } trials \text{ } fail] \leq \left(1-\frac{1}{n^2}\right)^N.$$ Looking awfully familiar with $$\lim_{n \rightarrow \infty} \left(1-\frac{x}{n}\right)^n=e^x$$ we can perform e.g. $N=n^2$ trials, resulting in a 
+        by $$P[all \text{ } trials \text{ } fail] \leq \left(1-\frac{1}{n^2}\right)^N.$$ Looking awfully familiar with $$\lim_{n \rightarrow \infty} \left(1-\frac{x}{n}\right)^n=e^x$$ we can perform e.g. $N=n^2$ trials, resulting in a
         false solution bounded with probability $$P[all \text{ } trials \text{ } fail] \leq \frac{1}{e}.$$
         Or alternatively we perform $N=n^2log(n)$ trials to get the even smoother bound $$P[all \text{ } trials \text{ } fail] \leq \frac{1}{n}.$$
       </p>
 
       <p>
-        The benefits of this algorithm are clearly its simplicity and elegant math, not its practicality, justifying its academic nature. There exist deterministic solutions solving the same problem in better 
-        asymptotic time. However, sometimes we do not have this luxury and need to resort to randomized algorithms that do not always give the best solution, but give it only with a certain probability. This example was 
-        to show that algorithms that do not always find the optimal solution do have a legitimate place in the overarching toolbox of algorithms. In fact, many algorithms inside of the very computers we use are not 
-        optimal, but good enough. Optimal caching and the Bankers algorithm for instance both rely on knowlede of the future, clearly a real world contraint, which is why the clever engineers who designed our systems cooked up 
+        The benefits of this algorithm are clearly its simplicity and elegant math, not its practicality, justifying its academic nature. There exist deterministic solutions solving the same problem in better
+        asymptotic time. However, sometimes we do not have this luxury and need to resort to randomized algorithms that do not always give the best solution, but give it only with a certain probability. This example was
+        to show that algorithms that do not always find the optimal solution do have a legitimate place in the overarching toolbox of algorithms. In fact, many algorithms inside of the very computers we use are not
+        optimal, but good enough. Optimal caching and the Bankers algorithm for instance both rely on knowlede of the future, clearly a real world contraint, which is why the clever engineers who designed our systems cooked up
         approximate solutions or entirely different ones to solve these problems.
       </p>
 
       <p>
-        In our algorithm however we can either use PAC-bounds, or simply note that guarantees exist while simply running the algorithm and accepting that the solution might not be the optimal solution. But it still might be 
+        In our algorithm however we can either use PAC-bounds, or simply note that guarantees exist while simply running the algorithm and accepting that the solution might not be the optimal solution. But it still might be
         good enough for our purposes. And this, i.e. the notion of what is good enough, is something we can control by understanding the algorithm and its limits, and by setting our hyperparameters according to our needs.
       </p>
     </div>
-
 
     <div id="pac-bounds-connect" class="article-text-div">
       <h2>Wrapping up</h2>
 
       <p>
-        ... and there went 2 months of my lifetime. However, I hope you got a little more familiar with some techniques and how to use them. Essentially PAC-bounds proofs need a series of 
+        ... and there went 2 months of my lifetime. However, I hope you got a little more familiar with some techniques and how to use them. Essentially PAC-bounds proofs need a series of
         subsequent bounding, where each step provides the foundation for the next one, similar to system design almost. The bounds will reveal how to choose parameters such that the bounds
-        are fulfilled. In practice those numbers often get really large however, so often the bounds only serve a theoretical purpose, showing that at least in theory the algorithm has 
+        are fulfilled. In practice those numbers often get really large however, so often the bounds only serve a theoretical purpose, showing that at least in theory the algorithm has
         guarantees.
       </p>
 
       <p>
         As an upside to all this however we have mathematical guarantees that our learner does learn the correct result. If we wanted to we could bake those found parameters into the actual
         algorithm and have it run on a real data stream, say a network of computers. Under the assumption that there is a natural behavior of the network (similar to say energy consumption
-        in an energy network: In the evening everbody goes home turns on the light, hence more activity in the evenings and less during daytime for private households), then a model for 
-        the network can be built. And if we choose our parameters correctly we can be probably approximately sure (pun intended) that the result will be correct, and the model will be able 
+        in an energy network: In the evening everbody goes home turns on the light, hence more activity in the evenings and less during daytime for private households), then a model for
+        the network can be built. And if we choose our parameters correctly we can be probably approximately sure (pun intended) that the result will be correct, and the model will be able
         to raise alarms on anomalies.
       </p>
 
       <p>
-        More importantly: If you enjoyed this article or want to stay connected please feel free to reach out. You can find me on 
+        More importantly: If you enjoyed this article or want to stay connected please feel free to reach out. You can find me on
         <a href="https://de.linkedin.com/in/robertbaumg" target="_blank">LinkedIn</a> and <a href="https://github.com/RobBa" target="_blank">GitHub</a>.
       </p>
     </div>
-
-    <footer>
-        <div class="footer-div footer-left">
-            <b>PAC-bounds</b>
-        </div>
-        <div class="footer-div">
-          <button class="btn" onclick="scrollToTop()"><i class="fa fa-house" aria-hidden="true">Scroll Up</i></button>
-        </div>
-        <div class="footer-div footer-right">
-            <b>Follow me: &nbsp;</b>
-            <a href="https://github.com/RobBa" target="_blank"><i class="bi bi-github"></i></a>
-            <a href="https://de.linkedin.com/in/robertbaumg" target="_blank"><i class="bi bi-linkedin"></i></a>
-            <a href="https://scholar.google.com/citations?user=_Ii4Of0AAAAJ&hl=en" target="_blank"><i class="ai ai-google-scholar"></i></a>
-            <a href="https://instagram.com/r_drops_photos?igshid=OGQ5ZDc2ODk2ZA==" target="_blank"><i class="bi bi-instagram"></i></a>
-        </div>
-    </footer>
-
-  </body>
-
-</html>

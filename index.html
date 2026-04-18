@@ -1,46 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-
-  <head>
-    <meta charset="utf-8">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-    <title>Robert Baumgartner</title>
-
-    <!-- for icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" 
-      rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" 
-      crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
-    
-    <!-- the buttons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    
-    <!-- my native stylesheet -->
-    <link rel="stylesheet" href="styles.css">
-
-    <!-- scrolling functions -->
-    <script defer src="code/scrolling.js"></script>
-
-    <!-- fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com"> 
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin> 
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
-  </head>
-
-  <body>
-
-    <nav class="menu">
-        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Home</button>
-        <a href="./research/" class="idxelement">
-          <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Research</button>
-        </a>
-        <a href="./blog/" class="idxelement">
-          <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Blog</button>
-        </a>
-    </nav>
+---
+layout: default
+section: Home
+nav_active: home
+---
 
     <h1>Home</h1>
 
@@ -50,7 +12,7 @@
         <img class="home-images" src="./assets/images/singapore-crop.png" alt="at singapore airport" width="70%">
         <h2>Robert Baumgartner</h2>
         <p id="short-description">
-          Software engineer, PhD candidate at the TU Delft <a href="https://cyber-analytics.nl/" target="_blank">cyber-analytics lab</a>, 
+          Software engineer, PhD candidate at the TU Delft <a href="https://cyber-analytics.nl/" target="_blank">cyber-analytics lab</a>,
           hobby musician and sports enthusiast.
         </p>
         <div class="education-div">
@@ -83,12 +45,12 @@
       <div class="home-top-div" id="home-top-right">
         <h2>About me</h2>
         <p>
-          Hi, I'm Robert, software engineer and PhD candidate at the TU Delft (work submitted, defense date pending). 
+          Hi, I'm Robert, software engineer and PhD candidate at the TU Delft (work submitted, defense date pending).
           Interested in fast software, machine learning, and computer architecture. I write about those in my blog.
         </p>
 
         <p>
-          Apart from coding and science I do sports like hitting the gym, table tennis, volleyball at the 
+          Apart from coding and science I do sports like hitting the gym, table tennis, volleyball at the
           beach, and surfing. Creatively I play guitar, and strive to learn as much as I can about writing and
           producing music.
         </p>
@@ -96,24 +58,3 @@
         <img class="home-images" src="./assets/images/surf.jpg" alt="surfing" width="80%">
       </div>
     </div>
-
-    <footer>
-        <div class="footer-div footer-left">
-            <b>Home</b>
-        </div>
-        <div class="footer-div">
-          <button class="btn" onclick="scrollToTop()"><i class="fa fa-house" aria-hidden="true">Scroll Up</i></button>
-        </div>
-        <div class="footer-div footer-right">
-            <b>Follow me: &nbsp;</b>
-            <a href="https://github.com/RobBa" target="_blank"><i class="bi bi-github"></i></a>
-            <a href="https://de.linkedin.com/in/robertbaumg" target="_blank"><i class="bi bi-linkedin"></i></a>
-            <a href="https://scholar.google.com/citations?user=_Ii4Of0AAAAJ&hl=en" target="_blank"><i class="ai ai-google-scholar"></i></a>
-            <a href="https://instagram.com/r_drops_photos?igshid=OGQ5ZDc2ODk2ZA==" target="_blank"><i class="bi bi-instagram"></i></a>
-        </div>
-    </footer>
-
-  </body>
-  
-
-</html>

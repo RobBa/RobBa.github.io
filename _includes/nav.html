@@ -1,0 +1,23 @@
+    <nav class="menu">
+      {% if page.nav_active == 'home' %}
+        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Home</button>
+      {% else %}
+        <a href="{{ '/' | relative_url }}" class="idxelement">
+          <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Home</button>
+        </a>
+      {% endif %}
+      {% if page.nav_active == 'research' %}
+        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Research</button>
+      {% else %}
+        <a href="{{ '/research/' | relative_url }}" class="idxelement">
+          <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Research</button>
+        </a>
+      {% endif %}
+      {% if page.nav_active == 'blog' %}
+        <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Blog</button>
+      {% else %}
+        <a href="{{ '/blog/' | relative_url }}" class="idxelement">
+          <button class="btn"><i class="fa fa-house" aria-hidden="true"></i>Blog</button>
+        </a>
+      {% endif %}
+    </nav>
