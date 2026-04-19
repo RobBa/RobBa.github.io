@@ -78,7 +78,7 @@ mathjax: true
         PAC-bounds and why we use them.
       </p>
 
-      <figure>
+      <figure class="dark-invert">
         <img
         id="pac-bounds-pdfa-example"
         src="./showing_fomal_pac_bounds/hdfs_model.png"
@@ -129,11 +129,19 @@ mathjax: true
         $1-\delta$, if samples are provided i.i.d. from the target distribution. Pretty cool I'd say.
       </p>
 
-      <figure>
+      <figure class="fig-light">
       <img
       id="pac-bounds-graph"
       class="blog-image"
       src="./showing_fomal_pac_bounds/pac-bounds-graph.png"
+      alt="Concept of how we will show the bounds">
+      <figcaption>Steps for proof of PAC-bounds, from bottom to top.</figcaption>
+      </figure>
+      <figure class="fig-dark">
+      <img
+      id="pac-bounds-graph-dark"
+      class="blog-image"
+      src="./showing_fomal_pac_bounds/pac-bounds-graph-dark.png"
       alt="Concept of how we will show the bounds">
       <figcaption>Steps for proof of PAC-bounds, from bottom to top.</figcaption>
       </figure>
@@ -212,11 +220,22 @@ mathjax: true
         This settles our score with the CMS.
       </p>
 
-      <figure>
+      <figure class="fig-light">
       <img
       id="pac-bounds-cms-to-test"
       class="blog-image"
       src="./showing_fomal_pac_bounds/cms-to-statistical-test.png"
+      alt="CMS to statistical test">
+      <figcaption>Comparing two states. Each state has one CMS, through which we can retrieve a sampled distribution
+        over input words. The two distributions are then compared through a statistical test. Mistakes can happen in the
+        statistical test and in retrieving the sampled distributions.
+      </figcaption>
+      </figure>
+      <figure class="fig-dark">
+      <img
+      id="pac-bounds-cms-to-test-dark"
+      class="blog-image"
+      src="./showing_fomal_pac_bounds/cms-to-statistical-test-dark.png"
       alt="CMS to statistical test">
       <figcaption>Comparing two states. Each state has one CMS, through which we can retrieve a sampled distribution
         over input words. The two distributions are then compared through a statistical test. Mistakes can happen in the
@@ -406,11 +425,21 @@ mathjax: true
         will emerge. This also helps to bound the number of iterations the algorithm performs in relation with $n$ and $|\Sigma|$, so it also gives us runtime-guarantees.
       </p>
 
-      <figure>
+      <figure class="fig-light">
       <img
       id="pac-bounds-graph-traversal"
       class="blog-image"
       src="./showing_fomal_pac_bounds/traverse-graph.png"
+      alt="Tree with example trace">
+      <figcaption>Mini example of a tree before creating the graph from it with an example trace of states to be parsed. We need to be sure that each of the nodes has seen enough
+        data samples so that its sampled distributions and predicted probabilities can be error bound for our purposes.
+      </figcaption>
+      </figure>
+      <figure class="fig-dark">
+      <img
+      id="pac-bounds-graph-traversal-dark"
+      class="blog-image"
+      src="./showing_fomal_pac_bounds/traverse-graph-dark.png"
       alt="Tree with example trace">
       <figcaption>Mini example of a tree before creating the graph from it with an example trace of states to be parsed. We need to be sure that each of the nodes has seen enough
         data samples so that its sampled distributions and predicted probabilities can be error bound for our purposes.
@@ -460,11 +489,22 @@ mathjax: true
         Given a graph ($V$, $E$), find two partitions $G$, $H$, s.t. $G \cup H = V$ and that the set of edges crossing the two sets are minimal.
       </p>
 
-      <figure>
+      <figure class="fig-light">
       <img
       id="pac-bounds-min-cut"
       class="blog-image"
       src="./showing_fomal_pac_bounds/min-cut.png"
+      alt="Example graph with a minimum-cut">
+      <figcaption>
+        Example mini-graph with a minimum-cut solution. The min-cut separates the graph into two virtual components, connected through a minimum number of edges. Applications are e.g. finding vulnerabilities
+        in one's system, say a distributed system, to make it more robust against fallouts.
+      </figcaption>
+      </figure>
+      <figure class="fig-dark">
+      <img
+      id="pac-bounds-min-cut-dark"
+      class="blog-image"
+      src="./showing_fomal_pac_bounds/min-cut-dark.png"
       alt="Example graph with a minimum-cut">
       <figcaption>
         Example mini-graph with a minimum-cut solution. The min-cut separates the graph into two virtual components, connected through a minimum number of edges. Applications are e.g. finding vulnerabilities
