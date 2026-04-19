@@ -1,14 +1,54 @@
 @import url('./blog/blog.css');
 @import url('./research/research.css');
 
-/* ------------------- Global elements -------------- */
+/*
+ * Knobs:
+ *   --color-bg              page background
+ *   --color-font            main body text
+ *   --color-font-figure     figcaption text
+ *   --color-chrome-bg       nav + footer background
+ *   --color-chrome-text     nav + footer text, buttons, icons
+ *   --color-social-icons    large social media icons on the home page
+ *   --color-code            inline <code> elements
+ */
+
+:root {
+    --color-bg:             whitesmoke;
+    --color-font:           #111111;
+    --color-font-figure:    #666666;
+    --color-chrome-bg:      lightskyblue;
+    --color-chrome-text:    white;
+    --color-social-icons:   lightskyblue;
+    --color-code:           darkblue;
+    --color-article-date:   #888888;
+    --color-blog-odd:       rgb(228, 225, 225);
+    --color-blog-even:      white;
+}
+
+[data-theme="dark"] {
+    --color-bg:             #1e1e1e;
+    --color-font:           #c9a87c;
+    --color-font-figure:    #b8a898;
+    --color-chrome-bg:      #7d6b56;
+    --color-chrome-text:    white;
+    --color-social-icons:   #c9a87c;
+    --color-code:           #a8c8e0;
+    --color-article-date:   #a09080;
+    --color-blog-odd:       #2a2a2a;
+    --color-blog-even:      #252525;
+}
+
+/* ─── Global elements ────────────────────────────────────────────────────── */
 
 html {
-    background-color: whitesmoke;
+    background-color: var(--color-bg);
+    color: var(--color-font);
     font-family: 'Open Sans', sans-serif;
 }
 
 body {
+    background-color: var(--color-bg);
+    color: var(--color-font);
     padding-top: 47px;
     min-height: 100vh;
     position: relative;
@@ -23,36 +63,36 @@ body {
     flex-grow: 1;
     justify-content: end;
     gap: 10px;
-    background-color: lightskyblue;
+    background-color: var(--color-chrome-bg);
     width: 100%;
     z-index: 9999;
 }
 
 .menu h4 {
-    color: white;
+    color: var(--color-chrome-text);
     flex: 0.9;
     vertical-align: auto;
 }
 
 .idxelement {
-    color: white;
+    color: var(--color-chrome-text);
 }
 
 .btn {
-    color: white;
+    color: var(--color-chrome-text);
 }
 
 .fa {
-    color: white;
+    color: var(--color-chrome-text);
     margin-right: 5px;
 }
 
 .bi {
-    color: lightskyblue;
+    color: var(--color-social-icons);
 }
 
 .ai {
-  color: lightskyblue;
+    color: var(--color-social-icons);
 }
 
 img {
@@ -74,7 +114,7 @@ div {
 }
 
 code {
-    color: darkblue;
+    color: var(--color-code);
 }
 
 footer {
@@ -84,7 +124,7 @@ footer {
     flex-grow: 1;
     align-items: stretch;
     justify-content: space-between;
-    background-color: lightskyblue;
+    background-color: var(--color-chrome-bg);
     height: 45px;
     width: 100%;
 }
@@ -96,11 +136,11 @@ footer {
     flex-grow: 1;
     justify-content: center;
     gap: 0 5px;
-    color: white;
+    color: var(--color-chrome-text);
 }
 
 .footer-btn {
-    color: white;
+    color: var(--color-chrome-text);
 }
 
 .footer-left {
@@ -113,7 +153,7 @@ footer {
 
 .footer-div .bi,
 .footer-div .ai {
-    color: white;
+    color: var(--color-chrome-text);
     font-size: 1.5rem;
 }
 
@@ -147,12 +187,32 @@ figure img {
 figcaption {
     text-align: center;
     font-style: italic;
-    color: #666;
+    color: var(--color-font-figure);
     margin-top: 8px;
     font-size: 14px;
 }
 
-/* Touchscreen devices (phones and tablets) */
+/* ─── Dark mode figure handling ──────────────────────────────────────────── */
+/*
+ * .dark-invert   — apply to figures that invert cleanly (white-bg academic plots).
+ *                  invert(0.88) maps white → #1e1e1e to match --color-bg.
+ *
+ * .fig-light /   — use when you provide separate light and dark image versions.
+ * .fig-dark        Put each on its own <figure> element.
+ */
+
+[data-theme="dark"] .dark-invert {
+    filter: invert(0.88) hue-rotate(180deg);
+}
+
+.fig-light { display: block; }
+.fig-dark  { display: none;  }
+
+[data-theme="dark"] .fig-light { display: none;  }
+[data-theme="dark"] .fig-dark  { display: block; }
+
+/* ─── Touchscreen devices ────────────────────────────────────────────────── */
+
 @media (hover: none) and (pointer: coarse) {
     body {
         padding-top: 60px;
@@ -212,7 +272,7 @@ figcaption {
     }
 }
 
-/* -------------- The home page ---------------- */
+/* ─── Main page ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 1200px) {
     .home-top {

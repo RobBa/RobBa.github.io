@@ -5,7 +5,7 @@
 }
 
 .article-date {
-    color: #888;
+    color: var(--color-article-date);
     font-size: 0.85em;
     margin-top: -10px;
     margin-bottom: 20px;
@@ -26,11 +26,11 @@
 }
 
 .blog-index-div:nth-child(odd) {
-  background-color: rgb(228, 225, 225); /* Light grey for odd entries */
+  background-color: var(--color-blog-odd);
 }
 
 .blog-index-div:nth-child(even) {
-  background-color: white; /* White for even entries */
+  background-color: var(--color-blog-even);
 }
 
 #calling-network-from-cpp {
