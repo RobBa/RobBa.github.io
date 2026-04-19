@@ -159,6 +159,17 @@ footer {
     justify-content: flex-end;
 }
 
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    .footer-hide-portrait {
+        display: none;
+    }
+
+    .footer-right {
+        justify-content: center;
+        flex-grow: 1;
+    }
+}
+
 .footer-div .bi,
 .footer-div .ai {
     color: var(--color-chrome-text);
