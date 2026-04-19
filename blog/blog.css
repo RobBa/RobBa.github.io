@@ -12,6 +12,14 @@
     text-align: center;
 }
 
+.article-date-index {
+    color: var(--color-article-date);
+    font-size: 0.85em;
+    margin-top: -10px;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
 .blog-image {
     width: 98%;
     height: auto;
@@ -66,7 +74,7 @@
 
 #pac-bounds-graph-traversal,
 #pac-bounds-graph-traversal-dark {
-    width: 62%;
+    width: 57%;
     max-width: 700px;
 }
 
