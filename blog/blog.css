@@ -4,19 +4,17 @@
     max-width: 100%;
 }
 
-.article-date {
+.article-date,
+.article-date-index {
     color: var(--color-article-date);
-    font-size: 0.85em;
+    font-size: 0.95em;
+    font-style: italic;
     margin-top: -10px;
     margin-bottom: 20px;
     text-align: center;
 }
 
 .article-date-index {
-    color: var(--color-article-date);
-    font-size: 0.85em;
-    margin-top: -10px;
-    margin-bottom: 20px;
     text-align: left;
 }
 
@@ -74,7 +72,7 @@
 
 #pac-bounds-graph-traversal,
 #pac-bounds-graph-traversal-dark {
-    width: 57%;
+    width: 53%;
     max-width: 700px;
 }
 
