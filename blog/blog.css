@@ -81,7 +81,7 @@
     max-width: 800px;
 }
 
-@media (hover: none) and (pointer: coarse) {
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     .blog-image {
         width: 100%;
         height: auto;

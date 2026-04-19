@@ -30,7 +30,7 @@
     max-width: 500px;
 }
 
-@media (hover: none) and (pointer: coarse) {
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     #research-pac-bounds-cms-to-test,
     #research-pac-bounds-cms-to-test-dark {
         width: 60%;
