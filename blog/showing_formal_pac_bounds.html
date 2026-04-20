@@ -157,7 +157,7 @@ mathjax: true
         they produce, and move it up layer by layer until we cover the whole algorithm. In our publication we chose Count-Min-Sketches
         (CMS) as the most basic data structure. Hence, we first have to show that the CMS and the operations we perform on them are bounded.
         We store samples distributions in the CMS and test with the Hoeffding-bound whether the two sampled distributions are
-        equal or not. If the sampled distribution satisfies
+        equal or not. If two sampled distributions, retrieved from the CMS and denoted with $\frac{\hat{c}_{\sigma_{q_i}}}{n_{q_i}}$, satisfy
 
         <br>
 
@@ -165,10 +165,10 @@ mathjax: true
         \left(\frac{2}{\alpha}\right)}\left(\frac{1}{\sqrt{n_{q_1}}}+\frac{1}{\sqrt{n_{q_2}}}\right),$$
 
 
-        then the two distributions are considered equal. When using CMS it needs to be noted that the data structure
-        works similar to a multimap. But unlike a multimap it does not return exact counts, instead approximate counts. It is thus
-        a memory saving data structure to count elements of a data stream, where the cardinality of elements to store is either unknown before
-        runtime, or simply too large. Hence, when drawing sampled statistics from a CMS we get an induced error from estimating the sampled counts.
+        then we consider them equal. The challenge we face now is that the CMS data structure works similar to a multiset. But unlike a 
+        multiset it does not return exact counts, instead approximate counts. It is thus a memory saving data structure to count elements 
+        of a data stream, where the cardinality of elements to store is either unknown before runtime, or simply too large. In short, the 
+        sampled distributions we get from the CMS come with an error induced by estimating the sampled counts.
       </p>
 
       <p>

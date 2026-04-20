@@ -91,15 +91,21 @@ nav_active: research
         Well, that example works, but it is so simple. <b>Why would I do the work to design a state machine in first place?</b>
         Simple state machines are mostly a domain of smaller systems. For example,
         controllers in embedded system design are often first modeled as a state machine before translated into
-        code, adding a layer of code security on critical applications. The interested learner is referred to
+        code, adding a layer of code security on critical applications. An advantage of that method is also that other techniques 
+        such as model checking can be employed to ensure code runs as intended. In case someone wants to go deeper in the topic I 
+        point to 
         <a href="https://www.udemy.com/course/embedded-system-design-using-uml-state-machines/" target="_blank">
-        this excellent course</a>. An advantage of that method is also that other techniques such as model checking can
-        be employed to ensure code testing. A book recommended by a former instructor is the
-        <a href="https://mitpress.mit.edu/9780262026499/principles-of-model-checking/" target="_blank">Principles of Model Checking</a>.
+          this course
+        </a> 
+        about designed state machines using UML, and the book
+        <a href="https://mitpress.mit.edu/9780262026499/principles-of-model-checking/" target="_blank">
+            Principles of Model Checking
+        </a>
+        , the latter recommended by a former instructor at the TU Munich.
       </p>
 
       <p>
-        <b>What if I have something that is more complex than a controller?</b> In cases where a system is too large
+        <b>But what if I have something that is more complex than a controller?</b> In cases where a system is too large
         to be designed by hand, or where we want to understand an existing system, we have to employ automatic
         algorithms to infer those state machines for us. This is called <b>State Machine Learning</b>, and it comes in
         two flavors: Active and passive learning. In <b>active learning</b>, we have access to an existing

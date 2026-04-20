@@ -321,6 +321,10 @@ figcaption {
         margin-left: 3px;
         margin-right: 3px;
     }
+
+    #home-top-left .home-images {
+        margin-top: 12px;
+    }
 }
 
 /* ─── Main page ──────────────────────────────────────────────────────────── */
@@ -331,6 +335,7 @@ figcaption {
     }
 
     #home-top-left {
+        margin-top: 16px;
         display: block;
         margin-left: 5%;
         margin-right: 5%;
@@ -352,6 +357,7 @@ figcaption {
 
     #home-top-left {
         flex: 0.4;
+        margin-top: 16px;
         margin-left: 4%;
         margin-right: 2%;
         max-width: 600px;
@@ -359,6 +365,7 @@ figcaption {
 
     #home-top-right {
         flex: 0.6;
+        margin-top: 16px;
         margin-right: 3%;
         max-width: 500px;
     }
@@ -369,6 +376,10 @@ figcaption {
     margin-left: auto;
     margin-right: auto;
     max-width: 500px;
+}
+
+#education-div {
+    margin-top: 6px;
 }
 
 #short-description {
@@ -399,6 +410,8 @@ figcaption {
 
 .home-top-div h2 {
     text-align: center;
+    margin-top: 14px;
+    margin-bottom: 14px;
 }
 
 .education-div h4 {
