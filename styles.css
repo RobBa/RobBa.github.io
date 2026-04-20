@@ -145,13 +145,10 @@ code {
 
 a {
     color: var(--color-link);
-}
-
-.footer-div a {
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.footer-div a:hover {
+a:hover {
     opacity: 0.8;
     transform: translateY(-2px);
 }

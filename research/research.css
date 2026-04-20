@@ -3,7 +3,7 @@
  */
 #floating-toc {
     position: fixed;
-    top: 40px;
+    top: 48px;
     left: 16px;
     z-index: 100;
     max-width: 300px;
