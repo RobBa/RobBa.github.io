@@ -22,6 +22,7 @@
     --color-blog-odd:       #e0e0e0;
     --color-blog-even:      whitesmoke;
     --color-link:           #0066cc;
+    --color-nav-active:     #1b3b6e;
 }
 
 [data-theme="dark"] {
@@ -36,6 +37,7 @@
     --color-blog-odd:       #2a2a2a;
     --color-blog-even:      #1e1e1e;
     --color-link:           #7eb5d6;
+    --color-nav-active:     #5c4b3a;
 }
 
 /* ─── Global elements ────────────────────────────────────────────────────── */
@@ -84,6 +86,14 @@ body {
 
 .btn {
     color: var(--color-chrome-text);
+}
+
+/*
+ * Highlight currently selected nav-button
+ * by changing its font color.
+*/
+nav.menu > .btn {
+    color: var(--color-nav-active);
 }
 
 .fa {
