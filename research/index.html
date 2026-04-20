@@ -5,38 +5,41 @@ section: Research
 nav_active: research
 ---
 
-    <div class="article-content-div">
-      <h2>Content</h2>
-      <ul>
-        <li>State Machine Learning Algorithms</li>
+    <h1>Research</h1>
+
+    <div class="article-text-div" id="research-intro">
+      <p>
+        Modern software and ML systems produce vast amounts of data essential to understanding
+        and debugging them. Making sense of it typically means navigating a patchwork of
+        specialized tools while building deep theoretical intuition from scratch — steep learning
+        curves with no clear picture of the whole. My research focuses on closing that gap by
+        automatically reverse-engineering visualizable models that serve as a global map to these
+        systems and how they behave.
+      </p>
+    </div>
+
+    <div id="floating-toc">
+      <button id="toc-toggle" onclick="toggleToc()" aria-label="Toggle table of contents">
+        <i class="bi bi-list"></i> Contents
+      </button>
+      <nav id="toc-list">
         <ul>
-          <li>
-            <a href="#why-state-machines">What are state machines and why use them?</a>
-          </li>
-          <li>
-            <a href="#streaming-state-machines-1">Learning state machines via efficient hashing of future traces</a>
-          </li>
-          <li>
-            <a href="#streaming-state-machines-2">Learning state machines from data streams: A generic strategy and an improved heuristic</a>
-          </li>
-          <li>
-            <a href="#pac-learning-pdfa">PAC learning PDFA from data streams</a>
-          </li>
-          <li>
-            <a href="#database-assisted-ml">Database-Assisted State Machine Learning</a>
-          </li>
-          <li>
-            <a href="#pdfa-distillation-1">PDFA Distillation with Error Bound Guarantees</a>
-          </li>
-          <li>
-            <a href="#pdfa-distillation-2">PDFA Distillation via String Probability Queries</a>
-          </li>
+          <li class="toc-category">State Machine Learning</li>
+          <ul>
+            <li><a href="#why-state-machines" onclick="closeToc()">What are state machines and why use them?</a></li>
+            <li><a href="#streaming-state-machines-1" onclick="closeToc()">Learning via efficient hashing of future traces</a></li>
+            <li><a href="#streaming-state-machines-2" onclick="closeToc()">Learning from data streams: A generic strategy</a></li>
+            <li><a href="#pac-learning-pdfa" onclick="closeToc()">PAC learning PDFA from data streams</a></li>
+            <li><a href="#database-assisted-ml" onclick="closeToc()">Database-Assisted State Machine Learning</a></li>
+            <li><a href="#pdfa-distillation-1" onclick="closeToc()">PDFA Distillation with Error Bound Guarantees</a></li>
+            <li><a href="#pdfa-distillation-2" onclick="closeToc()">PDFA Distillation via String Probability Queries</a></li>
+          </ul>
+          <li class="toc-category">ML in Cybersecurity</li>
+          <ul>
+            <li><a href="#preprocessing-in-cyber" onclick="closeToc()">Preprocessing for anomaly detection</a></li>
+          </ul>
         </ul>
-        <li>Machine Learning in Cybersecurity</li>
-        <ul>
-          <li><a href="#preprocessing-in-cyber">Preprocessing of cybersecurity data for anomaly detection</a></li>
-        </ul>
-      </ul>
+      </nav>
     </div>
 
     <br>
@@ -399,3 +402,12 @@ nav_active: research
       </figure>
 
   </div>
+
+    <script>
+      function toggleToc() {
+        document.getElementById('toc-list').classList.toggle('open');
+      }
+      function closeToc() {
+        document.getElementById('toc-list').classList.remove('open');
+      }
+    </script>
