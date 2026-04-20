@@ -1,6 +1,8 @@
-/*
- * TOC = Table of content
- */
+h2 {
+    text-align: center;
+}
+
+/* TOC = Table of content*/
 #floating-toc {
     position: fixed;
     top: 43px;

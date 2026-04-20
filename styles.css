@@ -306,17 +306,9 @@ figcaption {
         font-size: 18px;
     }
 
-    h1 {
-        font-size: 24px;
-    }
-
-    h2 {
-        font-size: 22px;
-    }
-
-    h4 {
-        font-size: 18px;
-    }
+    h1 { font-size: 24px; }
+    h2 { font-size: 22px; }
+    h4 { font-size: 18px; }
 
     .article-content-div {
         max-width: 100%;

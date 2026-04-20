@@ -27,8 +27,12 @@
 
     <!-- my native stylesheet -->
     <link rel="stylesheet" href="{{ '/styles.css' | relative_url }}">
+    {% if page.nav_active == 'blog' %}
     <link rel="stylesheet" href="{{ '/blog/blog.css' | relative_url }}">
+    {% endif %}
+    {% if page.nav_active == 'research' %}
     <link rel="stylesheet" href="{{ '/research/research.css' | relative_url }}">
+    {% endif %}
 
     <!-- scrolling + dark mode -->
     <script defer src="{{ '/code/scrolling.js' | relative_url }}"></script>
