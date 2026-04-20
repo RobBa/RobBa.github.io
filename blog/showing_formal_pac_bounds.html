@@ -269,12 +269,12 @@ mathjax: true
       <br>
 
       <p>
-        Here, $n$ is an upper bound on the states that are expected of the final automaton (technically we do not need this)
-        in a practical scenario, but we need it to show PAC-bounds, see
+        Here, $n$ is an upper bound on the states that are expected of the final automaton. Technically we do not need this hyperparameter
+        in a practical scenario, but we need it to show PAC-bounds. For more details on that see
         <a href="https://www.cs.ox.ac.uk/people/paul.goldberg/papers/alt05.pdf" target="_blank">
           this publication
         </a>
-        by Palmer and Goldberg (which has greatly served as a guideline for me while constructing my own proof). What this means essentially is that
+        by Palmer and Goldberg, which has greatly served as a guideline while constructing out own proof. What the theorem then tells us in simple terms is that
         we know that there must a minimum non-zero transition probability within the automaton. Once we know that transition probability we can define an
         expected constant proportional to the inverse of the minimum probability, and then the maximum number of expected samples grows linearly in
         the number of states and the batch size. While not needed for the remainder, it is still nice to know that we can bound how many i.i.d. samples
