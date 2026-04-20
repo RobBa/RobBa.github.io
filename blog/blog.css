@@ -29,6 +29,7 @@
   margin-right: auto;
   padding: 20px;
   margin-bottom: 10px;
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .blog-index-div:nth-child(odd) {
@@ -37,6 +38,18 @@
 
 .blog-index-div:nth-child(even) {
   background-color: var(--color-blog-even);
+}
+
+.blog-index-div:nth-child(odd):hover {
+  background-color: var(--color-blog-odd-hover);
+  transform: translateY(-4px);
+  box-shadow: 4px 6px 16px var(--color-blog-shadow);
+}
+
+.blog-index-div:nth-child(even):hover {
+  background-color: var(--color-blog-even-hover);
+  transform: translateY(-4px);
+  box-shadow: 4px 6px 16px var(--color-blog-shadow);
 }
 
 #calling-network-from-cpp,

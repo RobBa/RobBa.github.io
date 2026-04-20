@@ -3,6 +3,11 @@ const observer = new IntersectionObserver((entries) => {
         if (entry.isIntersecting) {
             entry.target.style.opacity = 1;
             entry.target.style.transform = 'translateY(0)';
+            setTimeout(() => {
+                entry.target.style.opacity = '';
+                entry.target.style.transform = '';
+                entry.target.style.transition = '';
+            }, 650);
         }
     });
 }, { threshold: 0.05 });
