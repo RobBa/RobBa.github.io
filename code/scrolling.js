@@ -1,7 +1,7 @@
 /**
  * Note: I do not remember where and how I got this code. I might have copy-pasted 
- * it from someone. If so, please let me know who deserves his/her rightful 
- * credits here. Thank you.
+ * it from someone, likely StackOverflow. If so, please let me know who deserves 
+ * his/her rightful credits here. Thank you.
  */
 
 let mybutton = document.getElementById("myBtn");
