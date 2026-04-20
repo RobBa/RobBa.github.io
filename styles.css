@@ -100,6 +100,12 @@ body {
 */
 nav.menu > .btn {
     color: var(--color-nav-active);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+nav.menu > .btn:hover {
+    opacity: 0.8;
+    transform: translateY(-2px);
 }
 
 .fa {
@@ -139,10 +145,13 @@ code {
 
 a {
     color: var(--color-link);
+}
+
+.footer-div a {
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-a:hover {
+.footer-div a:hover {
     opacity: 0.8;
     transform: translateY(-2px);
 }
