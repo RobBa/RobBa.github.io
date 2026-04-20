@@ -181,6 +181,10 @@ footer {
     font-size: 1.5rem;
 }
 
+.footer-div .ai {
+    vertical-align: middle;
+}
+
 .article-text-div {
     max-width: 900px;
     margin-left: auto;

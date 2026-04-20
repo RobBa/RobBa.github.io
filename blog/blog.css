@@ -88,6 +88,11 @@
 }
 
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    .blog-index-div h4,
+    .article-date-index {
+        text-align: center;
+    }
+
     .blog-image {
         width: 100%;
         height: auto;
