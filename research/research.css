@@ -3,7 +3,7 @@
  */
 #floating-toc {
     position: fixed;
-    top: 48px;
+    top: 43px;
     left: 16px;
     z-index: 100;
     max-width: 300px;
@@ -17,7 +17,7 @@
     background-color: var(--color-chrome-bg);
     color: var(--color-chrome-text);
     border: none;
-    border-radius: 0 0 6px 6px;
+    border-radius: 6px;
     padding: 5px 14px;
     font-size: 0.9rem;
     cursor: pointer;
@@ -39,13 +39,12 @@
     overflow: hidden;
     transition: max-height 0.4s ease;
     background-color: var(--color-bg);
-    border: 1px solid var(--color-chrome-bg);
-    border-top: none;
-    border-radius: 0 0 6px 6px;
+    border-radius: 6px;
 }
 
 #toc-list.open {
     max-height: 600px;
+    box-shadow: 0 0 0 1px var(--color-chrome-bg);
 }
 
 #toc-list ul {

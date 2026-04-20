@@ -52,12 +52,13 @@ html {
     background-color: var(--color-bg);
     color: var(--color-font);
     font-family: 'Open Sans', sans-serif;
+    scroll-behavior: smooth;
 }
 
 body {
     background-color: var(--color-bg);
     color: var(--color-font);
-    padding-top: 62px;
+    padding-top: 55px;
     min-height: 100vh;
     position: relative;
     padding-bottom: 50px;
