@@ -47,8 +47,8 @@ mathjax: true
 
       <p>
         In our publication <a href="https://proceedings.mlr.press/v217/baumgartner23a.html" target="_blank">
-            Learning state machines from data streams: A generic strategy and an improved heuristic
-        </a> we introduced an algorithm learning probabilistic automata from data streams. Probabilistic
+          Learning state machines from data streams: A generic strategy and an improved heuristic</a> 
+        we introduced an algorithm learning probabilistic automata from data streams. Probabilistic
         means that parsing the automaton with a string will yield its probability to occur, information
         that is interesting when identifying rare events of the data stream. Rare events are intesting
         in the domain of anomaly detection and can e.g. pose network threats on a network or rare
@@ -71,8 +71,7 @@ mathjax: true
         PAC-bounds (PAC=Probably Approximately Correct). We take this approach to show the correctness
         of our algorithm in the extended version of our publication, found
         <a href="https://arxiv.org/pdf/2604.02244" target="_blank">
-          here
-        </a>. However, because the proof is long and has lots of mathematical details I outline its main ideas
+          here</a>. However, because the proof is long and has lots of mathematical details I outline its main ideas
         and steps in this blog post. For simplicity I use the same notation as in the paper, thus this blogpost
         is a complemetary piece to the original proof. With that said, let's dive in with the definition of
         PAC-bounds and why we use them.
@@ -190,8 +189,8 @@ mathjax: true
 
       <p>In order to proof the theorem we start with the error bounds on the CMS given by the
         <a href="https://dsf.berkeley.edu/cs286/papers/countmin-latin2004.pdf" target="_blank">
-          original authors of the data structure
-        </a>, and we define a new random variable from their approach using indicator variables. Subsequently we use the Markov bound
+          original authors of the data structure</a>, 
+        and we define a new random variable from their approach using indicator variables. Subsequently we use the Markov bound
         $$ P(X>a) \leq \frac{E(X)}{a} $$
         to bound the random variable, showing that the divergence from the expectation value of the left hand side of the Hoeffding test above
         is bounded. However, this proof only works when the left hand side's term before taking the absolute value is larger than or equal to
@@ -272,8 +271,7 @@ mathjax: true
         Here, $n$ is an upper bound on the states that are expected of the final automaton. Technically we do not need this hyperparameter
         in a practical scenario, but we need it to show PAC-bounds. For more details on that see
         <a href="https://www.cs.ox.ac.uk/people/paul.goldberg/papers/alt05.pdf" target="_blank">
-          this publication
-        </a>
+          this publication</a>
         by Palmer and Goldberg, which has greatly served as a guideline while constructing out own proof. What the theorem then tells us in simple terms is that
         we know that there must a minimum non-zero transition probability within the automaton. Once we know that transition probability we can define an
         expected constant proportional to the inverse of the minimum probability, and then the maximum number of expected samples grows linearly in
@@ -299,8 +297,8 @@ mathjax: true
       <p>
         We get this bound for free by using the same test as
         <a href="https://link.springer.com/chapter/10.1007/3-540-58473-0_144" target="_blank">
-          Carrasco and Oncina
-        </a>. The test is essentially a clever reformulation of the classical Hoeffding-bound, where they inject an $\alpha$
+          Carrasco and Oncina</a>. 
+        The test is essentially a clever reformulation of the classical Hoeffding-bound, where they inject an $\alpha$
         parameter that serves as an upper bound for the error. We can simply use their results here. However, the probability for
         a false reject we'll have to bound on our own. We introduce a notion for what it means to distinguish two distributions:
       </p>
@@ -380,8 +378,7 @@ mathjax: true
         Once we can bound the number of samples needed to perform statistical tests in a way that we can bound the minimum error, we have everything we need to follow Palmer and Goldberg
         analogously. I will outline their main ideas in this last section of this post and refer again to
         <a href="https://www.cs.ox.ac.uk/people/paul.goldberg/papers/alt05.pdf" target="_blank">
-          their work
-        </a> to give credits where credits are due. The first interesting statement is the following theorem:
+          their work</a> to give credits where credits are due. The first interesting statement is the following theorem:
       </p>
 
       <br>
@@ -451,8 +448,7 @@ mathjax: true
         our merge heuristic and employing a different streaming framework, we estimate the outgoing probabilities analogous to Palmer and Goldberg, and our proof so far has layer the groundwork to follow their analysis on
         the transition probabilities one on one. Thus we did not elaborate on this part in our paper, but instead again refer to
         <a href="https://www.cs.ox.ac.uk/people/paul.goldberg/papers/alt05.pdf" target="_blank">
-          their work
-        </a>. The basic idea however is once again making sure that each state sees enough samples, so that errors on probabilities can be bound.
+          their work</a>. The basic idea however is once again making sure that each state sees enough samples, so that errors on probabilities can be bound.
         For us in turn, all that is left is stitching it all together with the last theorem:
       </p>
 

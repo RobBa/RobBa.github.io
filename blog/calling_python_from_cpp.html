@@ -414,8 +414,7 @@ Py_DECREF(p_result); <br>
         hold multiple Python interpreters, they share the same GIL as of
         <a href="https://docs.python.org/3.12/c-api/init.html#thread-state-and-the-global-interpreter-lock"
          target="_blank">
-          Python 3.12
-        </a>. According to the documentation, the functions <code>PyGILState_Ensure()</code> and
+          Python 3.12</a>. According to the documentation, the functions <code>PyGILState_Ensure()</code> and
         <code>PyGILState_Release()</code> do not work well when multiple interpreters exist within the
         same process, meaning that true parallelism can only be reached via actual multiprocessing.
       </p>
