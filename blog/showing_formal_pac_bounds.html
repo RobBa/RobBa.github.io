@@ -480,9 +480,15 @@ mathjax: true
       </p>
 
       <p>
-        A second argument can be made just by studying 'classical' algorithmic design. For instance, for complex problems often approximate or randomized algorithms are used. For instance, Karger's algorithm for
-        the min-cut problem on graphs is a classical example in a good curriculum to show that simple algorithms can elegantly achieve desired results. The min-cut problem essentially states as the following.
-        Given a graph ($V$, $E$), find two partitions $G$, $H$, s.t. $G \cup H = V$ and that the set of edges crossing the two sets are minimal.
+        A second argument can be made just by studying 'classical' algorithmic design. Specifically, we want to take a look at two examples of algorithms that are non-optimal, but still worth looking at. 
+        The first one is an example of a randomized algorithm, i.e. it is non-deterministic. The algorithm is not the optimal algorithm for the problem it solves, but it serves as a good example
+        how random algorithms are still capable to find elegant solutions for difficult problems. The second algorithm we briefly touch on solves the infamous Knapsack problem, an instance of an 
+        <a href="https://en.wikipedia.org/wiki/NP-hardness" target="_blank">NP-hard</a> problem.
+        
+      <h4>Karger's algorithm for the min-cut problem</h4>
+
+      <p>Karger's algorithm for the min-cut problem on graphs is a classical example in a good curriculum to show that simple algorithms can elegantly achieve desired results. The min-cut problem 
+        essentially states as the following. Given a graph ($V$, $E$), find two partitions $G$, $H$, s.t. $G \cup H = V$ and that the set of edges crossing the two sets are minimal.
       </p>
 
       <figure class="fig-light">
@@ -534,7 +540,25 @@ mathjax: true
         asymptotic time. However, sometimes we do not have this luxury and need to resort to randomized algorithms that do not always give the best solution, but give it only with a certain probability. This example was
         to show that algorithms that do not always find the optimal solution do have a legitimate place in the overarching toolbox of algorithms. In fact, many algorithms inside of the very computers we use are not
         optimal, but good enough. Optimal caching and the Bankers algorithm for instance both rely on knowlede of the future, clearly a real world contraint, which is why the clever engineers who designed our systems cooked up
-        approximate solutions or entirely different ones to solve these problems.
+        approximate solutions or entirely different ones to solve these problems. The second example below may prove to be an even better example to illustrate trade-offs we have to make in algorithms sometimes.
+      </p>
+
+      <h4>Fully polynomial time approximation scheme for the Knapsack problem</h4>
+
+      <p>
+        The fully polynomial time approximation scheme (FPTAS) for the <a href="https://en.wikipedia.org/wiki/Knapsack_problem" target="_blank">Knapsack problem</a> is an algorithm to approximate the optimal solution. The optimal algorithm, 
+        solved by dynamic programming in $O(nW)$, where $n$ is the number of items, and $W$ is the capacity of the bag, is NP-complete. That means we can't solve it in polynomial time (looking at the run-time that fact looks very counterintuitive, worth 
+        thinking about). To solve the bottleneck an approximation algorithm exists. The basic idea of the algorithm is to find a value $v_{max}$ over all the items we get as input, then scale all weights by a factor of $\frac{1}{m}$, rounding towards 
+        the floor. With that we can define a recurrence s.t. for an arbitrary value $\epsilon$ we can choose $m$ s.t. 
+
+        $$m=\frac{\epsilon v_{max}}{n},$$
+
+        we get a solution $V_{approx}$ that is guaranteed to satisfy 
+
+        $$V_{approx} \geq (1-\epsilon) V_{opt},$$
+
+        with V_{opt} the optimal solution. The run-time of the approximation is $O(n^ v_{max})$, a polynomial solution for small $v_{max}$. For more information on the algorithm I refer 
+        to <a href ="https://en.wikipedia.org/wiki/Knapsack_problem#Fully_polynomial_time_approximation_scheme" target="_blank">Wikipedia</a>.
       </p>
 
       <p>
