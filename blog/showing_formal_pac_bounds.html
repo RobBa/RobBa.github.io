@@ -543,13 +543,15 @@ mathjax: true
         approximate solutions or entirely different ones to solve these problems. The second example below may prove to be an even better example to illustrate trade-offs we have to make in algorithms sometimes.
       </p>
 
+      <br>
+
       <h4>Fully polynomial time approximation scheme for the Knapsack problem</h4>
 
       <p>
-        The fully polynomial time approximation scheme (FPTAS) for the <a href="https://en.wikipedia.org/wiki/Knapsack_problem" target="_blank">Knapsack problem</a> is an algorithm to approximate the optimal solution. The optimal algorithm, 
-        solved by dynamic programming in $O(nW)$, where $n$ is the number of items, and $W$ is the capacity of the bag, is NP-complete. That means we can't solve it in polynomial time (looking at the run-time that fact looks very counterintuitive, worth 
-        thinking about). To solve the bottleneck an approximation algorithm exists. The basic idea of the algorithm is to find a value $v_{max}$ over all the items we get as input, then scale all weights by a factor of $\frac{1}{m}$, rounding towards 
-        the floor. With that we can define a recurrence s.t. for an arbitrary value $\epsilon$ we can choose $m$ s.t. 
+        The fully polynomial time approximation scheme (FPTAS) for the <a href="https://en.wikipedia.org/wiki/Knapsack_problem" target="_blank">Knapsack problem</a> is an algorithm to approximate the optimal solution. The exact algorithm yields 
+        the solution in $O(nW)$ by means of dynamic programming, where $n$ is the number of items, and $W$ is the capacity of the bag, is NP-complete. That means we can't solve it in polynomial time (looking at the run-time that fact looks 
+        very counterintuitive, worth thinking about). To solve the bottleneck an approximation algorithm exists. The basic idea of the algorithm is to find a value $v_{max}$ over all the items we get as input, then scale all weights by a factor 
+        of $\frac{1}{m}$, rounding towards the floor. With that we can define a recurrence s.t. for an arbitrary value $\epsilon$ we can choose $m$ s.t. 
 
         $$m=\frac{\epsilon v_{max}}{n},$$
 
@@ -557,13 +559,16 @@ mathjax: true
 
         $$V_{approx} \geq (1-\epsilon) V_{opt},$$
 
-        with V_{opt} the optimal solution. The run-time of the approximation is $O(n^ v_{max})$, a polynomial solution for small $v_{max}$. For more information on the algorithm I refer 
+        with $V_{opt}$ the optimal solution. The run-time of the approximation is $O(n^2 v_{max})$, a polynomial solution for small $v_{max}$. For more information on the algorithm I refer 
         to <a href ="https://en.wikipedia.org/wiki/Knapsack_problem#Fully_polynomial_time_approximation_scheme" target="_blank">Wikipedia</a>.
       </p>
 
       <p>
-        In our algorithm however we can either use PAC-bounds, or simply note that guarantees exist while simply running the algorithm and accepting that the solution might not be the optimal solution. But it still might be
-        good enough for our purposes. And this, i.e. the notion of what is good enough, is something we can control by understanding the algorithm and its limits, and by setting our hyperparameters according to our needs.
+        This example relates well to our algorithm. Both use a heuristic to simplify a computationally complex problem, and both give approximation guarantees. The difference is that the Knapsack problem 
+        has an optimal solution that can be reached precily given some input, whereas the ground truth of the PDFA we are learning to might or might not even be feasible, depending on what data points we 
+        get to see. Hence we have to retreat to PAC-bounds territory. In practice we could simply note that guarantees exist while simply running the algorithm and accepting that the solution might not be 
+        the optimal solution. But it still might be good enough for our purposes. And this, i.e. the notion of what is good enough, is something we can control by understanding the algorithm and its limits, 
+        and by setting our hyperparameters according to our needs.
       </p>
     </div>
 
