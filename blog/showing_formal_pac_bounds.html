@@ -568,7 +568,11 @@ mathjax: true
       <p>
         This example relates well to our algorithm. Both use a heuristic to simplify a computationally complex problem, and both give approximation guarantees. The difference is that the Knapsack problem 
         has an optimal solution that can be reached precily given some input, whereas the ground truth of the PDFA we are learning might or might not even be feasible, depending on what data points we 
-        get to see. Hence we have to retreat to PAC-bounds territory. In practice we could simply note that guarantees exist while simply running the algorithm and accepting that the solution might not be 
+        get to see. Hence we have to retreat to PAC-bounds territory. 
+      </p>
+
+      <p>
+        In practice we could simply note that guarantees exist while simply running the algorithm and accepting that the solution might not be 
         the optimal solution. But it still might be good enough for our purposes. And this, i.e. the notion of what is good enough, is something we can control by understanding the algorithm and its limits, 
         and by setting our hyperparameters according to our needs.
       </p>
