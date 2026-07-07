@@ -23,6 +23,23 @@
     height: auto;
 }
 
+.article-quote {
+    max-width: 700px;
+    margin: 0 auto 30px auto;
+    padding: 10px 20px;
+    border-left: 4px solid var(--color-article-date);
+    font-style: italic;
+    color: var(--color-article-date);
+}
+
+.article-quote cite {
+    display: block;
+    margin-top: 8px;
+    font-style: normal;
+    font-size: 0.9em;
+    text-align: right;
+}
+
 .blog-index-div {
   max-width: 900px;
   margin-left: auto;

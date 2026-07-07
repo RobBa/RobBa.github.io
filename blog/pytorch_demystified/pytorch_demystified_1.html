@@ -1,0 +1,104 @@
+---
+layout: default
+title: "PyTorch demystified 1: Tensor interface and Python bindings"
+section: Pytorch demystified - 1
+highlight: true
+mathjax: true
+---
+
+    <br>
+
+    <h1>PyTorch demystified 1: Tensor interface and Python bindings</h1>
+    <p class="article-date">Published: Jul. 2026</p>
+
+    <br>
+
+    <blockquote class="article-quote">
+      "Replace this with your real quote."
+      <cite>&mdash; Quote attribution</cite>
+    </blockquote>
+
+    <br>
+
+    <div class="article-content-div">
+      <h2>Content</h2>
+      <ul>
+        <li>
+          <a href="#introduction">Introduction</a>
+        </li>
+        <li>
+          <a href="#tensor-backend">Designing the Tensor backend</a>
+        </li>
+      </ul>
+    </div>
+
+    <br>
+
+    <div id="introduction" class="article-text-div">
+
+      <h2>Introduction</h2>
+
+      <p>
+        If you are like me then chances are things don't really stick with you unless you really
+        understand how they work from the ground up. Having used PyTorch and Tensorflow/Keras for 
+        a while I never really understood why things are the way they are in those. So I decided
+        to implement my own small library to train neural networks. It turned out to be quite 
+        similar to PyTorch in its frontend, so I can make a strong case for this one now. In the 
+        following 5 part series I will walk you step-by-step through the components that are necessary
+        to build your own library. The posts planned so far are: 
+      </p>
+
+      <ol>
+        <li>
+          In part 1 I will introduce the basic structure of the Tensor. By the end of this one
+          we will have basic Python interface to instantiate Tensors and do basic operations 
+          on them such as MatMul, addition, and elementwise multiplication.
+        </li>
+        <li>
+          Part 2 will be all about training. We will introduce the computational graph, show how we
+          can build it dynamically during run-time, how to use it to enable autograd, and everything 
+          that we needfor a basic network implementation. It will conclude in a running MNIST end-to-end 
+          training pipeline built from scratch.
+        </li>
+        <li>
+          Having built a minimal MNIST example, we take a break from ML itself and will start to 
+          make it actually practical to use. The main challenge for anything ML from the users 
+          perspective are performance and energy/hardware efficiency. To do so we will enable the  
+          GPU by implementing our backend in CUDA. We will then optimize the CUDA backend step-by-step
+          using profilers (NSYS and NCU).
+        </li>
+        <li>
+          For everyone who does not have an NVIDIA GPU at hand, but also for the fun of it, we will 
+          optimize our C++ backend for the CPU version as well. We will use techniques such as cache 
+          optimization, thread pools, and hardware accelerators such as AVX to achieve better runtime.
+        </li>
+      </ol>
+
+      <p>
+        If we still have time we can then continue implementing advanced models such as transformers 
+        and computer vision modules, and provide further optimization techniques guided by larger models.
+      </p>
+
+      <p>
+        The blogposts themselves explain the main points, programming techniques, and design choices, 
+        while everything is backed up by a real
+        <a href="https://github.com/RobBa/dl_lib" target="_blank">
+          GitHub repository
+        </a> that has been built in real time and can be used for a full executable example. Git commits 
+        and release notes index the correct versions.
+      </p>
+    </div>
+
+    <div id="tensor-backend" class="article-text-div">
+
+        <h2>Designing the Tensor backend</h2>
+
+        <p>
+          The heart of deep learning is always the tensor data structure. What sounds fancy at first actually
+          becomes pretty quickly just plain and simple linear algebra in spirit. Basically, a tensor is a 
+          generalized matrix with an arbitrary large number of dimension. So, basically a tensor is a data 
+          structure of the form $\mathbb{R}^n$, $n \in \mathbb{N}^+$. In code, this will be a multidimensional 
+          array of a floating point type. 
+        </p>
+
+    </div>
