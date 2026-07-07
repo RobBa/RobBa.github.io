@@ -8,7 +8,7 @@ mathjax: true
 
     <br>
 
-    <h1>PyTorch demystified 1: Tensor interface and Python bindings</h1>
+    <h1>PyTorch demystified - Part 1: <br>Tensor interface and Python bindings</h1>
     <p class="article-date">Published: Jul. 2026</p>
 
     <br>
@@ -22,14 +22,17 @@ mathjax: true
 
     <div class="article-content-div">
       <h2>Content</h2>
-      <ul>
+      <ol>
         <li>
           <a href="#introduction">Introduction</a>
         </li>
         <li>
-          <a href="#tensor-backend">Designing the Tensor backend</a>
+          <a href="#preliminary-thoughts">Preliminary thoughts</a>
         </li>
-      </ul>
+        <li>
+          <a href="#tensor-backend">Designing the tensor backend</a>
+        </li>
+      </ol>
     </div>
 
     <br>
@@ -50,9 +53,11 @@ mathjax: true
 
       <ol>
         <li>
-          In part 1 I will introduce the basic structure of the Tensor. By the end of this one
+          First we introduce the basic structure of the Tensor. By the end of this one
           we will have basic Python interface to instantiate Tensors and do basic operations 
-          on them such as MatMul, addition, and elementwise multiplication.
+          on them such as MatMul, addition, and elementwise multiplication. This will be the easiest 
+          to grasp blogpost, as we lay the foundation for the more specialized ones that follow, and will
+          be mainly about software design.
         </li>
         <li>
           Part 2 will be all about training. We will introduce the computational graph, show how we
@@ -89,16 +94,275 @@ mathjax: true
       </p>
     </div>
 
+    <br>
+
+    <div id="preliminary-thoughts" class="article-text-div">
+
+      <h2>Preliminary thoughts</h2>
+
+      <p>
+        Before we start we want to think about the overall structure that we want to have. We want our 
+        design to be flexible for maintainance, modular, and easy to change. In short, we want to obey 
+        the 
+        <a href="https://en.wikipedia.org/wiki/SOLID" target="_blank">
+          SOLID principles
+        </a>. 
+        Because neither of us can anticipate what is going to happen in the future we can make decisions 
+        now that minimize the risk of major overhauls with a little bit of foreshadowing. Taking a look at 
+        current developments we can see the following trends: 
+
+        <ul>
+          <li>New data types are introduced to optimize computation.</li>
+          <li>Edge devices are expected to run AI (egde AI).</li>
+          <li>Hardware accelerators and GPUs are becoming more important by the day.</li>
+          <li>New ways of computation keep on being researched.</li>
+        </ul>
+
+        We can take the following lessons from those to secure our camp:
+        <ul>
+          <li>Do not settle for a datatype yet, but use a generic one we can quickly find and exchange.</li>
+          <li>Same goes for tensor representations for edge devices.</li>
+          <li>Keep the data management device agnostic to support GPUs and other types of special hardware.</li>
+          <li>Make things as modular as possible to incorporate new research as quick as possible.</li>
+        </ul>
+
+        We will go further into those below, but two things to start with: Because we can see that the dimensions and
+        the fundamental data types of representation are changing we can make our future lives easier by using aliases.
+        While two of them might look confusing we can easily make them signed or unsigned, whatever suits our purpose 
+        better, and as for <code>ftype</code>, we can either change the data type completely throughout the whole project,
+        or we can adjust punctually very easily. After all, a global search for "ftype" will give us better results than a 
+        global search for "float" or "double", helping us refactoring later if we wanted to.
+      </p>
+
+<pre><code class="language-cpp">// src/utility/global_parameters.h -> will be renamed util.h later
+using ftype = float;
+
+using tensorDim_t = std::uint16_t; // represent one dimension of a tensor
+using tensorSize_t = std::uint32_t; // represent the total size of a tensor
+
+static_assert(sizeof(tensorSize_t) >= sizeof(tensorDim_t));
+</code></pre>
+
+    </div>
+
+    <br>
+
     <div id="tensor-backend" class="article-text-div">
 
-        <h2>Designing the Tensor backend</h2>
+      <h2>Designing the tensor backend</h2>
 
-        <p>
-          The heart of deep learning is always the tensor data structure. What sounds fancy at first actually
-          becomes pretty quickly just plain and simple linear algebra in spirit. Basically, a tensor is a 
-          generalized matrix with an arbitrary large number of dimension. So, basically a tensor is a data 
-          structure of the form $\mathbb{R}^n$, $n \in \mathbb{N}^+$. In code, this will be a multidimensional 
-          array of a floating point type. 
-        </p>
+      <p>
+        The heart of deep learning is always the tensor data structure. What sounds fancy at first actually
+        becomes pretty quickly just plain and simple linear algebra in spirit. Basically, a tensor is a 
+        generalized matrix with an arbitrary large number of dimension. So, basically a tensor is a data 
+        structure of the form $\mathbb{R}^n$, $n \in \mathbb{N}^+$. In code, this will be a multidimensional 
+        array of a floating point type, for which we have to figure out the best shape. The beginning of the 
+        tensor then looks like this:
+      </p>
 
+<pre><code class="language-cpp">// src/data_modeling/tensor.h
+
+class Tensor final { // final to promote flat hierarchies
+private:
+  Dimension dims;
+  std::unique_ptr<tensorValues_t> values = nullptr; // contained values of tensor
+
+public:
+  // stuff goes here
+}
+</code></pre>
+
+      <p>
+        Here, we implicitly use two new datatypes we have yet to define: <code>tensorValues_t</code> and 
+        <code>Dimension</code>. We start with the latter, since it is easier to explain. Basically, what it 
+        does is represent the dimensions of our tensor. Because we want a Python binding later, there's no 
+        implicit conversion method from any Python datatype to our Dimension data type, thus we use a 
+        <code>std::vector<tensorDim_t></code> as an argument. The data type looks like this for now:
+      </p>
+
+<pre><code class="language-cpp">// src/data_modeling/dimension.h
+
+class Dimension final {
+  private:
+    std::vector<tensorDim_t> dims;
+    tensorSize_t size = 0;
+
+  public:
+    Dimension(const std::vector<tensorDim_t>& dims);
+
+    Dimension(const Dimension& other);
+    Dimension& operator=(const Dimension& other);
+
+    Dimension(Dimension&& other) noexcept;
+    Dimension& operator=(Dimension&& other) noexcept;
+
+    ~Dimension() noexcept = default;
+
+    void resize(const std::vector<tensorDim_t>& dims);
+      
+    tensorSize_t getSize() const noexcept {
+      return size;
+    }
+
+    tensorDim_t get(int idx) const {
+      return (*this)[idx];
+    }
+
+    tensorDim_t operator[](int idx) const {
+      assert(size > 0);
+      if(idx < 0){
+        idx = dims.size() + idx; // -1 is last idx, -2 second last and so forth
+      }
+
+      return dims[idx];
+    }
+
+    bool operator==(const Dimension& other) const {
+      assert(size!=0);
+      return this->dims == other.dims;
+    }
+
+    bool operator==(const std::vector<tensorDim_t>& other) const {
+      return this->dims == other;
+    }
+
+    bool operator!=(const Dimension& other) const {
+      return !(*this == other);
+    }
+
+    bool operator!=(const std::vector<tensorDim_t>& other) const {
+      return !(*this == other);
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const Dimension& d) noexcept; 
+}
+</code></pre>
+
+      <p>
+        There are no real surprises here. Worth noting is probably only that we gave
+        the data type implicitly a second function apart from representing the dimensions, 
+        namely through the attribute <code>tensorSize_t size</code>. Whether the total size, 
+        which is the product of the input to the constructor 
+        <code>Dimension(const std::vector<tensorDim_t>& dims)</code>, should be part of the dimension
+        or the tensor itself is more a matter of taste. We leave it here for now, and shifting it over
+        will be an easy task. The Dimension data type will become more interesting later, when 
+        we use strided access patterns to represent transposed or permuted tensors. For now we keep it 
+        simple. 
+      </p>
+
+      <p>
+        The second data structure <code>tensorValues_t</code> is the more interesting one for now. Its main
+        purpose is to manage the underlying data. Whether the tensor's data sits on a GPU, the computer's memory, 
+        or any other device such as a TPU should not matter to the tensor. And managing that is the job of this one.
+        Because we already plan concretely to use CUDA later on we encode the device in an enum value via
+      </p>
+
+<pre><code class="language-cpp">// src/data_modeling/device.h
+
+enum class Device {
+    CPU,
+    CUDA
+};
+</code></pre>
+
+      <p>
+        With this in mind, we define the <code>tensorValues_t</code> as a private nested class inside the tensor class, 
+        as only the tensor should have access to the values. Anybody else who wants to see the data has to knock 
+        first and ask friendly. The implementation of this one goes as follows:
+      </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.h
+
+class Tensor final { // final to promote flat hierarchies
+private:
+  // ...
+
+  class tensorValues_t final
+  {
+  private:
+    tensorSize_t size = 0;
+    ftype *values = nullptr;
+
+    Device device;
+    inline static Device defaultDevice = Device::CPU;
+
+  public:
+    explicit tensorValues_t();
+    explicit tensorValues_t(Device d);
+    ~tensorValues_t() noexcept;
+
+    tensorValues_t(const tensorValues_t& other) = delete;
+    tensorValues_t& operator=(const tensorValues_t& other) = delete;
+
+    tensorValues_t(tensorValues_t&& other) noexcept;
+    tensorValues_t& operator=(tensorValues_t&& other) noexcept;
+
+    explicit operator bool() const noexcept;
+    ftype& operator[](const tensorSize_t idx);
+    ftype operator[](const tensorSize_t idx) const;
+
+    void set(ftype v, tensorSize_t idx);
+    ftype get(tensorSize_t idx);
+
+    tensorSize_t getSize() const noexcept;
+
+    // this is still templated in the release
+    void resize(const tensorSize_t size)
+    {
+      this->size = size;
+      switch (this->device)
+      {
+      case Device::CPU:
+        values = static_cast<ftype* >(std::malloc(this->size * sizeof(ftype)));
+        break;
+      case Device::CUDA:
+        std::__throw_invalid_argument("Not implemented yet.");
+        break;
+      }
+    }
+
+    void setDevice(const Device d) noexcept;
+    Device getDevice() const noexcept;
+  };
+
+public:
+  // ...
+}
+</code></pre>   
+
+      <p>
+        Again, no big surprises here. The only things probably worth noting are the resize function,
+        which could be better named <code>init()</code> at this stage, the resize will make sense later.
+        Interesting is also the static field <code>defaultDevice</code>. We enable a default device via a
+        global field. When I was a kid my grandma used to always tell me "Code says more than a thousand 
+        words", so in this spirit here we go:
+      </p>
+
+<pre><code class="language-cpp">// src/system/system_functions.h
+
+namespace sys {
+  void setDevice(Device d) noexcept;
+  Device getDevice() noexcept;
+
+  void setRandomSeed(unsigned int s) noexcept;
+}
+
+// src/system/system_functions.cpp
+using namespace sys;
+
+void sys::setDevice(Device d) noexcept {
+  Tensor::setDefaultDevice(d);
+}
+
+Device sys::getDevice() noexcept {
+  return Tensor::getDefaultDevice();
+}
+
+void sys::setRandomSeed(const unsigned int s) noexcept {
+  utility::InitializerBase::setSeed(s);
+}
+      <p>
+        TODO: explain linear indexing of array, tensor constructors, and add some math operators to the tensors
+        Then add some printing functions, and we can move to the second part, the Python binding
+      </p>
     </div>
