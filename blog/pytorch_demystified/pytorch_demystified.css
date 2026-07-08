@@ -1,0 +1,11 @@
+/* -------------- Pytorch demystified series ---------------- */
+
+.pytorch-step-img {
+    width: 55%;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    .pytorch-step-img {
+        width: 80%;
+    }
+}

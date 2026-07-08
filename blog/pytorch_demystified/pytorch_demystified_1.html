@@ -47,37 +47,108 @@ mathjax: true
         a while I never really understood why things are the way they are in those. So I decided
         to implement my own small library to train neural networks. It turned out to be quite 
         similar to PyTorch in its frontend, so I can make a strong case for this one now. In the 
-        following 5 part series I will walk you step-by-step through the components that are necessary
+        following multi-part series I will walk you step-by-step through the components that are necessary
         to build your own library. The posts planned so far are: 
       </p>
 
-      <ol>
-        <li>
-          First we introduce the basic structure of the Tensor. By the end of this one
+      <p>
+          <b>Part 1 - Tensor & Python frontend:</b> First we introduce the basic structure of the Tensor. By the end of this one
           we will have basic Python interface to instantiate Tensors and do basic operations 
           on them such as MatMul, addition, and elementwise multiplication. This will be the easiest 
           to grasp blogpost, as we lay the foundation for the more specialized ones that follow, and will
           be mainly about software design.
-        </li>
-        <li>
-          Part 2 will be all about training. We will introduce the computational graph, show how we
-          can build it dynamically during run-time, how to use it to enable autograd, and everything 
-          that we needfor a basic network implementation. It will conclude in a running MNIST end-to-end 
+      </p>
+
+      <figure class="fig-light">
+      <img
+      id="pytorch-step-1"
+      class="blog-image pytorch-step-img"
+      src="./img_1/step_1.png"
+      alt="Diagram of part 1: Tensor and Python frontend">
+      <figcaption>Part 1: Tensor interface and Python bindings.</figcaption>
+      </figure>
+      <figure class="fig-dark">
+      <img
+      id="pytorch-step-1-dark"
+      class="blog-image pytorch-step-img"
+      src="./img_1/step_1_dark.png"
+      alt="Diagram of part 1: Tensor and Python frontend">
+      <figcaption>Part 1: Tensor interface and Python bindings.</figcaption>
+      </figure>
+
+      <p>
+          <b>Part 2 - Autograd and training pipeline:</b> Part 2 will be all about training. We will introduce the 
+          computational graph, show how we can build it dynamically during run-time, how to use it to enable autograd, 
+          and everything that we needfor a basic network implementation. It will conclude in a running MNIST end-to-end 
           training pipeline built from scratch.
-        </li>
-        <li>
-          Having built a minimal MNIST example, we take a break from ML itself and will start to 
+      </p>
+
+      <figure class="fig-light">
+      <img
+      id="pytorch-step-2"
+      class="blog-image pytorch-step-img"
+      src="./img_1/step_2.png"
+      alt="Diagram of part 2: Autograd and training pipeline">
+      <figcaption>Part 2: Autograd and training pipeline.</figcaption>
+      </figure>
+      <figure class="fig-dark">
+      <img
+      id="pytorch-step-2-dark"
+      class="blog-image pytorch-step-img"
+      src="./img_1/step_2_dark.png"
+      alt="Diagram of part 2: Autograd and training pipeline">
+      <figcaption>Part 2: Autograd and training pipeline.</figcaption>
+      </figure>
+
+      <p>
+          <b>Part 3 - CUDA backend implementation and optimization:</b> Having built a minimal MNIST example, 
+          we take a break from ML itself and will start to 
           make it actually practical to use. The main challenge for anything ML from the users 
           perspective are performance and energy/hardware efficiency. To do so we will enable the  
           GPU by implementing our backend in CUDA. We will then optimize the CUDA backend step-by-step
           using profilers (NSYS and NCU).
-        </li>
-        <li>
-          For everyone who does not have an NVIDIA GPU at hand, but also for the fun of it, we will 
+      </p>
+
+      <figure class="fig-light">
+      <img
+      id="pytorch-step-3"
+      class="blog-image pytorch-step-img"
+      src="./img_1/step_3.png"
+      alt="Diagram of part 3: CUDA backend implementation and optimization">
+      <figcaption>Part 3: CUDA backend implementation and optimization.</figcaption>
+      </figure>
+      <figure class="fig-dark">
+      <img
+      id="pytorch-step-3-dark"
+      class="blog-image pytorch-step-img"
+      src="./img_1/step_3_dark.png"
+      alt="Diagram of part 3: CUDA backend implementation and optimization">
+      <figcaption>Part 3: CUDA backend implementation and optimization.</figcaption>
+      </figure>
+
+      <p>
+          <b>Part 4 - CPU backend optimization:</b> For everyone who does not have an NVIDIA GPU at hand, 
+          but also for the fun of it, we will 
           optimize our C++ backend for the CPU version as well. We will use techniques such as cache 
           optimization, thread pools, and hardware accelerators such as AVX to achieve better runtime.
-        </li>
-      </ol>
+      </p>
+
+      <figure class="fig-light">
+      <img
+      id="pytorch-step-4"
+      class="blog-image pytorch-step-img"
+      src="./img_1/step_4.png"
+      alt="Diagram of part 4: CPU backend optimization">
+      <figcaption>Part 4: CPU backend optimization.</figcaption>
+      </figure>
+      <figure class="fig-dark">
+      <img
+      id="pytorch-step-4-dark"
+      class="blog-image pytorch-step-img"
+      src="./img_1/step_4_dark.png"
+      alt="Diagram of part 4: CPU backend optimization">
+      <figcaption>Part 4: CPU backend optimization.</figcaption>
+      </figure>
 
       <p>
         If we still have time we can then continue implementing advanced models such as transformers 
@@ -110,6 +181,8 @@ mathjax: true
         Because neither of us can anticipate what is going to happen in the future we can make decisions 
         now that minimize the risk of major overhauls with a little bit of foreshadowing. Taking a look at 
         current developments we can see the following trends: 
+
+        TODO: make this a figure too
 
         <ul>
           <li>New data types are introduced to optimize computation.</li>
@@ -171,6 +244,8 @@ public:
   // stuff goes here
 }
 </code></pre>
+
+      TODO: use a sort of class diagram that shows the 3 modules and what each is for
 
       <p>
         Here, we implicitly use two new datatypes we have yet to define: <code>tensorValues_t</code> and 
@@ -331,11 +406,15 @@ public:
 </code></pre>   
 
       <p>
-        Again, no big surprises here. The only things probably worth noting are the resize function,
-        which could be better named <code>init()</code> at this stage, the resize will make sense later.
-        Interesting is also the static field <code>defaultDevice</code>. We enable a default device via a
-        global field. When I was a kid my grandma used to always tell me "Code says more than a thousand 
-        words", so in this spirit here we go:
+        Again, no big surprises here. The only things probably worth noting are the <code>resize()</code>
+        method, which could be better named <code>init()</code> at this stage. The choice for resize will 
+        make sense later. 
+      </p>
+      
+      <p>
+        Interesting is also the static field <code>defaultDevice</code>. We enable a 
+        default device via a global field. When I was a kid my grandma used to always tell me "Code says 
+        more than a thousand words", so in this spirit here we go:
       </p>
 
 <pre><code class="language-cpp">// src/system/system_functions.h
@@ -361,8 +440,10 @@ Device sys::getDevice() noexcept {
 void sys::setRandomSeed(const unsigned int s) noexcept {
   utility::InitializerBase::setSeed(s);
 }
+</code></pre>   
+
       <p>
-        TODO: explain linear indexing of array, tensor constructors, and add some math operators to the tensors
+        TODO - explain linear indexing of array, tensor constructors, and add some math operators to the tensors
         Then add some printing functions, and we can move to the second part, the Python binding
       </p>
     </div>

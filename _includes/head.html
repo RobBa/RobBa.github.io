@@ -33,6 +33,9 @@
     {% if page.url contains '/research/' %}
     <link rel="stylesheet" href="{{ '/research/research.css' | relative_url }}">
     {% endif %}
+    {% if page.url contains '/pytorch_demystified/' %}
+    <link rel="stylesheet" href="{{ '/blog/pytorch_demystified/pytorch_demystified.css' | relative_url }}">
+    {% endif %}
 
     <!-- scrolling + dark mode -->
     <script defer src="{{ '/code/scrolling.js' | relative_url }}"></script>
