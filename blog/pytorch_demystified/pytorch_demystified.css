@@ -21,6 +21,16 @@
     width: 95%;
 }
 
+.pytorch-step-heading {
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.pytorch-step-heading-mobile {
+    display: none;
+}
+
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     .pytorch-step-row,
     .pytorch-step-row-reverse {
@@ -30,5 +40,13 @@
 
     .pytorch-step-img {
         width: 80%;
+    }
+
+    .pytorch-step-heading {
+        display: none;
+    }
+
+    .pytorch-step-heading-mobile {
+        display: inline;
     }
 }
