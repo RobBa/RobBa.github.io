@@ -1,10 +1,33 @@
 /* -------------- Pytorch demystified series ---------------- */
 
+.pytorch-step-row {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    margin-bottom: 20px;
+}
+
+.pytorch-step-row-reverse {
+    flex-direction: row-reverse;
+}
+
+.pytorch-step-text,
+.pytorch-step-figs {
+    flex: 1 1 70%;
+    min-width: 0;
+}
+
 .pytorch-step-img {
-    width: 55%;
+    width: 95%;
 }
 
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    .pytorch-step-row,
+    .pytorch-step-row-reverse {
+        flex-direction: column;
+        gap: 10px;
+    }
+
     .pytorch-step-img {
         width: 80%;
     }
