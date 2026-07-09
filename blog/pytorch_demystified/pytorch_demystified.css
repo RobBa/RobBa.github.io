@@ -11,14 +11,28 @@
     flex-direction: row-reverse;
 }
 
-.pytorch-step-text,
+.pytorch-step-text {
+    flex: 1 1 45%;
+    min-width: 0;
+}
+
 .pytorch-step-figs {
-    flex: 1 1 70%;
+    flex: 1 1 55%;
     min-width: 0;
 }
 
 .pytorch-step-img {
     width: 95%;
+}
+
+#pytorch-trends-in-ml,
+#pytorch-trends-in-ml-dark {
+    width: 75%;
+}
+
+#pytorch-class-diagram,
+#pytorch-class-diagram-dark {
+    width: 64%;
 }
 
 .pytorch-step-heading {

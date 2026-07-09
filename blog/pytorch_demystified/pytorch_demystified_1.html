@@ -14,8 +14,8 @@ mathjax: true
     <br>
 
     <blockquote class="article-quote">
-      "Replace this with your real quote."
-      <cite>&mdash; Quote attribution</cite>
+      "Sometimes science is more art than science."
+      <cite>&mdash; Rick Sanchez (Rick & Morty)</cite>
     </blockquote>
 
     <br>
@@ -31,6 +31,14 @@ mathjax: true
         </li>
         <li>
           <a href="#tensor-backend">Designing the tensor backend</a>
+          <ol>
+            <li>
+              <a href="#data-layout">Designing the data layout</a>
+            </li>
+            <li>
+              <a href="#tensor-operations">Adding operations to the tensor</a>
+            </li>
+          </ol>
         </li>
       </ol>
     </div>
@@ -186,10 +194,9 @@ mathjax: true
       <p>
         The blogposts themselves explain the main points, programming techniques, and design choices, 
         while everything is backed up by a real
-        <a href="https://github.com/RobBa/dl_lib" target="_blank">
-          GitHub repository
-        </a> that has been built in real time and can be used for a full executable example. Git commits 
-        and release notes index the correct versions.
+        <a href="https://github.com/RobBa/dl_lib" target="_blank">GitHub repository</a> that has been 
+        built in real time and can be used for a full executable example. Git commits and release notes index 
+        the correct versions.
       </p>
     </div>
 
@@ -202,24 +209,30 @@ mathjax: true
       <p>
         Before we start we want to think about the overall structure that we want to have. We want our 
         design to be flexible for maintainance, modular, and easy to change. In short, we want to obey 
-        the 
-        <a href="https://en.wikipedia.org/wiki/SOLID" target="_blank">
-          SOLID principles
-        </a>. 
+        the <a href="https://en.wikipedia.org/wiki/SOLID" target="_blank">SOLID principles</a>. 
         Because neither of us can anticipate what is going to happen in the future we can make decisions 
-        now that minimize the risk of major overhauls with a little bit of foreshadowing. Taking a look at 
-        current developments we can see the following trends: 
+        now that minimize the risk of major overhauls with a little bit of foreshadowing. While thinking
+        about everything is probably beyond the scope of this project, we can consider the following trends 
+        to hedge ourselves a little against gruesome refactoring sessions.
 
-        TODO: make this a figure too
+        <figure class="fig-light">
+        <img
+        id="pytorch-trends-in-ml"
+        class="blog-image"
+        src="./img_1/trends_in_ml.png"
+        alt="Trends in machine learning">
+        <figcaption>Current trends shaping machine learning system design.</figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-trends-in-ml-dark"
+        class="blog-image"
+        src="./img_1/trends_in_ml_dark.png"
+        alt="Trends in machine learning">
+        <figcaption>Current trends shaping machine learning system design.</figcaption>
+        </figure>
 
-        <ul>
-          <li>New data types are introduced to optimize computation.</li>
-          <li>Edge devices are expected to run AI (egde AI).</li>
-          <li>Hardware accelerators and GPUs are becoming more important by the day.</li>
-          <li>New ways of computation keep on being researched.</li>
-        </ul>
-
-        We can take the following lessons from those to secure our camp:
+        Securing our camp, we want the following:
         <ul>
           <li>Do not settle for a datatype yet, but use a generic one we can quickly find and exchange.</li>
           <li>Same goes for tensor representations for edge devices.</li>
@@ -252,6 +265,8 @@ static_assert(sizeof(tensorSize_t) >= sizeof(tensorDim_t));
 
       <h2>Designing the tensor backend</h2>
 
+      <h4 id="data-layout">Designing the data layout</h4>
+
       <p>
         The heart of deep learning is always the tensor data structure. What sounds fancy at first actually
         becomes pretty quickly just plain and simple linear algebra in spirit. Basically, a tensor is a 
@@ -272,8 +287,6 @@ public:
   // stuff goes here
 }
 </code></pre>
-
-      TODO: use a sort of class diagram that shows the 3 modules and what each is for
 
       <p>
         Here, we implicitly use two new datatypes we have yet to define: <code>tensorValues_t</code> and 
@@ -312,32 +325,14 @@ class Dimension final {
     }
 
     tensorDim_t operator[](int idx) const {
-      assert(size > 0);
-      if(idx < 0){
+      if(idx &lt 0){
         idx = dims.size() + idx; // -1 is last idx, -2 second last and so forth
       }
 
       return dims[idx];
     }
 
-    bool operator==(const Dimension& other) const {
-      assert(size!=0);
-      return this->dims == other.dims;
-    }
-
-    bool operator==(const std::vector<tensorDim_t>& other) const {
-      return this->dims == other;
-    }
-
-    bool operator!=(const Dimension& other) const {
-      return !(*this == other);
-    }
-
-    bool operator!=(const std::vector<tensorDim_t>& other) const {
-      return !(*this == other);
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, const Dimension& d) noexcept; 
+    // also add some operators for convenience: !=, ==, &lt&lt for printing
 }
 </code></pre>
 
@@ -400,16 +395,9 @@ private:
     tensorValues_t(tensorValues_t&& other) noexcept;
     tensorValues_t& operator=(tensorValues_t&& other) noexcept;
 
-    explicit operator bool() const noexcept;
-    ftype& operator[](const tensorSize_t idx);
-    ftype operator[](const tensorSize_t idx) const;
-
-    void set(ftype v, tensorSize_t idx);
-    ftype get(tensorSize_t idx);
-
     tensorSize_t getSize() const noexcept;
 
-    // this is still templated in the release
+    // this is still templated in the commit
     void resize(const tensorSize_t size)
     {
       this->size = size;
@@ -426,52 +414,256 @@ private:
 
     void setDevice(const Device d) noexcept;
     Device getDevice() const noexcept;
+
+    // also add access functions [] and/or get(tensorSize_t idx) and set(tensorSize_t idx)
   };
 
-public:
-  // ...
+// Tensor continues here...
 }
 </code></pre>   
 
       <p>
-        Again, no big surprises here. The only things probably worth noting are the <code>resize()</code>
-        method, which could be better named <code>init()</code> at this stage. The choice for resize will 
-        make sense later. 
+        The things worth noting are the <code>resize()</code> method, which could be better named 
+        <code>init()</code> at this stage, since it does implicit allocation. The choice for resize will 
+        make sense later. Also note that we enable moving, but disable copying. We do not accidentally want
+        to copy potentially huge arrays by accident, so this will help us make our code safer.
       </p>
       
       <p>
         Interesting is also the static field <code>defaultDevice</code>. We enable a 
-        default device via a global field. When I was a kid my grandma used to always tell me "Code says 
-        more than a thousand words", so in this spirit here we go:
+        default device via a global field. When I was a kid my grandma used to always tell me "A few lines
+        of code say more than a thousand words", so in this spirit here we go:
       </p>
 
 <pre><code class="language-cpp">// src/system/system_functions.h
 
 namespace sys {
-  void setDevice(Device d) noexcept;
-  Device getDevice() noexcept;
-
-  void setRandomSeed(unsigned int s) noexcept;
-}
-
-// src/system/system_functions.cpp
-using namespace sys;
-
-void sys::setDevice(Device d) noexcept {
-  Tensor::setDefaultDevice(d);
-}
-
-Device sys::getDevice() noexcept {
-  return Tensor::getDefaultDevice();
-}
-
-void sys::setRandomSeed(const unsigned int s) noexcept {
-  utility::InitializerBase::setSeed(s);
+  void setDevice(Device d) noexcept {
+    Tensor::setDefaultDevice(d);
+  }
+  Device getDevice() noexcept {
+    return Tensor::getDefaultDevice();
+  }
 }
 </code></pre>   
 
       <p>
-        TODO - explain linear indexing of array, tensor constructors, and add some math operators to the tensors
-        Then add some printing functions, and we can move to the second part, the Python binding
+        The probably most interesting thing about the tensor's values is that they are represented 
+        by a single pointer/array, not a multidimensional one. This has mainly performance reasons. 
+        Say we impelemented it as a 2D array as in <code>std::vector &l tstd::vector &lt ftype &gt &gt</code>:
+        In this case we would access a value via <code>values[i][j]</code>, leading to two pointer chasings.
+        Same for the case <code>ftype** values;</code>. And with higher dimensional tensors this gets a mess really 
+        quick. Thus, linear indexing provides a clean solution with only one pointer, that also happens to be 
+        much more cache friendly. To index into the array we do the following:
       </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.cpp
+
+// static method
+tensorSize_t Tensor::computeLinearIdx(const std::vector<tensorDim_t>& idx, const Dimension& dims) {
+  assert(idx.size()!=dims.nDims() && idx.size() > 0);
+
+  const auto lastIdx = idx.size() - 1;
+  tensorSize_t offsetFactor = dims.get(lastIdx);
+  
+  tensorSize_t res = idx[lastIdx];
+  for(int i = lastIdx - 1; i >= 0; i--){
+    res += idx[i] * offsetFactor;
+    offsetFactor *= dims.get(i);
+  }
+
+  return res;
+}
+</code></pre>   
+
+      <p>
+        If this didn't make it clear yet, we refer e.g. to the 
+        <a href="https://web.cs.hacettepe.edu.tr/~bbm201/Lectures/BBM201-Lecture3.pdf" target=""_blank>following presentation</a>. 
+        It is important to grasp this concept now, since it will haunt us for the rest of this tutorial. We conclude this part by 
+        showing the final impostor of a class diagram showing the relationships in between the three classes we just created, and
+        what each of them is responsible for.
+      </p>
+
+      <figure class="fig-light">
+      <img
+      id="pytorch-class-diagram"
+      class="blog-image"
+      src="./img_1/class_diagram.png"
+      alt="Class diagram of the three tensor modules">
+      <figcaption>(Non-UML) class diagram showing the three modules and what each is for.</figcaption>
+      </figure>
+      <figure class="fig-dark">
+      <img
+      id="pytorch-class-diagram-dark"
+      class="blog-image"
+      src="./img_1/class_diagram_dark.png"
+      alt="Class diagram of the three tensor modules">
+      <figcaption>(Non-UML) class diagram showing the three modules and what each is for.</figcaption>
+      </figure>
+
     </div>
+
+    <br>
+
+    <div id="tensor-operations-section" class="article-text-div">
+
+      <h4 id="tensor-operations">Adding operations to the tensor</h4>
+
+      <p>
+        Now that we have the initial data layout down we can embellish the class with more functions.
+        The tensor itself is nice, but if it doesn't do anything but represent data it'll be useless for 
+        us. For a good start we can gobble up some math operations we expect to happen. To keep things simple
+        we start with basic operations, exemplified via the following:
+      </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.cpp
+
+Tensor Tensor::operator+(ftype scalar) const {
+  Tensor res(dims, values->getDevice(), false);
+  for (tensorSize_t i = 0; i &lt values->getSize(); ++i) {
+    (*res.values)[i] = (*values)[i] + scalar;
+  }
+
+  return res;
+}
+
+Tensor Tensor::operator*(const Tensor& other) const {
+  assert(values->getDevice() == other.values->getDevice() &&
+         values->getSize()==other.values->getSize());
+
+  Tensor res(dims, values->getDevice(), false);
+  for(tensorSize_t i=0; i<values->getSize(); i++){
+    (*res.values)[i] = (*values)[i] * (*other.values)[i];
+  }
+
+  return res;
+}
+</code></pre>
+
+        <p>
+          The drill is pretty clear in between those, and no surprises. The only one we need
+          to look out for so far is the matrix multiplication. Given two matrices $A \in \mathbb{R}^N$ 
+          and $B \in \mathbb{R}^N$, we have space requirement $\mathcal{O}(N^2)$, but a whopping cubic computational
+          complexity of $\mathcal{O}(N^3)$ (taking 
+          <a href="https://en.wikipedia.org/wiki/Strassen_algorithm" target="_blank">Strassen's algorithm</a> aside, 
+          which is more of a theoretically impressive result than something that gets used in practice). 
+          Because in deep learning so many matrix multiplications are performed this is widely considered the 
+          main slug of deep learning. In fact, most of the hardware accelerators focus exactly on making this 
+          operation as fast as possible, such as Google's TPU or AMD's NPUs. For now we compute the matmul in 
+          two steps: Step one is isolating the individual multiplications if the dimensions of the tensors are 
+          larger than two, e.g. for batched tensors. 
+        </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.cpp
+  
+Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right) {
+  if(left.dims.get(-1) != right.dims.get(-2)){
+    __throw_runtime_error("Tensor dimensions do not match");
+  }
+
+  // broadcasting
+  auto resDims = left.dims.nDims() > right.dims.nDims() ? left.dims.toVector() : right.dims.toVector();
+  resDims[resDims.size()-2] = left.dims.get(-2); // rows
+  resDims[resDims.size()-1] = right.dims.get(-1); // cols
+
+  Tensor res(resDims, left.values->getDevice(), false);
+
+  // sizes of the 2D matrices respectively
+  const tensorSize_t leftSize = left.dims.get(-1) * left.dims.get(-2); 
+  const tensorSize_t rightSize = right.dims.get(-1) * right.dims.get(-2);
+  const tensorSize_t resSize = left.dims.get(-2) * right.dims.get(-1);
+
+  tensorSize_t leftOffset = 0;
+  tensorSize_t rightOffset = 0;
+  tensorSize_t resOffset = 0;
+
+  while(leftOffset &lt left.getSize()){
+    // this is the matmul itself
+    matMul2DCpu(res, left, right, resOffset, leftOffset, rightOffset);
+
+    leftOffset += leftSize;
+    rightOffset += rightSize;
+    resOffset += resSize;
+  }
+
+  return res;
+}
+</code></pre>
+
+        <p>
+          Next we multiply the indidual matrices together. We will revisit this piece of code later,
+          as we will be able to harvest a lot of performance improvements from this piece of code. 
+          The naive version we use for now is as follows:
+        </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.cpp
+
+void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, const tensorSize_t resOffset, 
+                           const tensorSize_t leftOffset, const tensorSize_t rightOffset) {
+  
+  const auto nRowsLeft = static_cast<tensorSize_t>(left.dims.get(-2));
+  const auto nColsLeft = static_cast<tensorSize_t>(left.dims.get(-1));
+  const auto nRowsRight = static_cast<tensorSize_t>(right.dims.get(-2));
+  const auto nColsRight = static_cast<tensorSize_t>(right.dims.get(-1));
+
+  tensorSize_t resIdx = resOffset;
+  for(tensorSize_t lrow = 0; lrow &lt nRowsLeft; lrow++){
+
+    for(tensorSize_t rcol = 0; rcol &lt nColsRight; rcol++){
+      tensorSize_t leftIdx = leftOffset + lrow * nColsLeft;
+      tensorSize_t rightIdx = rightOffset + rcol;
+
+      ftype scalar = 0.0;
+      for(tensorSize_t lcol = 0; lcol &lt nColsLeft; lcol++){
+        scalar += (*left.values)[leftIdx] * (*right.values)[rightIdx];
+        leftIdx++;
+        rightIdx += nColsRight;
+      }
+      
+      (*res.values)[resIdx] = scalar;
+      resIdx++;
+    }
+  }
+}
+</code></pre>
+
+        <p>
+          We note that we already did a minor optimization here. Instead of traversing the rows of the 
+          right tensor, we go column wise. This way we avoid strided access into the right column, which 
+          makes this implementation more memory access friendly. We will go deeper into this part of the 
+          code when we optimize, so for now we will leave it as is and move on to exposing our tensor and 
+          its operations to Python next.
+        </p>
+
+    </div>
+
+    <br>
+
+    <div id="python-frontend" class="article-text-div">
+
+        <h2>Adding a Python frontend</h2>
+
+        <p>
+          Most of today's ML runs in Python, not in C++. Reasons are vast, I personally consider Python's 
+          ability to change code and therefore fast prototyping the main reason. When writing ML applications
+          it is genuinely easy to mess up internal dimensions or wanting the experiment with different configurations
+          quickly. If all that was written in C++ we'd spend a lot of time on simple try-and-error loops, wasting lots
+          of time on unnecessary complicated prototyping and compilation. Python on the other hand circumvents all 
+          these problems and is in general just a fast-prototyping powerhouse. 
+        </p>
+
+        <p>
+          A challenge of building Python code on top of C++ code is managing two different memory management systems.
+          I already talked about this in my article 
+          <a href="../calling_python_from_cpp/calling_python_from_cpp.html" target="_blank">Calling Python From C++</a>, 
+          so lets not repeat that here. Instead let's focus on solutions. There are multiple good frameworks out there
+          that are up to the task...
+        </p>
+
+        <h2>Building and importing the project</h2>
+
+        <p>
+
+        </p>
+    </div>
+
