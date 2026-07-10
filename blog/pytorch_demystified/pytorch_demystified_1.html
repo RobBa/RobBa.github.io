@@ -657,13 +657,67 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
           I already talked about this in my article 
           <a href="../calling_python_from_cpp/calling_python_from_cpp.html" target="_blank">Calling Python From C++</a>, 
           so lets not repeat that here. Instead let's focus on solutions. There are multiple good frameworks out there
-          that are up to the task...
+          that are up to the task. While the best choice would probably be 
+          <a href="https://pybind11.readthedocs.io/en/stable/" target="_blank">pybind11</a> I chose to use 
+          <a href="https://www.boost.org/doc/libs/latest/libs/python/doc/html/index.html" target="_blank">Boost.Python</a>.
+          The reason being that as a C++ dev I already was used to Boost, and there was a ready tutorial that made getting started
+          very easy. 
+        </p>
+
+        <p>
+          However, for better maintainability the Python frontend and the C++ backend are still separated in code, making it easy
+          for us to exchange either if we wanted to. With that we can start exposing the tensor object into Python. We start with 
+          an easy one that we will refine in the autograd section of the next post. To expose the tensor we simply have to write  
+        </p>
+
+<pre><code class="language-cpp">// src/python/data_modeling/py_data_modeling.h
+
+#include <boost/python.hpp>
+#include <boost/python/enum.hpp>
+#include <boost/python/return_internal_reference.hpp>
+#include <boost/python/object.hpp>
+
+namespace Py_DataModeling {
+    enum_<Device>("Device")
+        .value("CPU", Device::CPU)
+        .value("CUDA", Device::CUDA)
+    ;
+
+    // register dim type here in between
+ 
+    class_<Tensor, std::shared_ptr&ltTensor&gt, boost::noncopyable>("Tensor", no_init)
+        .def(init&ltconst std::vector&lttensorDim_t&gt&, optional&ltbool&gt &gt())
+        .def(init&ltconst std::vector&lttensorDim_t&gt&, optional&ltDevice, bool&gt &gt())
+        .add_property("device", &Tensor::getDevice, &Tensor::setDevice)
+        .add_property("dims", make_function(&Tensor::getDims, return_internal_reference&lt&gt()))
+        .def("__getitem__", &Py_DataModeling::tensorGetItem)
+        .def("__setitem__", &Py_DataModeling::tensorSetItem)
+        .def("__matmul__", WRAP_TENSOR_METHOD_1(matmul))
+        .def("__add__", WRAP_TENSOR_METHOD_1(operator+)) // elementwise add
+        .def("__mul__", WRAP_TENSOR_METHOD_1(operator*)) // elementwise mult
+        .def("__mul__", WRAP_SCALAR(operator*, float))
+        .def("__rmul__", WRAP_SCALAR_REVERSE(*, float))
+        .def("__add__", WRAP_SCALAR(operator+, float))
+        .def("__radd__", WRAP_SCALAR_REVERSE(+, float))
+        // add more operations
+    ;
+}
+</code></pre>
+
+        <p>
+          The <code>class_&lt&gt("ClassName", {ctor_signature})</code> is the call that manages our class. The 
+          first argument is what class we manage, then comes what Boost.Python manages in the background. 
         </p>
 
         <h2>Building and importing the project</h2>
 
         <p>
 
+        </p>
+
+        <p>
+          The commit SHA you can go to is 6f51694988306de2f22342aff6911e0d10234141
+          ...
         </p>
     </div>
 
