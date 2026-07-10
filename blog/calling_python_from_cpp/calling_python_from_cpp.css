@@ -1,0 +1,21 @@
+/* -------------- Calling Python from C++ ---------------- */
+
+#calling-network-from-cpp,
+#calling-network-from-cpp-dark {
+    max-width: 700px;
+}
+
+#memory-management-cpp-vs-cpython {
+    max-width: 700px;
+}
+
+#python-execution-path {
+    width: 45%;
+    max-width: 350px;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    #python-execution-path {
+        width: 55%;
+    }
+}

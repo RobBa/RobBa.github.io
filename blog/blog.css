@@ -69,54 +69,6 @@
   box-shadow: 4px 6px 16px var(--color-blog-shadow);
 }
 
-#calling-network-from-cpp,
-#calling-network-from-cpp-dark {
-    max-width: 700px;
-}
-
-#memory-management-cpp-vs-cpython {
-    max-width: 700px;
-}
-
-#python-execution-path {
-    width: 45%;
-    max-width: 350px;
-}
-
-#code-example-python-call {
-    width: 95%;
-    max-width: 800px;
-}
-
-#pac-bounds-graph,
-#pac-bounds-graph-dark {
-    width: 45%;
-    max-width: 400px;
-}
-
-#pac-bounds-cms-to-test,
-#pac-bounds-cms-to-test-dark {
-    width: 60%;
-    max-width: 500px;
-}
-
-#pac-bounds-graph-traversal,
-#pac-bounds-graph-traversal-dark {
-    width: 53%;
-    max-width: 700px;
-}
-
-#pac-bounds-min-cut,
-#pac-bounds-min-cut-dark {
-    width: 70%;
-    max-width: 600px;
-}
-
-#pac-bounds-pdfa-example {
-    width: 100%;
-    max-width: 800px;
-}
-
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     .blog-index-div h4,
     .article-date-index {
@@ -130,30 +82,5 @@
 
     .MathJax {
         overflow-x: auto;
-    }
-
-    #python-execution-path {
-        width: 55%;
-    }
-
-    #pac-bounds-graph,
-    #pac-bounds-graph-dark {
-        width: 75%;
-    }
-
-    #pac-bounds-cms-to-test,
-    #pac-bounds-cms-to-test-dark {
-        width: 80%;
-        max-width: 500px;
-    }
-
-    #pac-bounds-min-cut,
-    #pac-bounds-min-cut-dark {
-        width: 75%;
-        max-width: 600px;
-    }
-
-    #pac-bounds-pdfa-example {
-        width: 100%;
     }
 }
