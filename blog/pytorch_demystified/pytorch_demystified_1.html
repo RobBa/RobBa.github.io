@@ -450,7 +450,7 @@ namespace sys {
       <p>
         The probably most interesting thing about the tensor's values is that they are represented 
         by a single pointer/array, not a multidimensional one. This has mainly performance reasons. 
-        Say we impelemented it as a 2D array as in <code>std::vector &l tstd::vector &lt ftype &gt &gt</code>:
+        Say we implemented it as a 2D array as in <code>std::vector &l tstd::vector &lt ftype &gt &gt</code>:
         In this case we would access a value via <code>values[i][j]</code>, leading to two pointer chasings.
         Same for the case <code>ftype** values;</code>. And with higher dimensional tensors this gets a mess really 
         quick. Thus, linear indexing provides a clean solution with only one pointer, that also happens to be 
@@ -461,7 +461,7 @@ namespace sys {
 
 // static method
 tensorSize_t Tensor::computeLinearIdx(const std::vector<tensorDim_t>& idx, const Dimension& dims) {
-  assert(idx.size()!=dims.nDims() && idx.size() > 0);
+  assert(idx.size() != dims.nDims() || idx.size() > 0);
 
   const auto lastIdx = idx.size() - 1;
   tensorSize_t offsetFactor = dims.get(lastIdx);
@@ -591,7 +591,7 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right) {
 </code></pre>
 
         <p>
-          Next we multiply the indidual matrices together. We will revisit this piece of code later,
+          Next we multiply the individual matrices together. We will revisit this piece of code later,
           as we will be able to harvest a lot of performance improvements from this piece of code. 
           The naive version we use for now is as follows:
         </p>
