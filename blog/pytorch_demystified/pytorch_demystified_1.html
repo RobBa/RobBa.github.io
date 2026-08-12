@@ -49,12 +49,13 @@ mathjax: true
               <a href="#basic-frontend">Implementing the basic frontend</a>
             </li>
             <li>
-              <a href="#bp-under-hood">Optional: A brief look under the hood</a>
+              <a href="#bp-under-hood">Optional: Boost.Python under the hood</a>
             </li>
           </ol>
         </li>
 
         <li><a href="#build-project">Building and importing the project</a></li>
+        <li><a href="#summary">Summary</a></li>
       </ol>
     </div>
     
@@ -264,13 +265,13 @@ mathjax: true
         global search for "float" or "double", helping us refactoring later if we wanted to.
       </p>
 
-<pre><code class="language-cpp">// src/utility/global_parameters.h -> will be renamed util.h later
+<pre><code class="language-cpp">// src/utility/global_parameters.h -&gt; will be renamed util.h later
 using ftype = float;
 
 using tensorDim_t = std::uint16_t; // represent one dimension of a tensor
 using tensorSize_t = std::uint32_t; // represent the total size of a tensor
 
-static_assert(sizeof(tensorSize_t) >= sizeof(tensorDim_t));
+static_assert(sizeof(tensorSize_t) &gt;= sizeof(tensorDim_t));
 </code></pre>
 
     </div>
@@ -297,7 +298,7 @@ static_assert(sizeof(tensorSize_t) >= sizeof(tensorDim_t));
 class Tensor final { // final to promote flat hierarchies
 private:
   Dimension dims;
-  std::unique_ptr<tensorValues_t> values = nullptr; // contained values of tensor
+  std::unique_ptr&lt;tensorValues_t&gt; values = nullptr; // contained values of tensor
 
 public:
   // stuff goes here
@@ -309,18 +310,18 @@ public:
         <code>Dimension</code>. We start with the latter, since it is easier to explain. Basically, what it 
         does is represent the dimensions of our tensor. Because we want a Python binding later, there's no 
         implicit conversion method from any Python datatype to our Dimension data type, thus we use a 
-        <code>std::vector<tensorDim_t></code> as an argument. The data type looks like this for now:
+        <code>std::vector&lt;tensorDim_t&gt;</code> as an argument. The data type looks like this for now:
       </p>
 
 <pre><code class="language-cpp">// src/data_modeling/dimension.h
 
 class Dimension final {
   private:
-    std::vector<tensorDim_t> dims;
+    std::vector&lt;tensorDim_t&gt; dims;
     tensorSize_t size = 0;
 
   public:
-    Dimension(const std::vector<tensorDim_t>& dims);
+    Dimension(const std::vector&lt;tensorDim_t&gt;& dims);
 
     Dimension(const Dimension& other);
     Dimension& operator=(const Dimension& other);
@@ -330,7 +331,7 @@ class Dimension final {
 
     ~Dimension() noexcept = default;
 
-    void resize(const std::vector<tensorDim_t>& dims);
+    void resize(const std::vector&lt;tensorDim_t&gt;& dims);
       
     tensorSize_t getSize() const noexcept {
       return size;
@@ -341,14 +342,14 @@ class Dimension final {
     }
 
     tensorDim_t operator[](int idx) const {
-      if(idx &lt 0){
+      if(idx &lt; 0){
         idx = dims.size() + idx; // -1 is last idx, -2 second last and so forth
       }
 
       return dims[idx];
     }
 
-    // also add some operators for convenience: !=, ==, &lt&lt for printing
+    // also add some operators for convenience: !=, ==, &lt;&lt; for printing
 }
 </code></pre>
 
@@ -357,7 +358,7 @@ class Dimension final {
         the data type implicitly a second function apart from representing the dimensions, 
         namely through the attribute <code>tensorSize_t size</code>. Whether the total size, 
         which is the product of the input to the constructor 
-        <code>Dimension(const std::vector<tensorDim_t>& dims)</code>, should be part of the dimension
+        <code>Dimension(const std::vector&lt;tensorDim_t&gt;& dims)</code>, should be part of the dimension
         or the tensor itself is more a matter of taste. We leave it here for now, and shifting it over
         will be an easy task. The Dimension data type will become more interesting later, when 
         we use strided access patterns to represent transposed or permuted tensors. For now we keep it 
@@ -416,11 +417,11 @@ private:
     // this is still templated in the commit
     void resize(const tensorSize_t size)
     {
-      this->size = size;
-      switch (this->device)
+      this-&gt;size = size;
+      switch (this-&gt;device)
       {
       case Device::CPU:
-        values = static_cast<ftype* >(std::malloc(this->size * sizeof(ftype)));
+        values = static_cast&lt;ftype* &gt;(std::malloc(this-&gt;size * sizeof(ftype)));
         break;
       case Device::CUDA:
         std::__throw_invalid_argument("Not implemented yet.");
@@ -466,7 +467,7 @@ namespace sys {
       <p>
         The probably most interesting thing about the tensor's values is that they are represented 
         by a single pointer/array, not a multidimensional one. This has mainly performance reasons. 
-        Say we implemented it as a 2D array as in <code>std::vector &l tstd::vector &lt ftype &gt &gt</code>:
+        Say we implemented it as a 2D array as in <code>std::vector &l tstd::vector &lt; ftype &gt; &gt;</code>:
         In this case we would access a value via <code>values[i][j]</code>, leading to two pointer chasings.
         Same for the case <code>ftype** values;</code>. And with higher dimensional tensors this gets a mess really 
         quick. Thus, linear indexing provides a clean solution with only one pointer, that also happens to be 
@@ -476,14 +477,14 @@ namespace sys {
 <pre><code class="language-cpp">// src/data_modeling/tensor.cpp
 
 // static method
-tensorSize_t Tensor::computeLinearIdx(const std::vector<tensorDim_t>& idx, const Dimension& dims) {
-  assert(idx.size() != dims.nDims() || idx.size() > 0);
+tensorSize_t Tensor::computeLinearIdx(const std::vector&lt;tensorDim_t&gt;& idx, const Dimension& dims) {
+  assert(idx.size() != dims.nDims() || idx.size() &gt; 0);
 
   const auto lastIdx = idx.size() - 1;
   tensorSize_t offsetFactor = dims.get(lastIdx);
   
   tensorSize_t res = idx[lastIdx];
-  for(int i = lastIdx - 1; i >= 0; i--){
+  for(int i = lastIdx - 1; i &gt;= 0; i--){
     res += idx[i] * offsetFactor;
     offsetFactor *= dims.get(i);
   }
@@ -535,8 +536,8 @@ tensorSize_t Tensor::computeLinearIdx(const std::vector<tensorDim_t>& idx, const
 <pre><code class="language-cpp">// src/data_modeling/tensor.cpp
 
 Tensor Tensor::operator+(ftype scalar) const {
-  Tensor res(dims, values->getDevice(), false);
-  for (tensorSize_t i = 0; i &lt values->getSize(); ++i) {
+  Tensor res(dims, values-&gt;getDevice(), false);
+  for (tensorSize_t i = 0; i &lt; values-&gt;getSize(); ++i) {
     (*res.values)[i] = (*values)[i] + scalar;
   }
 
@@ -544,11 +545,11 @@ Tensor Tensor::operator+(ftype scalar) const {
 }
 
 Tensor Tensor::operator*(const Tensor& other) const {
-  assert(values->getDevice() == other.values->getDevice() &&
-         values->getSize()==other.values->getSize());
+  assert(values-&gt;getDevice() == other.values-&gt;getDevice() &&
+         values-&gt;getSize()==other.values-&gt;getSize());
 
-  Tensor res(dims, values->getDevice(), false);
-  for(tensorSize_t i=0; i<values->getSize(); i++){
+  Tensor res(dims, values-&gt;getDevice(), false);
+  for(tensorSize_t i=0; i&lt;values-&gt;getSize(); i++){
     (*res.values)[i] = (*values)[i] * (*other.values)[i];
   }
 
@@ -578,11 +579,11 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right) {
   }
 
   // broadcasting
-  auto resDims = left.dims.nDims() > right.dims.nDims() ? left.dims.toVector() : right.dims.toVector();
+  auto resDims = left.dims.nDims() &gt; right.dims.nDims() ? left.dims.toVector() : right.dims.toVector();
   resDims[resDims.size()-2] = left.dims.get(-2); // rows
   resDims[resDims.size()-1] = right.dims.get(-1); // cols
 
-  Tensor res(resDims, left.values->getDevice(), false);
+  Tensor res(resDims, left.values-&gt;getDevice(), false);
 
   // sizes of the 2D matrices respectively
   const tensorSize_t leftSize = left.dims.get(-1) * left.dims.get(-2); 
@@ -593,7 +594,7 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right) {
   tensorSize_t rightOffset = 0;
   tensorSize_t resOffset = 0;
 
-  while(leftOffset &lt left.getSize()){
+  while(leftOffset &lt; left.getSize()){
     // this is the matmul itself
     matMul2DCpu(res, left, right, resOffset, leftOffset, rightOffset);
 
@@ -617,20 +618,20 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right) {
 void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, const tensorSize_t resOffset, 
                            const tensorSize_t leftOffset, const tensorSize_t rightOffset) {
   
-  const auto nRowsLeft = static_cast<tensorSize_t>(left.dims.get(-2));
-  const auto nColsLeft = static_cast<tensorSize_t>(left.dims.get(-1));
-  const auto nRowsRight = static_cast<tensorSize_t>(right.dims.get(-2));
-  const auto nColsRight = static_cast<tensorSize_t>(right.dims.get(-1));
+  const auto nRowsLeft = static_cast&lt;tensorSize_t&gt;(left.dims.get(-2));
+  const auto nColsLeft = static_cast&lt;tensorSize_t&gt;(left.dims.get(-1));
+  const auto nRowsRight = static_cast&lt;tensorSize_t&gt;(right.dims.get(-2));
+  const auto nColsRight = static_cast&lt;tensorSize_t&gt;(right.dims.get(-1));
 
   tensorSize_t resIdx = resOffset;
-  for(tensorSize_t lrow = 0; lrow &lt nRowsLeft; lrow++){
+  for(tensorSize_t lrow = 0; lrow &lt; nRowsLeft; lrow++){
 
-    for(tensorSize_t rcol = 0; rcol &lt nColsRight; rcol++){
+    for(tensorSize_t rcol = 0; rcol &lt; nColsRight; rcol++){
       tensorSize_t leftIdx = leftOffset + lrow * nColsLeft;
       tensorSize_t rightIdx = rightOffset + rcol;
 
       ftype scalar = 0.0;
-      for(tensorSize_t lcol = 0; lcol &lt nColsLeft; lcol++){
+      for(tensorSize_t lcol = 0; lcol &lt; nColsLeft; lcol++){
         scalar += (*left.values)[leftIdx] * (*right.values)[rightIdx];
         leftIdx++;
         rightIdx += nColsRight;
@@ -694,24 +695,24 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
 
 <pre><code class="language-cpp">// src/python/data_modeling/py_data_modeling.h
 
-#include <boost/python.hpp>
-#include <boost/python/enum.hpp>
-#include <boost/python/return_internal_reference.hpp>
-#include <boost/python/object.hpp>
+#include &lt;boost/python.hpp&gt;
+#include &lt;boost/python/enum.hpp&gt;
+#include &lt;boost/python/return_internal_reference.hpp&gt;
+#include &lt;boost/python/object.hpp&gt;
 
 namespace Py_DataModeling {
-    enum_<Device>("Device")
+    enum_&lt;Device&gt;("Device")
         .value("CPU", Device::CPU)
         .value("CUDA", Device::CUDA)
     ;
 
     // register dim type here in between
  
-    class_<Tensor, std::shared_ptr&ltTensor&gt, boost::noncopyable>("Tensor", no_init)
-        .def(init&ltconst std::vector&lttensorDim_t&gt&, optional&ltbool&gt &gt())
-        .def(init&ltconst std::vector&lttensorDim_t&gt&, optional&ltDevice, bool&gt &gt())
+    class_&lt;Tensor, std::shared_ptr&lt;Tensor&gt;, boost::noncopyable&gt;("Tensor", no_init)
+        .def(init&lt;const std::vector&lt;tensorDim_t&gt;&, optional&lt;bool&gt; &gt;())
+        .def(init&lt;const std::vector&lt;tensorDim_t&gt;&, optional&lt;Device, bool&gt; &gt;())
         .add_property("device", &Tensor::getDevice, &Tensor::setDevice)
-        .add_property("dims", make_function(&Tensor::getDims, return_internal_reference&lt&gt()))
+        .add_property("dims", make_function(&Tensor::getDims, return_internal_reference&lt;&gt;()))
         .def("__getitem__", &Py_DataModeling::tensorGetItem)
         .def("__setitem__", &Py_DataModeling::tensorSetItem)
         .def("__matmul__", WRAP_TENSOR_METHOD_1(matmul))
@@ -731,9 +732,9 @@ namespace Py_DataModeling {
         </p>
 
         <p>
-          <b>Base definition and object management:</b> The <code>class_&lt&gt("ClassName", {ctor_signature})</code> is the 
+          <b>Base definition and object management:</b> The <code>class_&lt;&gt;("ClassName", {ctor_signature})</code> is the 
           call that manages our class. The first argument is what class we manage. The second template argument, the 
-          <code>std::shared_ptr&ltTensor&gt</code>, tells Boost.Python how we want to manage our object in the background (the 
+          <code>std::shared_ptr&lt;Tensor&gt;</code>, tells Boost.Python how we want to manage our object in the background (the 
           choice for a shared pointer will become clearer in the next blogpost). We will scratch on how this works internally in
           the optional segment below, but for the uninterested reader, this basically means that internally, when calling say 
           <code>t = Tensor()</code> in Python, then <code>t</code> is an object that holds a reference to a shared pointer holding
@@ -753,8 +754,8 @@ t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
           <b>Constructors:</b> There was one thing I lied about here though. Looking at the next pieces of code, we realize we add the constructors. 
           The second argument in the braces enables us to define a constructor. I chose to give it a <code>no_init</code>, 
           because giving it one here would visually emphasize on that ctor. Giving the class more constructors however is
-          done via calling .def, as in <code>.def(init&ltconst std::vector&lttensorDim_t&gt&, optional&ltbool&gt &gt())</code>
-          and in <code>.def(init&ltconst std::vector&lttensorDim_t&gt&, optional&ltDevice, bool&gt &gt())</code>. The leading 
+          done via calling .def, as in <code>.def(init&lt;const std::vector&lt;tensorDim_t&gt;&, optional&lt;bool&gt; &gt;())</code>
+          and in <code>.def(init&lt;const std::vector&lt;tensorDim_t&gt;&, optional&lt;Device, bool&gt; &gt;())</code>. The leading 
           <code>init</code> tells boost.python that this is a constructor, and the <code>optional</code> is an easy way to 
           give it optional arguments. The lie in my earlier code therefore consisted in calling a non-existent default constructor
           that has no arguments. More on that can be taken from 
@@ -765,7 +766,7 @@ t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
         <p>
           <b>Adding class properties:</b> Going further then we can see that these next lines of code represent the properties and methods we give our tensor class.
           We start with two properties via <code>.add_property</code>, namely the device and the dimensions. We take extra care of the 
-          dimensions here, returning them via <code>make_function(&Tensor::getDims, return_internal_reference&lt&gt())</code>. We have to 
+          dimensions here, returning them via <code>make_function(&Tensor::getDims, return_internal_reference&lt;&gt;())</code>. We have to 
           do this since our original method has the following signature <code>const Dimension& getDims() const noexcept;</code>. The 
           interesting part here is the return value, being a constant reference. Python does not allow for constant values by design, 
           and by default the return value of Python is a copy of the object. Mirroring the C++ backend then we have to tell boost.python 
@@ -804,18 +805,18 @@ print(dims.get(0)) # safe only if dims keeps t alive
           Python keywords. For instance, defining <code>__add__</code> for our class enables us to write simply <code>t + 5</code>
           or <code>t1 + t2</code>. Similarly, <code>__getitem__</code> gives us <code>t[5] = 3.14</code>. However, there is a mismatch
           in the return values. These method do return a new tensor object as defined in the backend, but Python manages 
-          <code>shared_ptr&ltTensor&gt</code> objects. To bridge the gap we give it wrapper functions that convert the return value 
+          <code>shared_ptr&lt;Tensor&gt;</code> objects. To bridge the gap we give it wrapper functions that convert the return value 
           explicitly into the desired type. This would look something like this:
         </p>
 
 <pre><code>#define WRAP_TENSOR_METHOD_1(method) \
-+[](const Tensor& self, const Tensor& other) -> std::shared_ptr<Tensor> { \
-  return std::make_shared<Tensor>(self.method(other)); \
++[](const Tensor& self, const Tensor& other) -&gt; std::shared_ptr&lt;Tensor&gt; { \
+  return std::make_shared&lt;Tensor&gt;(self.method(other)); \
 }
 
 #define WRAP_SCALAR(method, T) \
-+[](const Tensor& self, T val) -> std::shared_ptr<Tensor> { \
-  return std::make_shared<Tensor>(self.method(val)); \
++[](const Tensor& self, T val) -&gt; std::shared_ptr&lt;Tensor&gt; { \
+  return std::make_shared&lt;Tensor&gt;(self.method(val)); \
 }
 </code></pre>
 
@@ -859,8 +860,8 @@ Tensor operator*(ftype scalar, const Tensor& tensor) {
         </p>
 
 <pre><code>#define WRAP_SCALAR_REVERSE(op, T) \
-+[](const Tensor& self, T val) -> std::shared_ptr<Tensor> { \
-  return std::make_shared<Tensor>(val op self); \
++[](const Tensor& self, T val) -&gt; std::shared_ptr&lt;Tensor&gt; { \
+  return std::make_shared&lt;Tensor&gt;(val op self); \
 }
 
 // ...
@@ -879,13 +880,13 @@ Tensor operator*(ftype scalar, const Tensor& tensor) {
 <pre><code> // src/data_modeling/tensor_creation.h
 
 // creates a tensor with gaussian initialized values, centered around zero with stddev=1
-std::shared_ptr<Tensor> Gaussian(std::vector<tensorDim_t> dims, Device d, const bool requiresGrad=false) {
-  auto res = std::make_shared<Tensor>(std::move(dims), d, requiresGrad);
-  res->reset(utility::InitClass::Gaussian);
+std::shared_ptr&lt;Tensor&gt; Gaussian(std::vector&lt;tensorDim_t&gt; dims, Device d, const bool requiresGrad=false) {
+  auto res = std::make_shared&lt;Tensor&gt;(std::move(dims), d, requiresGrad);
+  res-&gt;reset(utility::InitClass::Gaussian);
   return res;
 }
     
-std::shared_ptr<Tensor> Gaussian(std::vector<tensorDim_t> dims, const bool requiresGrad=false) {
+std::shared_ptr&lt;Tensor&gt; Gaussian(std::vector&lt;tensorDim_t&gt; dims, const bool requiresGrad=false) {
   return Gaussian(std::move(dims), Tensor::getDefaultDevice(), requiresGrad);
 }
 
@@ -898,19 +899,19 @@ std::shared_ptr<Tensor> Gaussian(std::vector<tensorDim_t> dims, const bool requi
         </p>
 
 <pre><code>// lambda wrappers to resolve default arguments
-auto GaussianWrapper0(std::vector<tensorDim_t> dims) { 
+auto GaussianWrapper0(std::vector&lt;tensorDim_t&gt; dims) { 
   return TensorFunctions::Gaussian(std::move(dims)); 
 }
 
-auto GaussianWrapper1(std::vector<tensorDim_t> dims, Device d) { 
+auto GaussianWrapper1(std::vector&lt;tensorDim_t&gt; dims, Device d) { 
   return TensorFunctions::Gaussian(std::move(dims), d); 
 }
 
 // explicit function pointers resolving overloads
-std::shared_ptr<Tensor>    (*Gaussian0)(std::vector<tensorDim_t>)                     = &ampGaussianWrapper0;
-std::shared_ptr<Tensor>    (*Gaussian1)(std::vector<tensorDim_t>, Device)             = &ampGaussianWrapper1;
-std::shared_ptr<Tensor>    (*Gaussian2)(std::vector<tensorDim_t>, const bool)         = &(TensorFunctions::Gaussian);
-std::shared_ptr<Tensor>    (*Gaussian3)(std::vector<tensorDim_t>, Device, const bool) = &(TensorFunctions::Gaussian);
+std::shared_ptr&lt;Tensor&gt;    (*Gaussian0)(std::vector&lt;tensorDim_t&gt;)                     = &amp;GaussianWrapper0;
+std::shared_ptr&lt;Tensor&gt;    (*Gaussian1)(std::vector&lt;tensorDim_t&gt;, Device)             = &amp;GaussianWrapper1;
+std::shared_ptr&lt;Tensor&gt;    (*Gaussian2)(std::vector&lt;tensorDim_t&gt;, const bool)         = &(TensorFunctions::Gaussian);
+std::shared_ptr&lt;Tensor&gt;    (*Gaussian3)(std::vector&lt;tensorDim_t&gt;, Device, const bool) = &(TensorFunctions::Gaussian);
 </code></pre>
 
         <p>
@@ -929,7 +930,7 @@ def("Gaussian", Py_DataModeling::Gaussian3);
 
         <br>
 
-        <h4 id="bp-under-hood">Optional: A brief look under the hood</h4>
+        <h4 id="bp-under-hood">Optional: Boost.Python under the hood</h4>
         
         <p>
           In the previous section we did a lot of magic with boost.python. For those also itching with uncertainty I want to 
@@ -944,11 +945,17 @@ def("Gaussian", Py_DataModeling::Gaussian3);
           ...
         </p>
 
+        <br>
+
         <h2 id="build-project">Building and importing the project</h2>
 
         <p>
           TODO
         </p>
+
+        <br>
+
+        <h2 id="summary">Summary</h2>
 
         <p>
           The commit SHA you can go to is 6f51694988306de2f22342aff6911e0d10234141
