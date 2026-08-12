@@ -8,7 +8,7 @@ mathjax: true
 
     <br>
 
-    <h1>PyTorch demystified - Part 1: <br>Tensor interface and Python bindings</h1>
+    <h1>PyTorch demystified 1 -<br>Tensor interface and Python bindings</h1>
     <p class="article-date">Published: Jul. 2026</p>
 
     <br>
@@ -29,6 +29,7 @@ mathjax: true
         <li>
           <a href="#preliminary-thoughts">Preliminary thoughts</a>
         </li>
+
         <li>
           <a href="#tensor-backend">Designing the tensor backend</a>
           <ol>
@@ -39,10 +40,21 @@ mathjax: true
               <a href="#tensor-operations">Adding operations to the tensor</a>
             </li>
           </ol>
+
+        </li>
+        <li>
+          <a href="#python-frontend">Adding the Python frontend</a>
+          <ol>
+            <li>
+              <a href="#basic-frontend">Implementing the basic frontend</a>
+            </li>
+            <li>
+              <a href="#bp-under-hood">Optional: A brief look under the hood</a>
+            </li>
+          </ol>
         </li>
       </ol>
     </div>
-
     <br>
 
     <div id="introduction" class="article-text-div">
@@ -50,12 +62,12 @@ mathjax: true
       <h2>Introduction</h2>
 
       <p>
-        If you are like me then chances are things don't really stick with you unless you really
+        If you are like me then chances are things are a whole lot more fun when you
         understand how they work from the ground up. Having used PyTorch and Tensorflow/Keras for 
         a while I never really understood why things are the way they are in those. So I decided
         to implement my own small library to train neural networks. It turned out to be quite 
-        similar to PyTorch in its frontend, so I can make a strong case for this one now. In the 
-        following multi-part series I will walk you step-by-step through the components that are necessary
+        similar to PyTorch in its frontend, making me like PyTorch a whole lot better in the end. This 
+        multi-part series will walk you step-by-step through the components that are necessary
         to build your own library. The posts planned so far are: 
       </p>
 
@@ -187,8 +199,8 @@ mathjax: true
       </div>
 
       <p>
-        If we still have time we can then continue implementing advanced models such as transformers 
-        and computer vision modules, and provide further optimization techniques guided by larger models.
+        If we still have time we can then continue implementing advanced models such as transformers (the basis for LLMs)
+        and modern computer vision modules, and provide further optimization techniques guided by larger models.
       </p>
 
       <p>
@@ -641,12 +653,14 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
 
     <div id="python-frontend" class="article-text-div">
 
-        <h2>Adding a Python frontend</h2>
+        <h2>Adding the Python frontend</h2>
 
         <p>
-          Most of today's ML runs in Python, not in C++. Reasons are vast, I personally consider Python's 
-          ability to change code and therefore fast prototyping the main reason. When writing ML applications
-          it is genuinely easy to mess up internal dimensions or wanting the experiment with different configurations
+          Most of today's ML runs in Python, not in C++. Reasons are vast, but Python's ability to change code and 
+          therefore fast prototyping is porbably the main reason. That and that support for scientific software was 
+          large before modern ML came into play even, through libraries like Scikit-learn, NumPy, Matplotlib, and 
+          SciPy. When writing ML applications
+          it is genuinely easy to mess up dimensions or wanting to experiment with different configurations
           quickly. If all that was written in C++ we'd spend a lot of time on simple try-and-error loops, wasting lots
           of time on unnecessary complicated prototyping and compilation. Python on the other hand circumvents all 
           these problems and is in general just a fast-prototyping powerhouse. 
@@ -661,12 +675,14 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
           <a href="https://pybind11.readthedocs.io/en/stable/" target="_blank">pybind11</a> I chose to use 
           <a href="https://www.boost.org/doc/libs/latest/libs/python/doc/html/index.html" target="_blank">Boost.Python</a>.
           The reason being that as a C++ dev I already was used to Boost, and there was a ready tutorial that made getting started
-          very easy. 
+          very easy. However, for better maintainability the Python frontend and the C++ backend are still separated in code, making it easy
+          for us to exchange either if we wanted to. With that we can start exposing the tensor object into Python.
         </p>
 
+        <h4 id="basic-frontend">Implementing the basic frontend</h4>
+
         <p>
-          However, for better maintainability the Python frontend and the C++ backend are still separated in code, making it easy
-          for us to exchange either if we wanted to. With that we can start exposing the tensor object into Python. We start with 
+           We start with 
           an easy one that we will refine in the autograd section of the next post. To expose the tensor we simply have to write  
         </p>
 
@@ -706,7 +722,31 @@ namespace Py_DataModeling {
 
         <p>
           The <code>class_&lt&gt("ClassName", {ctor_signature})</code> is the call that manages our class. The 
-          first argument is what class we manage, then comes what Boost.Python manages in the background. 
+          first argument is what class we manage. The second template argument, the <code>std::shared_ptr&ltTensor&gt</code>,
+          tells Boost.Python how we want to manage our object in the background. We will scratch on how this works internally in
+          the optional segment below, but for the uninterested reader, this basically means that internally, when calling say 
+          <code>t = Tensor()</code> in Python, then <code>t</code> is an object that holds a reference to a shared pointer holding
+          our tensor. The third argument <code>boost::noncopyable</code> now prevents boost.python from creating elaborate copies, 
+          i.e. it does not call the copy-constructor for the Python frontend. Instead it hands over the reference only. Removing the 
+          template argument will likely end up with a compiler error anyway, since we manually deleted the copy-operations for our Tensor
+          class. Lastly, the braces take in the Python internal class name "Tensor". In summary, we have this beavior:
+        </p>
+
+<pre><code>
+from dl_lib import Tensor # name Tensor defined by first argument in braces
+
+t1 = Tensor() # holds the tensor as a shared_ptr
+t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
+</code></pre>
+
+        <p>
+          
+        </p>
+
+        <h4 id="bp-under-hood">Optional: A brief look under the hood</h4>
+        
+        <p>
+          TODO
         </p>
 
         <h2>Building and importing the project</h2>
