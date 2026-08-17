@@ -700,7 +700,8 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
 #include &lt;boost/python/return_internal_reference.hpp&gt;
 #include &lt;boost/python/object.hpp&gt;
 
-namespace Py_DataModeling {
+BOOST_PYTHON_MODULE(py_data_modeling)
+{    
     enum_&lt;Device&gt;("Device")
         .value("CPU", Device::CPU)
         .value("CUDA", Device::CUDA)
@@ -738,7 +739,7 @@ namespace Py_DataModeling {
           choice for a shared pointer will become clearer in the next blogpost). We will scratch on how this works internally in
           the optional segment below, but for the uninterested reader, this basically means that internally, when calling say 
           <code>t = Tensor()</code> in Python, then <code>t</code> is an object that holds a reference to a shared pointer holding
-          our tensor. The third argument <code>boost::noncopyable</code> now prevents boost.python from creating elaborate copies, 
+          our tensor. The third argument <code>boost::noncopyable</code> now prevents Boost.Python from creating elaborate copies, 
           i.e. it does not call the copy-constructor for the Python frontend. Instead it hands over the reference only. Removing the 
           template argument will likely end up with a compiler error anyway, since we manually deleted the copy-operations for our Tensor
           class. Lastly, the braces take in the Python internal class name "Tensor". In summary, we have this beavior:
@@ -756,7 +757,7 @@ t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
           because giving it one here would visually emphasize on that ctor. Giving the class more constructors however is
           done via calling .def, as in <code>.def(init&lt;const std::vector&lt;tensorDim_t&gt;&, optional&lt;bool&gt; &gt;())</code>
           and in <code>.def(init&lt;const std::vector&lt;tensorDim_t&gt;&, optional&lt;Device, bool&gt; &gt;())</code>. The leading 
-          <code>init</code> tells boost.python that this is a constructor, and the <code>optional</code> is an easy way to 
+          <code>init</code> tells Boost.Python that this is a constructor, and the <code>optional</code> is an easy way to 
           give it optional arguments. The lie in my earlier code therefore consisted in calling a non-existent default constructor
           that has no arguments. More on that can be taken from 
           <a href="https://www.boost.org/doc/libs/latest/libs/python/doc/html/tutorial/tutorial/exposing.html#tutorial.exposing.constructors"
@@ -769,7 +770,7 @@ t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
           dimensions here, returning them via <code>make_function(&Tensor::getDims, return_internal_reference&lt;&gt;())</code>. We have to 
           do this since our original method has the following signature <code>const Dimension& getDims() const noexcept;</code>. The 
           interesting part here is the return value, being a constant reference. Python does not allow for constant values by design, 
-          and by default the return value of Python is a copy of the object. Mirroring the C++ backend then we have to tell boost.python 
+          and by default the return value of Python is a copy of the object. Mirroring the C++ backend then we have to tell Boost.Python 
           what to do with this one. <code>return_internal_reference</code> does two things then: Firstly it tells Python to not return a 
           copy of the dimension object (necessary if we deleted the copy-operations for that one), and secondly, it tells Python to 
           keep the tensor alive so long the reference to the dimensions object exists. Otherwise there would be no guarantee that the 
@@ -783,7 +784,7 @@ print(dims.get(0)) # safe only if dims keeps t alive
 
         <p>
           Holding a non-owning reference would mean that dims would be a dangling pointer, resulting in a crash. <code>return_internal_reference</code>
-          prevents this explicitly, making our code safer. For more on call-policies I refer to the boost.python 
+          prevents this explicitly, making our code safer. For more on call-policies I refer to the Boost.Python 
           <a href="https://www.boost.org/doc/libs/latest/libs/python/doc/html/tutorial/tutorial/functions.html#tutorial.functions.call_policies"
           target="_blank">tutorial</a>.
         </p>
@@ -792,12 +793,16 @@ print(dims.get(0)) # safe only if dims keeps t alive
           <b>Adding class methods:</b> Below the properties section we see all the method definitions we want to expose:
         </p>
 
-<pre><code>.def("__getitem__", &Py_DataModeling::tensorGetItem)
+<pre><code>BOOST_PYTHON_MODULE(py_data_modeling)
+{
+// ...
+.def("__getitem__", &Py_DataModeling::tensorGetItem)
 .def("__setitem__", &Py_DataModeling::tensorSetItem)
 .def("__add__", WRAP_TENSOR_METHOD_1(operator+))
 .def("__mul__", WRAP_TENSOR_METHOD_1(operator*))
 .def("__mul__", WRAP_SCALAR(operator*, float))
 // ...
+}
 </code></pre>
 
         <p>
@@ -823,7 +828,7 @@ print(dims.get(0)) # safe only if dims keeps t alive
         <p>
           In other words, we define lambas. The first argument is always a reference to the object we call the method on, 
           hence the input arguments. Then comes a list with arguments. The wrapper simply calls the operation we requested 
-          by the signature, and returns the result explicitly wrapped in a shared pointer. A quirk of boost.python here 
+          by the signature, and returns the result explicitly wrapped in a shared pointer. A quirk of Boost.Python here 
           is that when calling a method, it sees the Tensor, which it then unwraps into its representation, hence the
           expected argument is a normal Tensor reference. However, when returning the value, it takes the representation,
           and then wraps it into its own management structs. Thus the values look a bit odd and asymmetrical.
@@ -867,7 +872,7 @@ Tensor operator*(ftype scalar, const Tensor& tensor) {
 // ...
 // Add to tensor class:
 .def("__rmul__", WRAP_SCALAR_REVERSE(*, float))
-// ...
+// more operators...
 ; // we wrap up our tensor class with this
 </code></pre>
 
@@ -893,8 +898,8 @@ std::shared_ptr&lt;Tensor&gt; Gaussian(std::vector&lt;tensorDim_t&gt; dims, cons
 // also functions for creating zero- and ones-initialized tensors
 </code></pre>
           
-        <p>One problem that arises in boost.python is that when we give it function pointers as above 
-          it cannot tell what overload we need. Therefore boost.python needs an explicit function pointer to an unabiguous function name. 
+        <p>One problem that arises in Boost.Python is that when we give it function pointers as above 
+          it cannot tell what overload we need. Therefore Boost.Python needs an explicit function pointer to an unabiguous function name. 
           We achieve this by writing explicit wrapper-methods, one for each overload that we want to have. Those would look like this:
         </p>
 
@@ -930,19 +935,60 @@ def("Gaussian", Py_DataModeling::Gaussian3);
 
         <br>
 
-        <h4 id="bp-under-hood">Optional: Boost.Python under the hood</h4>
+        <h4 id="bp-under-hood">Optional: Boost.Python briefly under the hood</h4>
         
         <p>
-          In the previous section we did a lot of magic with boost.python. For those also itching with uncertainty I want to 
-          give a rough explanation of how this all works under the hood. I.e. in this brief, and optional, section we take a 
-          look into boost.python, and how it does all this for us with seeming ease. To do so we have to revisit CPython. For 
+          In the previous section we did a lot of magic with Boost.Python. For those also itching with curiosity I want to 
+          give a rough explanation of how this all works under the hood. I.e. in this quite brief and optional section we take a 
+          look into Boost.Python, and how it does all this for us with seeming ease. To do so we have to revisit CPython. For 
           those that have not read my previous post on CPython or have never had contact with it I refer to my article 
           <a href="../calling_python_from_cpp/calling_python_from_cpp.html" target="_blank">here</a>. In the following we will need
           this and add a little extra to everything I say there.
         </p>
 
         <p>
-          ...
+          <b>Writing custom data types in CPython</b>: Because our Tensor class is a new data type we introduce we first need to 
+          understand how CPython data types work. The <a href="https://github.com/python/cpython/blob/main/Include/pytypedefs.h"
+          target="_blank">source code</a> of CPython gives us a few typedefs. We find <code>typedef struct _typeobject PyTypeObject;</code>
+          a suitable starter. <code>_typeobject</code> itself is defined in 
+          <a href="https://github.com/python/cpython/blob/main/Include/cpython/object.h" target="_blank">object.h</a>, where we find
+          several pointers telling us more. We have attributes such as <code>PyObject_VAR_HEAD</code>, <code>Py_ssize_t tp_basicsize, tp_itemsize;</code>,
+          <code>destructor tp_dealloc;</code>, and the following block:
+        </p>
+
+<pre><code>struct _typeobject {
+    // ...
+    /* Attribute descriptor and subclassing stuff */
+    PyMethodDef *tp_methods;
+    PyMemberDef *tp_members;
+    PyGetSetDef *tp_getset;
+    // Strong reference on a heap type, borrowed reference on a static type
+    PyTypeObject *tp_base;
+    PyObject *tp_dict;
+    // ...
+};
+</code></pre>
+
+        <p>
+          It becomes clear that the struct itself is a wrapper around a datatype, with members for initialization, allocation, destructor like 
+          functions, members, information about inheritance, and many more. <code>PyMethodDef</code> is rather simple in comparison:
+        </p>
+
+<pre><code>struct PyMethodDef {
+    const char  *ml_name;
+    PyCFunction  ml_meth;
+    int ml_flags;
+    const char  *ml_doc;
+};
+</code></pre>
+
+        <p>
+          It has a name, a pointer to the actual function, some flags and a docstring. We can see where this is headed. In the next section 
+          we will come to see that we take our tensor class with the Python frontend, and we compile it into a shared library (.so on Linux).
+          Therefore, all Boost.Python has to do is to take the definitions we gave it, translate it into manual CPython code, and have the
+          thus written files compile into the library. The library will then be loaded by the Python interpreter, and following the ABI above 
+          takes care of the rest for us. For more information on how Python manages objects I refer to e.g. 
+          <a href="https://deepwiki.com/python/cpython/4.1-pyobject-and-type-system"target="_blank">DeepWiki</a>.
         </p>
 
         <br>
@@ -950,7 +996,83 @@ def("Gaussian", Py_DataModeling::Gaussian3);
         <h2 id="build-project">Building and importing the project</h2>
 
         <p>
-          TODO
+          Since we are writing C++, CMake is the preferred choice of a build system. We have to make sure we find Boost, and we have to find 
+          and link against the Python libs. More interesting for us is the question of how to get our code into the Python interpreter in the end.
+          Since we are not compiling a standalone binary/executable file, we have to make it a shared library. At first we acknowledge that we have 
+          two main components, the backend and the frontend. I named the backend library <code>DataModeling</code> (later renamed to <code>_core</code>), 
+          and we link it statically into the whole Python library. Subsequently, link it against the Python frontend, along with the libraries we 
+          used. The whole thing looks like the following:
+        </p>
+
+<pre><code>// src/data_modeling/CMakeLists.txt
+add_library(DataModeling STATIC
+    dim_type.cpp
+    tensor.cpp
+    tensor_functions.cpp
+)
+
+// src/python/CMakeLists.txt
+include_directories(
+        "${CMAKE_CURRENT_SOURCE_DIR}/python_utility"
+        )
+
+# remove the lib... prefix 
+set(CMAKE_SHARED_MODULE_PREFIX "")
+
+add_library(py_data_modeling MODULE
+            data_modeling/py_data_modeling.cpp
+            )
+set_target_properties(py_data_modeling PROPERTIES PREFIX "") # don't add "lib" in front
+
+// src/CMakeLists.txt
+target_link_libraries(py_data_modeling ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} DataModeling)
+target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+</code></pre>
+
+        <p>
+          I plead guilty for the redundant second time I removed the prefix here. Since we just added a shared library via 
+          <code>MODULE</code> CMake is so kind to us and automatically adds a lib-prefix to the file. However, this clashes 
+          with our naming of the module <code>BOOST_PYTHON_MODULE(py_data_modeling){...}</code>. Apart from maybe looking mildly 
+          awkward in our final Python module (depending on your personal taste that is), Boost.Python requires that 
+          the library's filename and the naming we give it internally must be identical. Else we will get problems when loading the 
+          library (and I challenge you to test it if you will so).
+        </p>
+
+        <p>
+          If you wonder why we choose to compile our Python library as a <code>MODULE</code> this paragraph will be for you. 
+          Esssentially, CMake gives us four options to consider: <code>STATIC</code>, <code>SHARED</code>, <code>MODULE</code>, and <code>INTERFACE</code>. 
+          <code>STATIC</code> is the bread and butter for most C++ devs. It compiles a static library, and everytime we link a binary against it the 
+          binary gets a full copy of it. It is the fastest during execution of binary, since no intermediate address translation layer has to be called, but 
+          it makes the binary larger and might lead to larger compile times, depending on your use case. <code>SHARED</code> and 
+          <code>MODULE</code> both introduce a shared library object. The difference between them is how they get loaded at run-time. 
+          When we compile with SHARED and execute the binary, then the binary will look for MYLIB_NAME.so before main is executed, and load
+          it before <code>main()</code> is called. The advantage here is that two binaries can use the same shared library, saving memory 
+          and loading times. <code>MODULE</code> is quite similar, but a library compiled with this flag cannot be linked against any 
+          binary. Instead it has to be loaded dynamically via a syscall. Lastly, <code>INTERFACE</code> is a little cryptic. It
+          "does not compile sources and does not produce a library artifact on disk" (<a href="https://cmake.org/cmake/help/latest/guide/tutorial/In-Depth%20CMake%20Library%20Concepts.html#background"
+          target="_blank">CMake tutorials</a>). What sounds odd at first glance makes a little bit more sense knowing that its 
+          main purpose is for header-only libraries.
+        </p>
+
+        <p>
+          Going full circle now why <code>MODULE</code>, I hope this has gotten somewhat clear now. When running Python, our main
+          binary we run is the Python interpreter. Knowing that a Python libary only ever gets included via an <code>import my_lib</code>
+          leaves <code>MODULE</code> as pretty much the only candidate now. It is important to note however that this alone is not enough. 
+          Since we do not link statically we also have to tell the compiler to generate position independent code for us. I did this 
+          globally, but the better approach would be a localized version telling it explicitly which parts of the code should be <a href="https://en.wikipedia.org/wiki/Position-independent_code"
+          target="_blank">position independent code</a> compiled. Anyway, I ain't perfect, and it's now on my TODO-list. But for now I 
+          will just give you the command I used, and it goes as follows: <code>set(CMAKE_POSITION_INDEPENDENT_CODE ON)</code>. If you 
+          are curious as to why this has to be, we will revisit this later in the optimization posts. But for now know that we have to 
+          do this because we are using a shared library. That means that the objects of the shared library cannot sit at fixed positions 
+          before linking against the binary, since that would mean that addresses there could clash. Position independent code does not 
+          give each class, function, and global object a fixed global address, but instead addresses relative to the base address where
+          they are loaded, meaning the linker can map this all out via building one extra level of indirection (the PLT-Procedure Linkage 
+          Table). In other words, this is a classical memory vs. run-time performance trade-off.
+        </p>
+
+        <p>
+          With that now all in place we can compile via our casual suspects, the classic CMake commands. We end up with a <i>py_data_modeling.so</i>
+          file. We can now fure 
         </p>
 
         <br>
