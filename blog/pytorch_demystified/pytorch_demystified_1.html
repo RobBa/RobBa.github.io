@@ -732,8 +732,12 @@ BOOST_PYTHON_MODULE(py_data_modeling)
           There obviously is a lot to unwrap here, so we go into it bit by bit.
         </p>
 
+        <br>
+
+        <h4>Class definition and object management</h4>
+
         <p>
-          <b>Class definition and object management:</b> The <code>class_&lt;&gt;("ClassName", {ctor_signature})</code> is the 
+          The <code>class_&lt;&gt;("ClassName", {ctor_signature})</code> is the
           call that manages our class. The first argument is what class we manage. The second template argument, the 
           <code>std::shared_ptr&lt;Tensor&gt;</code>, tells Boost.Python how we want to manage our object in the background (the 
           choice for a shared pointer will become clearer in the next blogpost). We will scratch on how this works internally in
@@ -753,8 +757,12 @@ t1 = Tensor() # holds the tensor as a shared_ptr
 t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
 </code></pre>
 
+        <br>
+
+        <h4>Constructors</h4>
+
         <p>
-          <b>Constructors:</b> There was one thing I lied about here though. Looking at the next pieces of code, we realize we add the constructors. 
+          There was one thing I lied about here though. Looking at the next pieces of code, we realize we add the constructors.
           The second argument in the braces enables us to define a constructor. I chose to give it a <code>no_init</code>, 
           because giving it one here would visually emphasize on that ctor. Giving the class more constructors however is
           done via calling .def, as in <code>.def(init&lt;const std::vector&lt;tensorDim_t&gt;&, optional&lt;bool&gt; &gt;())</code>
@@ -766,8 +774,12 @@ t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
           target="_blank">the official website</a>.
         </p>
 
+        <br>
+
+        <h4>Adding class properties</h4>
+
         <p>
-          <b>Adding class properties:</b> Going further then we can see that these next lines of code represent the properties and methods we give our tensor class.
+          Going further then we can see that these next lines of code represent the properties and methods we give our tensor class.
           We start with two properties via <code>.add_property</code>, namely the device and the dimensions. We take extra care of the 
           dimensions here, returning them via <code>make_function(&Tensor::getDims, return_internal_reference&lt;&gt;())</code>. We have to 
           do this since our original method has the following signature <code>const Dimension& getDims() const noexcept;</code>. The 
@@ -793,8 +805,12 @@ print(dims.get(0)) # safe only if dims keeps t alive
           target="_blank">tutorial</a>.
         </p>
 
+        <br>
+
+        <h4>Adding class methods</h4>
+
         <p>
-          <b>Adding class methods:</b> Below the properties section we see all the method definitions we want to expose:
+          Below the properties section we see all the method definitions we want to expose:
         </p>
 
 <pre><code>BOOST_PYTHON_MODULE(py_data_modeling)
@@ -838,8 +854,12 @@ print(dims.get(0)) # safe only if dims keeps t alive
           and then wraps it into its own management structs. Thus the values look a bit odd and asymmetrical.
         </p>
 
+        <br>
+
+        <h4>Adding commutative operators</h4>
+
         <p>
-          <b>Adding commutative operators:</b> Given Python and C++ treat operators differently, we need to pay some special attention
+          Given Python and C++ treat operators differently, we need to pay some special attention
           to those. In Python the call is simple: We define a reverse operator, usually specified via prefix-r. For instance, the reverse
           operator for <code>__mul__</code> is <code>__rmul__</code>. C++ is not so nice however. Say for instance we overlaod the 
           multiplication operator in C++: <code>Tensor operator*(ftype scalar) const;</code>. Now, in C++ we can do for instance 
@@ -880,8 +900,12 @@ Tensor operator*(ftype scalar, const Tensor& tensor) {
 ; // we wrap up our tensor class with this
 </code></pre>
 
+        <br>
+
+        <h4>Free functions and resolving operator overloading</h4>
+
         <p>
-          <b>Free functions and resolving operator overloading:</b> We wrap up our tensor class in the end with a semicolon ";", as per usual
+          We wrap up our tensor class in the end with a semicolon ";", as per usual
           in C++. However, we also want to give our frontend some free 
           functions. More specifically, we introduce some tensor-creation functions: 
         </p>  
