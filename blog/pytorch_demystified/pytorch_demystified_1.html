@@ -115,7 +115,7 @@ mathjax: true
               <b class="pytorch-step-heading-mobile">Part 2 - Autograd and training pipeline: </b>
               Part 2 will be all about training. We will introduce the
               computational graph, show how we can build it dynamically during run-time, how to use it to enable autograd,
-              and everything that we needfor a basic network implementation. It will conclude in a running MNIST end-to-end
+              and everything that we need for a basic network implementation. It will conclude in a running MNIST end-to-end
               training pipeline built from scratch.
           </p>
         </div>
@@ -225,7 +225,7 @@ mathjax: true
 
       <p>
         Before we start we want to think about the overall structure that we want to have. We want our 
-        design to be flexible for maintainance, modular, and easy to change. In short, we want to obey 
+        design to be flexible for maintenance, modular, and easy to change. In short, we want to obey 
         the <a href="https://en.wikipedia.org/wiki/SOLID" target="_blank">SOLID principles</a>. 
         Because neither of us can anticipate what is going to happen in the future we can make decisions 
         now that minimize the risk of major overhauls with a little bit of foreshadowing. While thinking
@@ -254,7 +254,7 @@ mathjax: true
           <li>Do not settle for a datatype yet, but use a generic one we can quickly find and exchange.</li>
           <li>Same goes for tensor representations for edge devices.</li>
           <li>Keep the data management device agnostic to support GPUs and other types of special hardware.</li>
-          <li>Make things as modular as possible to incorporate new research as quick as possible.</li>
+          <li>Make things as modular as possible to incorporate new research as quickly as possible.</li>
         </ul>
 
         We will go further into those below, but two things to start with: Because we can see that the dimensions and
@@ -467,7 +467,7 @@ namespace sys {
       <p>
         The probably most interesting thing about the tensor's values is that they are represented 
         by a single pointer/array, not a multidimensional one. This has mainly performance reasons. 
-        Say we implemented it as a 2D array as in <code>std::vector &l tstd::vector &lt; ftype &gt; &gt;</code>:
+        Say we implemented it as a 2D array as in <code>std::vector&lt;std::vector&lt;ftype&gt;&gt;</code>:
         In this case we would access a value via <code>values[i][j]</code>, leading to two pointer chasings.
         Same for the case <code>ftype** values;</code>. And with higher dimensional tensors this gets a mess really 
         quick. Thus, linear indexing provides a clean solution with only one pointer, that also happens to be 
@@ -495,9 +495,9 @@ tensorSize_t Tensor::computeLinearIdx(const std::vector&lt;tensorDim_t&gt;& idx,
 
       <p>
         If this didn't make it clear yet, we refer e.g. to the 
-        <a href="https://web.cs.hacettepe.edu.tr/~bbm201/Lectures/BBM201-Lecture3.pdf" target=""_blank>following presentation</a>. 
-        It is important to grasp this concept now, since it will haunt us for the rest of this tutorial. We conclude this part by 
-        showing the final impostor of a class diagram showing the relationships in between the three classes we just created, and
+        <a href="https://web.cs.hacettepe.edu.tr/~bbm201/Lectures/BBM201-Lecture3.pdf" target="_blank">following presentation</a>.
+        It is important to grasp this concept now, since it will haunt us for the rest of this tutorial. We conclude this part with
+        a final overview via a class diagram, showing the relationships in between the three classes we just created, and
         what each of them is responsible for.
       </p>
 
@@ -661,8 +661,8 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
         <h2>Adding the Python frontend</h2>
 
         <p>
-          Most of today's ML runs in Python, not in C++. Reasons are vast, but Python's ability to change code and 
-          therefore fast prototyping is porbably the main reason. That and that support for scientific software was 
+          Most of today's ML runs in Python, not in C++. Reasons are vast, but Python's ability to change code and
+          therefore fast prototyping is probably the main reason. That and that support for scientific software was 
           large before modern ML came into play even, through libraries like Scikit-learn, NumPy, Matplotlib, and 
           SciPy. When writing ML applications
           it is genuinely easy to mess up dimensions or wanting to experiment with different configurations
@@ -746,7 +746,7 @@ BOOST_PYTHON_MODULE(py_data_modeling)
           our tensor. The third argument <code>boost::noncopyable</code> now prevents Boost.Python from creating elaborate copies, 
           i.e. it does not call the copy-constructor for the Python frontend. Instead it hands over the reference only. Removing the 
           template argument will likely end up with a compiler error anyway, since we manually deleted the copy-operations for our Tensor
-          class. Lastly, the braces take in the Python internal class name "Tensor". In summary, we have this beavior:
+          class. Lastly, the braces take in the Python internal class name "Tensor". In summary, we have this behavior:
         </p>
 
 <pre><code> # in Python
@@ -846,7 +846,7 @@ print(dims.get(0)) # safe only if dims keeps t alive
 </code></pre>
 
         <p>
-          In other words, we define lambas. The first argument is always a reference to the object we call the method on, 
+          In other words, we define lambdas. The first argument is always a reference to the object we call the method on,
           hence the input arguments. Then comes a list with arguments. The wrapper simply calls the operation we requested 
           by the signature, and returns the result explicitly wrapped in a shared pointer. A quirk of Boost.Python here 
           is that when calling a method, it sees the Tensor, which it then unwraps into its representation, hence the
@@ -861,9 +861,9 @@ print(dims.get(0)) # safe only if dims keeps t alive
         <p>
           Given Python and C++ treat operators differently, we need to pay some special attention
           to those. In Python the call is simple: We define a reverse operator, usually specified via prefix-r. For instance, the reverse
-          operator for <code>__mul__</code> is <code>__rmul__</code>. C++ is not so nice however. Say for instance we overlaod the 
-          multiplication operator in C++: <code>Tensor operator*(ftype scalar) const;</code>. Now, in C++ we can do for instance 
-          <code>auto t = Tensor(/* args */) * 0.5f;</code>. However, flippping that around into 
+          operator for <code>__mul__</code> is <code>__rmul__</code>. C++ is not so nice however. Say for instance we overload the
+          multiplication operator in C++: <code>Tensor operator*(ftype scalar) const;</code>. Now, in C++ we can do for instance
+          <code>auto t = Tensor(/* args */) * 0.5f;</code>. However, flipping that around into
           <code>auto t = 0.5f * Tensor(/* args */); // ERROR!</code> is gonna result in a compiler error. The canonical way to deal with it
           is via a free floating friend class. 
         </p>
@@ -927,7 +927,7 @@ std::shared_ptr&lt;Tensor&gt; Gaussian(std::vector&lt;tensorDim_t&gt; dims, cons
 </code></pre>
           
         <p>One problem that arises in Boost.Python is that when we give it function pointers as above 
-          it cannot tell what overload we need. Therefore Boost.Python needs an explicit function pointer to an unabiguous function name. 
+          it cannot tell what overload we need. Therefore Boost.Python needs an explicit function pointer to an unambiguous function name.
           We achieve this by writing explicit wrapper-methods, one for each overload that we want to have. Those would look like this:
         </p>
 
@@ -949,7 +949,7 @@ std::shared_ptr&lt;Tensor&gt;    (*Gaussian3)(std::vector&lt;tensorDim_t&gt;, De
 
         <p>
           Here we did two things: Firstly, we have default arguments we introduced in our two overloads, in both cases the 
-          <code>const bool requiresGrad=false</code>. We need to resolved this via lambda wrappers (see also the
+          <code>const bool requiresGrad=false</code>. We need to resolve this via lambda wrappers (see also the
           <a href="https://beta.boost.org/doc/libs/develop/libs/python/doc/html/tutorial/tutorial/functions.html" 
           target="_blank">doc-tutorials</a>). Secondly, we gave it explicit function pointers to untangle the overloads, 
           and specify which ones we actually do want to expose. Finally, we expose our free floating functions via 
@@ -1026,7 +1026,7 @@ def("Gaussian", Py_DataModeling::Gaussian3);
           Therefore, all Boost.Python has to do is to take the definitions we gave it, translate it into manual CPython code, and have the
           thus written files compile into the library. The library will then be loaded by the Python interpreter, and following the ABI above 
           takes care of the rest for us. For more information on how Python manages objects I refer to e.g. 
-          <a href="https://deepwiki.com/python/cpython/4.1-pyobject-and-type-system"target="_blank">DeepWiki</a>.
+          <a href="https://deepwiki.com/python/cpython/4.1-pyobject-and-type-system" target="_blank">DeepWiki</a>.
         </p>
 
         </details>
@@ -1075,13 +1075,13 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
           with our naming of the module <code>BOOST_PYTHON_MODULE(py_data_modeling){...}</code>. Apart from maybe looking mildly 
           awkward in our final Python module (depending on your personal taste that is), Boost.Python requires that 
           the library's filename and the naming we give it internally must be identical. Else we will get problems when loading the 
-          library (and I challenge you to test it if you will so). We also have to compile our library using position indepenpent code,
+          library (and I challenge you to test it if you will so). We also have to compile our library using position independent code,
           which we do by <code>set(CMAKE_POSITION_INDEPENDENT_CODE ON)</code>.
         </p>
 
         <details class="pytorch-optional" id="module-pic-section">
         <summary class="pytorch-optional-summary">
-          <h4>Optional: The why behind MODULE and position indepent code</h4>
+          <h4>Optional: The why behind MODULE and position independent code</h4>
         </summary>
 
         <div class="pytorch-optional-collapse-bar">
@@ -1093,7 +1093,7 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
 
         <p>
           If you wonder why we choose to compile our Python library as a <code>MODULE</code>, this will be for you.
-          Esssentially, CMake gives us four options to consider: <code>STATIC</code>, <code>SHARED</code>, <code>MODULE</code>, and <code>INTERFACE</code>. 
+          Essentially, CMake gives us four options to consider: <code>STATIC</code>, <code>SHARED</code>, <code>MODULE</code>, and <code>INTERFACE</code>. 
           <code>STATIC</code> is the bread and butter for most C++ devs. It compiles a static library, and everytime we link a binary against it the 
           binary gets a full copy of it. It is the fastest during execution of binary, since no intermediate address translation layer has to be called, but 
           it makes the binary larger and might lead to larger compile times, depending on your use case. <code>SHARED</code> and 
@@ -1109,7 +1109,7 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
 
         <p>
           Going full circle now why <code>MODULE</code>, I hope this has gotten somewhat clear now. When running Python, our main
-          binary we run is the Python interpreter. Knowing that a Python libary only ever gets included via an <code>import my_lib</code>
+          binary we run is the Python interpreter. Knowing that a Python library only ever gets included via an <code>import my_lib</code>
           leaves <code>MODULE</code> as pretty much the only candidate now. It is important to note however that this alone is not enough. 
           Since we do not link statically we also have to tell the compiler to generate position independent code for us. I did this 
           globally, but the better approach would be a localized version telling it explicitly which parts of the code should be <a href="https://en.wikipedia.org/wiki/Position-independent_code"
@@ -1150,7 +1150,7 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
         <p>
           If you want to find the source of this example you can download it from 
           <a href="https://github.com/RobBa/dl_lib/releases/tag/ComputationalGraph" target="_blank">GitHub</a>. I went a little further here, 
-          having already done the computational graph, but it is a version covering some bugfixes, opposed to earlier commits. Anyway, feedback is 
+          having already done the computational graph, but it is a version covering some bugfixes, as opposed to earlier commits. Anyway, feedback is 
           always welcome, so feel free to reach out via LinkedIn or E-mail. Cheers.
         </p>
     </div>
