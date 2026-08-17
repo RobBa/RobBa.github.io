@@ -45,6 +45,65 @@
     display: none;
 }
 
+.pytorch-optional {
+    margin: 30px 0;
+    border: 1px solid var(--color-article-date);
+    border-radius: 6px;
+    padding: 0 20px 20px 20px;
+}
+
+.pytorch-optional-summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 15px 0;
+}
+
+.pytorch-optional-summary::-webkit-details-marker {
+    display: none;
+}
+
+.pytorch-optional-summary h4 {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.pytorch-optional-summary h4::before {
+    content: "\25B8";
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.pytorch-optional[open] .pytorch-optional-summary h4::before {
+    transform: rotate(90deg);
+}
+
+.pytorch-optional-collapse-bar {
+    position: sticky;
+    top: 40px;
+    z-index: 500;
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+    margin: 0 0 10px 0;
+    background: var(--color-bg);
+}
+
+.pytorch-optional-collapse-btn {
+    background-color: var(--color-chrome-bg);
+    color: var(--color-chrome-text);
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.pytorch-optional-collapse-btn:hover {
+    opacity: 0.85;
+}
+
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     .pytorch-step-row,
     .pytorch-step-row-reverse {
@@ -62,5 +121,9 @@
 
     .pytorch-step-heading-mobile {
         display: inline;
+    }
+
+    .pytorch-optional-collapse-bar {
+        top: 55px;
     }
 }

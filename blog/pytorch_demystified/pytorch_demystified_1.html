@@ -686,7 +686,7 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
 
         <br>
 
-        <h4 id="basic-frontend">Implementing the basic frontend</h4>
+        <h3 id="basic-frontend">Implementing the basic frontend</h3>
 
         <p>
           We start with 
@@ -733,7 +733,7 @@ BOOST_PYTHON_MODULE(py_data_modeling)
         </p>
 
         <p>
-          <b>Base definition and object management:</b> The <code>class_&lt;&gt;("ClassName", {ctor_signature})</code> is the 
+          <b>Class definition and object management:</b> The <code>class_&lt;&gt;("ClassName", {ctor_signature})</code> is the 
           call that manages our class. The first argument is what class we manage. The second template argument, the 
           <code>std::shared_ptr&lt;Tensor&gt;</code>, tells Boost.Python how we want to manage our object in the background (the 
           choice for a shared pointer will become clearer in the next blogpost). We will scratch on how this works internally in
@@ -745,7 +745,9 @@ BOOST_PYTHON_MODULE(py_data_modeling)
           class. Lastly, the braces take in the Python internal class name "Tensor". In summary, we have this beavior:
         </p>
 
-<pre><code>from dl_lib import Tensor # name Tensor defined by first argument in braces
+<pre><code> # in Python
+  
+from dl_lib import Tensor # name Tensor defined by first argument in braces
 
 t1 = Tensor() # holds the tensor as a shared_ptr
 t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
@@ -777,7 +779,9 @@ t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
           reference would stay valid for its lifetime, resulting in dangerous dangling pointers. Say we do the following:
         </p>
 
-<pre><code>dims = t.dims # get reference to dim object
+<pre><code> # in Python
+
+dims = t.dims # get reference to dim object
 del t # destroy tensor
 print(dims.get(0)) # safe only if dims keeps t alive
 </code></pre>
@@ -935,10 +939,20 @@ def("Gaussian", Py_DataModeling::Gaussian3);
 
         <br>
 
-        <h4 id="bp-under-hood">Optional: Boost.Python briefly under the hood</h4>
-        
+        <details class="pytorch-optional" id="bp-under-hood-section">
+        <summary class="pytorch-optional-summary">
+          <h4 id="bp-under-hood">Optional: Taking a brief look into Boost.Python</h4>
+        </summary>
+
+        <div class="pytorch-optional-collapse-bar">
+          <button type="button" class="pytorch-optional-collapse-btn"
+            onclick="var s=document.getElementById('bp-under-hood-section'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+            &#9650; Collapse
+          </button>
+        </div>
+
         <p>
-          In the previous section we did a lot of magic with Boost.Python. For those also itching with curiosity I want to 
+          In the previous section we did a lot of magic with Boost.Python. For those also itching with curiosity I want to
           give a rough explanation of how this all works under the hood. I.e. in this quite brief and optional section we take a 
           look into Boost.Python, and how it does all this for us with seeming ease. To do so we have to revisit CPython. For 
           those that have not read my previous post on CPython or have never had contact with it I refer to my article 
@@ -990,6 +1004,8 @@ def("Gaussian", Py_DataModeling::Gaussian3);
           takes care of the rest for us. For more information on how Python manages objects I refer to e.g. 
           <a href="https://deepwiki.com/python/cpython/4.1-pyobject-and-type-system"target="_blank">DeepWiki</a>.
         </p>
+
+        </details>
 
         <br>
 
