@@ -1112,7 +1112,8 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
 
         <p>
           With that now all in place we can compile via our casual suspects, the classic CMake commands. We end up with a <i>py_data_modeling.so</i>
-          file. We can now fure 
+          file. Firing up a Python interpreter in the directory where the .so resides we can now do <code>from py_data_modeling import Tensor</code>
+          and use our Tensor as we intended.
         </p>
 
         <br>
@@ -1120,8 +1121,22 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
         <h2 id="summary">Summary</h2>
 
         <p>
-          The commit SHA you can go to is 6f51694988306de2f22342aff6911e0d10234141
-          ...
+          This concludes the first of this series of blogposts. We first designed a Tensor class in C++ and implemented basic data management, 
+          some basic operations, and designed a Python frontend through the use of Boost.Python. Additionally we took the chance to find the right 
+          way to build the library and ended up with a standalone library we can now import and use in Python.   
+        </p>
+          
+        <p>
+          In the next post we will be getting to the real meat of deep learning and implement a backpropagation engine with dynamic computational 
+          graph allocation. This way we can use our Tensor class to define neural networks and propagate gradients through the network. We will also 
+          implement some additional modules enabling basic deep learning, such as activation functions, optimizers, and loss functions. Bringing that 
+          all into Python we will be able to write a full MNIST example in Python, using our own designed training backend.
+        </p>
+
+        <p>
+          If you want to find the source of this example, a commit SHA ready to go is 6f51694988306de2f22342aff6911e0d10234141, but I recommend to wait for
+          the end of the next post for a better picture of the architectural pattern, as I cleaned up some definitions in between the two. Anyway, feedback is 
+          always welcome, so feel free to reach out via LinkedIn or E-mail. Cheers.
         </p>
     </div>
 
