@@ -1075,11 +1075,24 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
           with our naming of the module <code>BOOST_PYTHON_MODULE(py_data_modeling){...}</code>. Apart from maybe looking mildly 
           awkward in our final Python module (depending on your personal taste that is), Boost.Python requires that 
           the library's filename and the naming we give it internally must be identical. Else we will get problems when loading the 
-          library (and I challenge you to test it if you will so).
+          library (and I challenge you to test it if you will so). We also have to compile our library using position indepenpent code,
+          which we do by <code>set(CMAKE_POSITION_INDEPENDENT_CODE ON)</code>.
         </p>
 
+        <details class="pytorch-optional" id="module-pic-section">
+        <summary class="pytorch-optional-summary">
+          <h4>Optional: The why behind module and position indepent code</h4>
+        </summary>
+
+        <div class="pytorch-optional-collapse-bar">
+          <button type="button" class="pytorch-optional-collapse-btn"
+            onclick="var s=document.getElementById('module-pic-section'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+            &#9650; Collapse
+          </button>
+        </div>
+
         <p>
-          If you wonder why we choose to compile our Python library as a <code>MODULE</code> this paragraph will be for you. 
+          If you wonder why we choose to compile our Python library as a <code>MODULE</code>, this will be for you.
           Esssentially, CMake gives us four options to consider: <code>STATIC</code>, <code>SHARED</code>, <code>MODULE</code>, and <code>INTERFACE</code>. 
           <code>STATIC</code> is the bread and butter for most C++ devs. It compiles a static library, and everytime we link a binary against it the 
           binary gets a full copy of it. It is the fastest during execution of binary, since no intermediate address translation layer has to be called, but 
@@ -1100,15 +1113,16 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
           leaves <code>MODULE</code> as pretty much the only candidate now. It is important to note however that this alone is not enough. 
           Since we do not link statically we also have to tell the compiler to generate position independent code for us. I did this 
           globally, but the better approach would be a localized version telling it explicitly which parts of the code should be <a href="https://en.wikipedia.org/wiki/Position-independent_code"
-          target="_blank">position independent code</a> compiled. Anyway, I ain't perfect, and it's now on my TODO-list. But for now I 
-          will just give you the command I used, and it goes as follows: <code>set(CMAKE_POSITION_INDEPENDENT_CODE ON)</code>. If you 
-          are curious as to why this has to be, we will revisit this later in the optimization posts. But for now know that we have to 
+          target="_blank">position independent code</a> compiled. Anyway, I ain't perfect, and it's now on my TODO-list. We will revisit 
+          this flag later in the optimization posts. But for now know that we have to 
           do this because we are using a shared library. That means that the objects of the shared library cannot sit at fixed positions 
           before linking against the binary, since that would mean that addresses there could clash. Position independent code does not 
           give each class, function, and global object a fixed global address, but instead addresses relative to the base address where
           they are loaded, meaning the linker can map this all out via building one extra level of indirection (the PLT-Procedure Linkage 
           Table). In other words, this is a classical memory vs. run-time performance trade-off.
         </p>
+
+      </details>
 
         <p>
           With that now all in place we can compile via our casual suspects, the classic CMake commands. We end up with a <i>py_data_modeling.so</i>
