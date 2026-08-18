@@ -25,6 +25,30 @@
     width: 95%;
 }
 
+/*
+ * Scoped to post 2's single figure row only (via pytorch-step-row-compact):
+ * tighter gap between text and figure, with the figure claiming the space
+ * that frees up, and the row itself flush against the surrounding text
+ * (plain divs otherwise inherit a global 2% side margin).
+ */
+.pytorch-step-row.pytorch-step-row-compact {
+    gap: 15px;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.pytorch-step-row-compact .pytorch-step-text {
+    flex: 1 1 40%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.pytorch-step-row-compact .pytorch-step-figs {
+    flex: 1 1 60%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
 #pytorch-trends-in-ml,
 #pytorch-trends-in-ml-dark {
     width: 75%;
@@ -112,6 +136,10 @@ h4.heading-spaced {
     .pytorch-step-row,
     .pytorch-step-row-reverse {
         flex-direction: column;
+        gap: 10px;
+    }
+
+    .pytorch-step-row.pytorch-step-row-compact {
         gap: 10px;
     }
 
