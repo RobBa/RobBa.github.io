@@ -6,9 +6,7 @@ highlight: true
 mathjax: true
 ---
 
-    <br>
-
-    <h1>PyTorch demystified 2 -<br>Autograd and a full training pipeline</h1>
+    <h1 class="heading-spaced">PyTorch demystified 2 -<br>Autograd and a full training pipeline</h1>
     <p class="article-date">Published: Jul. 2026</p>
 
     <br>
@@ -22,7 +20,7 @@ mathjax: true
     <br>
 
     <div class="article-content-div">
-      <h2>Content</h2>
+      <h2 class="heading-spaced">Content</h2>
       <ul>
         <li>
           <a href="#introduction">Introduction</a>
@@ -30,13 +28,45 @@ mathjax: true
       </ul>
     </div>
 
-    <br>
-
     <div id="introduction" class="article-text-div">
-
-      <h2>Introduction</h2>
+      <h2 class="heading-spaced">Introduction</h2>
 
       <p>
-        Text here
+        In the previous post of this series (found <a href="pytorch_demystified_1.html" target="_blank">here</a>) we built a Tensor class, gave
+        it basic operations such as multiplications with other tensors and scalars, addition, subtraction, and a basic matrix multiplication.
+        In this second post we want to build everything that it now needs to define and train real neural networks.
+      </p>
+
+      <p>
+        To this end, we will implement an engine that builds a computational graph for us on the fly, allowing us to propagate gradients through the 
+        graph (keyword: the infamous backprop-algorithm). We will then give it further components of a basic neural network, such as activation functions, 
+        and then give it everything we need for training: optimizers, loss functions, a Python frontend enabling us to define networks, and a training loop.
+      </p>
+
+        <figure class="fig-light">
+            <img
+            id="pytorch-step-2"
+            class="blog-image pytorch-step-img"
+            src="./img_shared/step_2.png"
+            alt="Diagram of part 2: Autograd and training pipeline">
+            <figcaption>Part 2: Autograd and training pipeline.</figcaption>
+            </figure>
+            <figure class="fig-dark">
+            <img
+            id="pytorch-step-2-dark"
+            class="blog-image pytorch-step-img"
+            src="./img_shared/step_2_dark.png"
+            alt="Diagram of part 2: Autograd and training pipeline">
+            <figcaption>Part 2: Autograd and training pipeline.</figcaption>
+        </figure>
+    </div>
+
+    <div id="autograd-engine" class="article-text-div">
+      
+      <h2>Implementing autograd</h2>
+    
+      <p>
+        For training we have multiple ways to to it. 
       </p>
     </div>
+

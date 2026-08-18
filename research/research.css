@@ -2,6 +2,10 @@ h2 {
     text-align: center;
 }
 
+.heading-spaced {
+    margin-top: 32px;
+}
+
 /* TOC = Table of content*/
 #floating-toc {
     position: fixed;

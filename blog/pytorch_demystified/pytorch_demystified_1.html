@@ -6,22 +6,20 @@ highlight: true
 mathjax: true
 ---
 
-    <br>
-
-    <h1>PyTorch demystified 1 -<br>Tensor interface and Python bindings</h1>
+    <h1 class="heading-spaced">PyTorch demystified 1 -<br>Tensor interface and Python bindings</h1>
     <p class="article-date">Published: Aug. 2026</p>
 
     <br>
 
     <blockquote class="article-quote">
-      "Sometimes science is more art than science."
-      <cite>&mdash; Rick Sanchez (Rick & Morty)</cite>
+      "TODO."
+      <cite>&mdash; TODO</cite>
     </blockquote>
 
     <br>
-
+    
     <div class="article-content-div">
-      <h2>Content</h2>
+      <h2 class="heading-spaced">Content</h2>
       <ol>
         <li>
           <a href="#introduction">Introduction</a>
@@ -58,12 +56,9 @@ mathjax: true
         <li><a href="#summary">Summary</a></li>
       </ol>
     </div>
-    
-    <br>
-    
-    <div id="introduction" class="article-text-div">
 
-      <h2>Introduction</h2>
+    <div id="introduction" class="article-text-div">
+      <h2 class="heading-spaced">Introduction</h2>
 
       <p>
         If you are like me then chances are things are a whole lot more fun when you
@@ -76,7 +71,7 @@ mathjax: true
       </p>
       
 
-      <h4 class="pytorch-step-heading">Part 1 - Tensor & Python frontend</h4>
+      <h4 class="pytorch-step-heading heading-spaced">Part 1 - Tensor & Python frontend</h4>
       <div class="pytorch-step-row">
         <div class="pytorch-step-text">
           <p>
@@ -108,7 +103,7 @@ mathjax: true
         </div>
       </div>
 
-      <h4 class="pytorch-step-heading">Part 2 - Autograd and training pipeline</h4>
+      <h4 class="pytorch-step-heading heading-spaced">Part 2 - Autograd and training pipeline</h4>
       <div class="pytorch-step-row pytorch-step-row-reverse">
         <div class="pytorch-step-text">
           <p>
@@ -139,7 +134,7 @@ mathjax: true
         </div>
       </div>
 
-      <h4 class="pytorch-step-heading">Part 3 - CUDA backend implementation and optimization</h4>
+      <h4 class="pytorch-step-heading heading-spaced">Part 3 - CUDA backend implementation and optimization</h4>
       <div class="pytorch-step-row">
         <div class="pytorch-step-text">
           <p>
@@ -172,7 +167,7 @@ mathjax: true
         </div>
       </div>
 
-      <h4 class="pytorch-step-heading">Part 4 - CPU backend optimization</h4>
+      <h4 class="pytorch-step-heading heading-spaced">Part 4 - CPU backend optimization</h4>
       <div class="pytorch-step-row pytorch-step-row-reverse">
         <div class="pytorch-step-text">
           <p>
@@ -217,11 +212,8 @@ mathjax: true
       </p>
     </div>
 
-    <br>
-
     <div id="preliminary-thoughts" class="article-text-div">
-
-      <h2>Preliminary thoughts</h2>
+      <h2 class="heading-spaced">Preliminary thoughts</h2>
 
       <p>
         Before we start we want to think about the overall structure that we want to have. We want our 
@@ -276,11 +268,8 @@ static_assert(sizeof(tensorSize_t) &gt;= sizeof(tensorDim_t));
 
     </div>
 
-    <br>
-
     <div id="tensor-backend" class="article-text-div">
-
-      <h2>Designing the tensor backend</h2>
+      <h2 class="heading-spaced">Designing the tensor backend</h2>
 
       <h4 id="data-layout">Designing the data layout</h4>
 
@@ -520,11 +509,8 @@ tensorSize_t Tensor::computeLinearIdx(const std::vector&lt;tensorDim_t&gt;& idx,
 
     </div>
 
-    <br>
-
     <div id="tensor-operations-section" class="article-text-div">
-
-      <h4 id="tensor-operations">Adding operations to the tensor</h4>
+      <h4 id="tensor-operations" class="heading-spaced">Adding operations to the tensor</h4>
 
       <p>
         Now that we have the initial data layout down we can embellish the class with more functions.
@@ -654,11 +640,8 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
 
     </div>
 
-    <br>
-
     <div id="python-frontend" class="article-text-div">
-
-        <h2>Adding the Python frontend</h2>
+        <h2 class="heading-spaced">Adding the Python frontend</h2>
 
         <p>
           Most of today's ML runs in Python, not in C++. Reasons are vast, but Python's ability to change code and
@@ -684,9 +667,7 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
           for us to exchange either if we wanted to. With that we can start exposing the tensor object into Python.
         </p>
 
-        <br>
-
-        <h3 id="basic-frontend">Implementing the basic frontend</h3>
+        <h3 id="basic-frontend" class="heading-spaced">Implementing the basic frontend</h3>
 
         <p>
           We start with 
@@ -732,9 +713,7 @@ BOOST_PYTHON_MODULE(py_data_modeling)
           There obviously is a lot to unwrap here, so we go into it bit by bit.
         </p>
 
-        <br>
-
-        <h4>Class definition and object management</h4>
+        <h4 class="heading-spaced">Class definition and object management</h4>
 
         <p>
           The <code>class_&lt;&gt;("ClassName", {ctor_signature})</code> is the
@@ -757,9 +736,7 @@ t1 = Tensor() # holds the tensor as a shared_ptr
 t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
 </code></pre>
 
-        <br>
-
-        <h4>Constructors</h4>
+        <h4 class="heading-spaced">Constructors</h4>
 
         <p>
           There was one thing I lied about here though. Looking at the next pieces of code, we realize we add the constructors.
@@ -774,9 +751,7 @@ t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
           target="_blank">the official website</a>.
         </p>
 
-        <br>
-
-        <h4>Adding class properties</h4>
+        <h4 class="heading-spaced">Adding class properties</h4>
 
         <p>
           Going further then we can see that these next lines of code represent the properties and methods we give our tensor class.
@@ -805,9 +780,7 @@ print(dims.get(0)) # safe only if dims keeps t alive
           target="_blank">tutorial</a>.
         </p>
 
-        <br>
-
-        <h4>Adding class methods</h4>
+        <h4 class="heading-spaced">Adding class methods</h4>
 
         <p>
           Below the properties section we see all the method definitions we want to expose:
@@ -854,9 +827,7 @@ print(dims.get(0)) # safe only if dims keeps t alive
           and then wraps it into its own management structs. Thus the values look a bit odd and asymmetrical.
         </p>
 
-        <br>
-
-        <h4>Adding commutative operators</h4>
+        <h4 class="heading-spaced">Adding commutative operators</h4>
 
         <p>
           Given Python and C++ treat operators differently, we need to pay some special attention
@@ -900,9 +871,7 @@ Tensor operator*(ftype scalar, const Tensor& tensor) {
 ; // we wrap up our tensor class with this
 </code></pre>
 
-        <br>
-
-        <h4>Free functions and resolving operator overloading</h4>
+        <h4 class="heading-spaced">Free functions and resolving operator overloading</h4>
 
         <p>
           We wrap up our tensor class in the end with a semicolon ";", as per usual
@@ -1031,9 +1000,7 @@ def("Gaussian", Py_DataModeling::Gaussian3);
 
         </details>
 
-        <br>
-
-        <h2 id="build-project">Building and importing the project</h2>
+        <h2 id="build-project" class="heading-spaced">Building and importing the project</h2>
 
         <p>
           Since we are writing C++, CMake is the preferred choice of a build system. We have to make sure we find Boost, and we have to find 
@@ -1130,9 +1097,7 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
           and use our Tensor as we intended.
         </p>
 
-        <br>
-
-        <h2 id="summary">Summary</h2>
+        <h2 id="summary" class="heading-spaced">Summary</h2>
 
         <p>
           This concludes the first of this series of blogposts. We first designed a Tensor class in C++ and implemented basic data management, 
@@ -1150,7 +1115,8 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
         <p>
           If you want to find the source of this example you can download it from 
           <a href="https://github.com/RobBa/dl_lib/releases/tag/ComputationalGraph" target="_blank">GitHub</a>. I went a little further here, 
-          having already done the computational graph, but it is a version covering some bugfixes, as opposed to earlier commits. Anyway, feedback is 
+          having already done the computational graph, but it is a version covering some bugfixes, as opposed to earlier commits. Anyway, a basic 
+          Python example can be found in the unit tests of the downloaded code. Feedback is 
           always welcome, so feel free to reach out via LinkedIn or E-mail. Cheers.
         </p>
     </div>

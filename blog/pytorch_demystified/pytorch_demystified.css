@@ -104,6 +104,10 @@
     opacity: 0.85;
 }
 
+h4.heading-spaced {
+    margin-top: 20px;
+}
+
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     .pytorch-step-row,
     .pytorch-step-row-reverse {

@@ -5,10 +5,7 @@ section: Python from C++
 highlight: true
 ---
 
-    <br>
-
-
-    <h1>Calling Python scripts from within C++</h1>
+    <h1 class="heading-spaced">Calling Python scripts from within C++</h1>
     <p class="article-date">Published: Jan. 2026 - Updated: March 2026</p>
 
     <br>
@@ -19,10 +16,8 @@ highlight: true
       <cite>&mdash; Guru Pathik (Avatar: The Last Airbender)</cite>
     </blockquote>
 
-    <br>
-
     <div class="article-content-div">
-      <h2>Content</h2>
+      <h2 class="heading-spaced">Content</h2>
       <ol>
         <li>
           <a href="#introduction-python-cpp">Introduction</a>
@@ -53,11 +48,8 @@ highlight: true
       </ol>
     </div>
 
-    <br>
-
     <div id="introduction-python-cpp" class="article-text-div">
-
-      <h2>Introduction</h2>
+      <h2 class="heading-spaced">Introduction</h2>
 
       <p>
         In this article we explore how to call Python scripts from within C++ code, and how to
@@ -107,11 +99,8 @@ highlight: true
 
     </div>
 
-    <br>
-
     <div id="cpython-primer" class="article-text-div">
-
-      <h2>CPython</h2>
+      <h2 class="heading-spaced">CPython</h2>
 
       <p>
         I will give a small primer on CPython that will be enough to understand all the contents of
@@ -148,10 +137,8 @@ highlight: true
       </figure>
     </div>
 
-    <br>
-
     <div id="setting-up-cpp-python-project" class="article-text-div">
-      <h2>Setting up the project and importing the Python script</h2>
+      <h2 class="heading-spaced">Setting up the project and importing the Python script</h2>
 
       <p>
         The basis for any object in CPython is the PyObject. We get access to this datatype by first
@@ -196,10 +183,8 @@ PyRun_SimpleString(cmd.str().c_str());<br>
       </p>
     </div>
 
-    <br>
-
     <div id="garbage-collection-and-error-handling" class="article-text-div">
-      <h2>Ownership rules and error handling in CPython</h2>
+      <h2 class="heading-spaced">Ownership rules and error handling in CPython</h2>
 
       <p>
         To understand the ownership rules we first have to have a look at the PyObject-type. In the
@@ -275,10 +260,8 @@ PyRun_SimpleString(cmd.str().c_str());<br>
 
     </div>
 
-    <br>
-
     <div id="loading-python-functions-into-cpp" class="article-text-div">
-      <h2>Loading Python-script and functions into C++</h2>
+      <h2 class="heading-spaced">Loading Python-script and functions into C++</h2>
 
       <p>
         Now that we understand memory-management and error handling, we can load our Python code
@@ -318,10 +301,8 @@ if (query_func == NULL || !PyCallable_Check(query_func)) {<br>
 </code></pre>
     </div>
 
-    <br>
-
     <div id="calling-python-function-with-argument" class="article-text-div">
-      <h2>Calling the Python function and receiving the argument</h2>
+      <h2 class="heading-spaced">Calling the Python function and receiving the argument</h2>
 
       <p>
         Lastly we want to call the Python script and translate its return value back into a C++

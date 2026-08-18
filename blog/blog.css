@@ -23,6 +23,10 @@
     height: auto;
 }
 
+.heading-spaced {
+    margin-top: 32px;
+}
+
 .article-quote {
     max-width: 700px;
     margin: 0 auto 30px auto;
