@@ -105,7 +105,7 @@ mathjax: true
         Thus I personally picked the PyTorch approach. Essentially, what we want to have is something along the lines of
       </p>
 
-<pre><code>A, B = some_tensors()
+<pre><code lang="python">A, B = some_tensors()
 C = some_op(A, B)
 C.backward()
 assert(C.has_grads() and C.has_grads())
@@ -193,8 +193,8 @@ assert(C.has_grads() and C.has_grads())
         
         In this matrix, 
         
-        $$\frac{\partial C}{\partial a_{11}} = \sum_{i=1, j=1}^{i=2, j=2} \frac{\partial c_{ij}}{\partial a_{11}} 
-                                             = b_{11} + b{12}$$
+        $$\frac{\partial C}{\partial a_{11}} = \sum_{i, j} \frac{\partial c_{ij}}{\partial a_{11}} 
+                                             = b_{11} + b_{12}$$
 
         And the other entries follow naturally. 
       </p>
@@ -207,7 +207,7 @@ assert(C.has_grads() and C.has_grads())
         addition here:
       </p>
 
-<pre><code>// src/tensor.cpp
+<pre><code class="language-cpp">// src/tensor.cpp
 
 Tensor Tensor::operator+(ftype scalar) const {
   Tensor res(dims, values->getDevice(), false);
@@ -314,7 +314,7 @@ Tensor Tensor::operator+(ftype scalar) const {
         we give it a new class via
       </p>
 
-<pre><code>// src/backend/computational_graph/graph_node.h
+<pre><code class="language-cpp">// src/backend/computational_graph/graph_node.h
 
 namespace cgraph {
   class GraphNode {
@@ -351,7 +351,7 @@ namespace cgraph {
         <code>std::shared_ptr<cgraph::GraphNode> cgNode = nullptr;</code>, and we expose it via 
       </p>
 
-<pre><code>// src/data_modeling/tensor.h
+<pre><code class="language-cpp">// src/data_modeling/tensor.h
 
 class Tensor final {
 // ..
@@ -371,7 +371,7 @@ public:
       when we actually start training neural networks. Here we will do something along the lines of
     </p>
 
-<pre><code>x = next_batch()
+<pre><code lang="python">x = next_batch()
 y_pred = my_network.forward(x)
 loss = loss_fn(y_pred)
 optim.step(loss)
@@ -382,7 +382,7 @@ optim.step(loss)
         other modules like activation functions. Internally, on calling forward it will do something like
       </p>
 
-<pre><code>def forward(self, x):
+<pre><code lang="python">def forward(self, x):
   for layer in self._layers:
     # x now is a newly created tensor holding a reference to its parent
     x = layer.forward(x)
@@ -432,7 +432,7 @@ optim.step(loss)
         wish to do so. Without further ado, let us start with a simple addition as implemented in the following:
       </p>
 
-<pre><code>// src/backend/data_modeling/tensor.cpp
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
 
 Tensor Tensor::operator*(ftype scalar) const {
   Tensor res(dims, values->getDevice(), false);
@@ -448,7 +448,7 @@ Tensor Tensor::operator*(ftype scalar) const {
         We write a wrapper around this operation in the following fashion:
       </p>
 
-<pre><code>// src/backend/computational_graph/tensor_ops/graph_creation.h
+<pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/graph_creation.h
 
 namespace cgraph {
   std::shared_ptr<Tensor> mul(const std::shared_ptr<Tensor> left, ftype scalar); 
@@ -482,7 +482,8 @@ shared_ptr<Tensor> cgraph::mul(ftype scalar, const shared_ptr<Tensor> t) {
         work, and you see the first implementation of a gradient in the backward() method:
       </p>
 
-<pre><code>// src/backend/computational_graph/tensor_ops/scalar_op_nodes.h
+<pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/scalar_op_nodes.h
+
 namespace cgraph {
   class ScalarMulNode final : public GraphNode {
     private:
@@ -527,7 +528,7 @@ vector<shared_ptr<Tensor>> cgraph::ScalarMulNode::backward(const Tensor& upstrea
       the declarations, the definitions follow the exact same pattern that we just observed. Here they come.
     </p>
 
-<pre><code>// src/backend/computational_graph/tensor_ops/graph_creation.h
+<pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/graph_creation.h
 
 namespace cgraph {
   // Arithmetic operations
@@ -559,7 +560,7 @@ namespace cgraph {
       more precisely the backward function implemented as the following:
     </p>
 
-<pre><code>// src/backend/computational_graph/tensor_ops/matmul_node.cpp
+<pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/matmul_node.cpp
 
 using namespace std;
 using namespace cgraph;
@@ -588,7 +589,7 @@ vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
       We do this via 
     </p>
 
-<pre><code>// src/backend/computational_graph/tensor_ops/graph_creation.cpp
+<pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/graph_creation.cpp
 
 shared_ptr<Tensor> cgraph::sumTensor(const shared_ptr<Tensor> t) {
   auto res = make_shared<Tensor>(std::vector<tensorDim_t>{1}, std::vector<ftype>{0.0}, 

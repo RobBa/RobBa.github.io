@@ -161,7 +161,7 @@ h4.heading-spaced {
 
 #pytorch-reference-illustration, 
 #pytorch-reference-illustration-dark {
-    width: 77%;
+    width: 82%;
 }
 
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
@@ -212,6 +212,6 @@ h4.heading-spaced {
     #pytorch-reference-illustration,
     #pytorch-reference-illustration-dark
     {
-        width: 85%;
+        width: 90%;
     }
 }
