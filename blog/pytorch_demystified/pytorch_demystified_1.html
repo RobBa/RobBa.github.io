@@ -12,8 +12,8 @@ mathjax: false
     <br>
 
     <blockquote class="article-quote">
-      "TODO."
-      <cite>&mdash; TODO</cite>
+      "Got to make sure it's right, until tomorrow, goodnight, oh."
+      <cite>&mdash; John Mayer</cite>
     </blockquote>
 
     <br>
@@ -666,7 +666,9 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
           very easy. However, for better maintainability the Python frontend and the C++ backend are still separated in code, making it easy
           for us to exchange either if we wanted to. With that we can start exposing the tensor object into Python.
         </p>
+    </div>
 
+    <div id="basic-frontend-section" class="article-text-div">
         <h3 id="basic-frontend" class="heading-spaced">Implementing the basic frontend</h3>
 
         <p>
@@ -712,7 +714,9 @@ BOOST_PYTHON_MODULE(py_data_modeling)
         <p>
           There obviously is a lot to unwrap here, so we go into it bit by bit.
         </p>
+    </div>
 
+    <div id="class-definition-section" class="article-text-div">
         <h4 class="heading-spaced">Class definition and object management</h4>
 
         <p>
@@ -735,7 +739,9 @@ from dl_lib import Tensor # name Tensor defined by first argument in braces
 t1 = Tensor() # holds the tensor as a shared_ptr
 t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
 </code></pre>
+    </div>
 
+    <div id="constructors-section" class="article-text-div">
         <h4 class="heading-spaced">Constructors</h4>
 
         <p>
@@ -750,7 +756,9 @@ t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
           <a href="https://www.boost.org/doc/libs/latest/libs/python/doc/html/tutorial/tutorial/exposing.html#tutorial.exposing.constructors"
           target="_blank">the official website</a>.
         </p>
+    </div>
 
+    <div id="class-properties-section" class="article-text-div">
         <h4 class="heading-spaced">Adding class properties</h4>
 
         <p>
@@ -779,7 +787,9 @@ print(dims.get(0)) # safe only if dims keeps t alive
           <a href="https://www.boost.org/doc/libs/latest/libs/python/doc/html/tutorial/tutorial/functions.html#tutorial.functions.call_policies"
           target="_blank">tutorial</a>.
         </p>
+    </div>
 
+    <div id="class-methods-section" class="article-text-div">
         <h4 class="heading-spaced">Adding class methods</h4>
 
         <p>
@@ -826,7 +836,9 @@ print(dims.get(0)) # safe only if dims keeps t alive
           expected argument is a normal Tensor reference. However, when returning the value, it takes the representation,
           and then wraps it into its own management structs. Thus the values look a bit odd and asymmetrical.
         </p>
+    </div>
 
+    <div id="commutative-operators-section" class="article-text-div">
         <h4 class="heading-spaced">Adding commutative operators</h4>
 
         <p>
@@ -870,7 +882,9 @@ Tensor operator*(ftype scalar, const Tensor& tensor) {
 // more operators...
 ; // we wrap up our tensor class with this
 </code></pre>
+    </div>
 
+    <div id="free-functions-section" class="article-text-div">
         <h4 class="heading-spaced">Free functions and resolving operator overloading</h4>
 
         <p>
@@ -999,7 +1013,9 @@ def("Gaussian", Py_DataModeling::Gaussian3);
         </p>
 
         </details>
+    </div>
 
+    <div id="build-project-section" class="article-text-div">
         <h2 id="build-project" class="heading-spaced">Building and importing the project</h2>
 
         <p>
@@ -1096,7 +1112,9 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
           file. Firing up a Python interpreter in the directory where the .so resides we can now do <code>from py_data_modeling import Tensor</code>
           and use our Tensor as we intended.
         </p>
+    </div>
 
+    <div id="summary-section" class="article-text-div">
         <h2 id="summary" class="heading-spaced">Summary</h2>
 
         <p>
