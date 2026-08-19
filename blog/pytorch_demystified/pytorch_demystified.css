@@ -59,6 +59,11 @@
     width: 64%;
 }
 
+#pytorch-boost-python-schematic,
+#pytorch-boost-python-schematic-dark {
+    width: 70%;
+}
+
 .pytorch-step-heading {
     text-align: center;
     margin-top: 20px;
@@ -197,6 +202,11 @@ h4.heading-spaced {
 
     .pytorch-optional-collapse-bar {
         top: 55px;
+    }
+
+    #pytorch-boost-python-schematic,
+    #pytorch-boost-python-schematic-dark {
+        width: 85%;
     }
 
     #pytorch-reference-illustration,
