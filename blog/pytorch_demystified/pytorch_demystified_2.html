@@ -517,7 +517,7 @@ vector<shared_ptr<Tensor>> cgraph::ScalarMulNode::backward(const Tensor& upstrea
       The backward function simply computes the gradient. For a function $f(g(x))$ here $g(x)$ is simply $c \cdot x$, with 
       $c$ being a constant. Then
 
-      $$\frac{\partial}{\partial x} c\cdot x = x$$, and $$\frac{\partial}{\partial x} f(g(x)) = f'(g(x)) \cdot g'(x)
+      $$\frac{\partial}{\partial x} c\cdot x = c$$, and $$\frac{\partial}{\partial x} f(g(x)) = f'(g(x)) \cdot g'(x)
       = f'(g(x)) \cdot c$$
       
       , and $f'(g(x))$ is the incoming gradient named upstreamGrad. 
