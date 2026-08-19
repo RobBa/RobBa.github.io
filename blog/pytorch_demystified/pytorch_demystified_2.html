@@ -27,6 +27,14 @@ mathjax: true
         </li>
         <li>
           <a href="#autograd-engine">Implementing autograd</a>
+          <ul>
+            <li>
+              <a href="#autograd-engine">Outlining the engine</a>
+            </li>
+            <li>
+              <a href="#implementing-graph-creation">Implementing dynamic graph creation</a>
+            </li>
+          </ul>
         </li>
       </ul>
     </div>
@@ -118,8 +126,8 @@ assert(C.has_grads() and C.has_grads())
 
         The graph including the backward computation are illustrated below for better clarity.
       </p>
-      
-      <div class="pytorch-graph-row">
+
+      <div class="pytorch-graph-row pytorch-graph-example">
         <div class="pytorch-graph-fig">
           <figure class="fig-light">
           <img
@@ -197,8 +205,96 @@ Tensor Tensor::operator+(ftype scalar) const {
 </code></pre>
 
     <p>
-      Here, we are creating a new tensor object, fill it with meaningful content, and return it. What we now need is a way to give this 
+      Here, we are creating a new tensor object, fill it with meaningful content, and return it. That is, in our framework $C$ is a result of $A$ and $B$,
+      and returned by the operation creating it. We can use this architecture to build our graph silently in the background. We will do this in a few sequential 
+      steps.
+    </p>
+
+    <p>
+      <b>Make the gradient computation optional: </b>Because we might not necessarily want every Tensor that participates in the graph to actually have a gradient, we give it a flag indicating whether we want to 
+      compute its gradients via <code>bool requiresGrad = false;</code>, accessible via constructor or setter methods. That saves us computation and memory, as 
+      it prevents us from performing redundant information.
+    </p>
+
+    <p>
+      <b>Give Tensor class a gradient field: </b>Each tensor gets an optional, lazily initialized Tensor via <code>std::shared_ptr&ltTensor&gt grads = nullptr;</code>.
+      The reason we are using a shared pointer is to allow for shallow copies. As we will later see it can be beneficial to allow for copies of Tensors without 
+      having to copy all the underlying fields in the backend, but selectively manipulate fields we want to. This will enable us to create views. So all fields that 
+      we want to remain shared for all views need to be managed via a shared reference.
+    </p>
+
+    <p>
+      <b>Make the Tensor class a graph node: </b>As seen in the example, both tensors creating new tensors of the graph, as well as tensors created from them, function 
+      as nodes of a the final graph. We therefore need to build that connection. We observe that so long we allow new edges to only emerge as the result of an operation 
+      creating a new node, it is impossible to introduce cycles into the graph (proof by contradiction). In other words, we do end up with an acyclic graph. And importantly,
+      a directed acyclic graph (DAG), since the only time the graph really matters is in the backward pass. And here parent nodes point only to child nodes to pass their 
+      gradient into them. Thus, graph creation consists of two steps:
+    </p>
+
+    <ol>
+      <li>
+        Step 1: Parent node is created as the result of an operation.
+      </li>
+      <li>
+        Step 2: Parent node gets references to its child nodes, and the edge represents the computation performed during the backward pass.
+      </li>
+    </ol>
+
+    <div class="pytorch-graph-row pytorch-graph-pass">
+      <div class="pytorch-graph-fig">
+        <figure class="fig-light">
+        <img
+        id="pytorch-forward-pass"
+        class="blog-image"
+        src="./img_2/forward-pass.png"
+        alt="Diagram of the forward pass graph construction">
+        <figcaption>
+          The forward pass consists one or more tensors performing an operation, creating the result. The control flow does 
+          not indicate a stable graph.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-forward-pass-dark"
+        class="blog-image"
+        src="./img_2/forward-pass-dark.png"
+        alt="Diagram of the forward pass graph construction">
+        <figcaption>
+          The forward pass consists one or more tensors performing an operation, creating the result. The control flow does 
+          not indicate a stable graph.
+        </figcaption>
+        </figure>
+      </div>
+      <div class="pytorch-graph-fig">
+        <figure class="fig-light">
+        <img
+        id="pytorch-backward-pass"
+        class="blog-image"
+        src="./img_2/backward-pass.png"
+        alt="Diagram of the backward pass graph traversal">
+        <figcaption>During the backward pass the graph gets built, the edge encodes the derivative operation.</figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-backward-pass-dark"
+        class="blog-image"
+        src="./img_2/backward-pass-dark.png"
+        alt="Diagram of the backward pass graph traversal">
+        <figcaption>During the backward pass the graph gets built, the edge encodes the derivative operation.</figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <p>
+      And this is the rough idea that we will implement in the next section.
     </p>
 
     </div>
 
+    <div id="implementing-graph-creation" class="article-text-div">
+      <h3 class="heading-spaced">Implementing dynamic graph creation</h3>
+
+      <p>
+        Given the 
+      </p>
+    </div>
