@@ -115,14 +115,53 @@ assert(C.has_grads() and C.has_grads())
         rule for $\frac{\partial E}{\partial A}$ becomes
 
         $$\frac{\partial E}{\partial A} = \frac{\partial E}{\partial C} \cdot \frac{\partial C}{\partial A} + \frac{\partial E}{\partial D} \cdot \frac{\partial D}{\partial A}$$
+
+        The graph including the backward computation are illustrated below for better clarity.
       </p>
       
-      TODO: insert image
+      <div class="pytorch-graph-row">
+        <div class="pytorch-graph-fig">
+          <figure class="fig-light">
+          <img
+          id="pytorch-example-graph"
+          class="blog-image"
+          src="./img_2/graph-example.png"
+          alt="Graph depicting the example">
+          <figcaption>Graph showing an example of a forward computational graph.</figcaption>
+          </figure>
+          <figure class="fig-dark">
+          <img
+          id="pytorch-example-graph-dark"
+          class="blog-image"
+          src="./img_2/graph-example-dark.png"
+          alt="Graph depicting the example">
+          <figcaption>Graph showing an example of a forward computational graph.</figcaption>
+          </figure>
+        </div>
+        <div class="pytorch-graph-fig">
+          <figure class="fig-light">
+          <img
+          id="pytorch-example-graph-backward"
+          class="blog-image"
+          src="./img_2/graph-example-backward.png"
+          alt="Graph depicting the example, backward pass">
+          <figcaption>When computing backward the derivative of $E$ wrt to $A$ and $B$ has to be the sum of their individual contributions.</figcaption>
+          </figure>
+          <figure class="fig-dark">
+          <img
+          id="pytorch-example-graph-backward-dark"
+          class="blog-image"
+          src="./img_2/graph-example-backward-dark.png"
+          alt="Graph depicting the example, backward pass">
+          <figcaption>When computing backward the derivative of $E$ wrt to $A$ and $B$ has to be the sum of their individual contributions.</figcaption>
+          </figure>
+        </div>
+      </div>
 
       <p>
-        This makes intuitively sense in that components that contribute forward must also take the same path backwards. And the fact that it turns out 
-        to be a sum, well, we leave that up to the smart mathematicians to prove that this always holds (or if you have an intuition or a cadid proof 
-        you are so kind to give it to me). Going now full circle back to our example, we have now the gradient 
+        This whole setup now makes intuitively sense in that components that contribute forward must also take the same path backwards. And the fact 
+        that it turns out to be a sum, well, we leave that up to the smart mathematicians to prove that this always holds (or if you have an intuition 
+        or a cadid proof you are so kind to give it to me). Going now full circle back to our example, we have now the gradient 
         
         $$\frac{\partial C}{\partial A} = \left [ \begin{matrix} 
                                                       \frac{\partial C}{\partial a_{11}} & \frac{\partial C}{\partial a_{12}} \\ 
