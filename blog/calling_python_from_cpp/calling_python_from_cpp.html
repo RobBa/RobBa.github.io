@@ -160,7 +160,8 @@ highlight: true
       </p>
 
       <p>
-      <pre><code class="language-cpp">// init
+
+<pre><code class="language-cpp">// init
 Py_Initialize();<br>
 PyRun_SimpleString("import sys");<br>
 PyRun_SimpleString("import os");<br>
@@ -276,7 +277,7 @@ PyRun_SimpleString(cmd.str().c_str());<br>
         target="_blank">in our code</a>, and that we use to query the output of neural networks):
       </p>
 
-      <pre><code lang="python">def do_query(x: list):<br>
+<pre><code lang="python">def do_query(x: list):<br>
 &nbsp; &nbsp; # do something<br>
 &nbsp; &nbsp; return some_list_of_ints<br>
 </code></pre>
@@ -291,7 +292,7 @@ PyRun_SimpleString(cmd.str().c_str());<br>
         is some boilerplate in CPython):
       </p>
 
-      <pre><code lang="language-cpp">query_func = PyObject_GetAttrString(p_module, "do_query");<br>
+<pre><code lang="language-cpp">query_func = PyObject_GetAttrString(p_module, "do_query");<br>
 if (query_func == NULL || !PyCallable_Check(query_func)) {<br>
 &nbsp; &nbsp; Py_DECREF(p_name);<br>
 &nbsp; &nbsp; Py_DECREF(p_module);<br>
@@ -299,6 +300,7 @@ if (query_func == NULL || !PyCallable_Check(query_func)) {<br>
 &nbsp; &nbsp; exit(1);<br>
 }
 </code></pre>
+
     </div>
 
     <div id="calling-python-function-with-argument" class="article-text-div">
@@ -333,7 +335,7 @@ if (query_func == NULL || !PyCallable_Check(query_func)) {<br>
         purposes we omit the error checking when translating our vector to a Python list and back.
       </p>
 
-      <pre><code lang="language-cpp">// step 1: Prepare the input<br>
+<pre><code lang="language-cpp">// step 1: Prepare the input<br>
 PyObject* p_list = PyList_New(cpp_list.size());<br>
 for(int i=0; i&lt;cpp_list.size(); i++){<br>
 &nbsp; &nbsp; PyObject p_int = PyLong_FromLong(cpp_list[i]);<br>
@@ -380,7 +382,7 @@ Py_DECREF(p_result);
         script, holding the GIL would look like this:
       </p>
 
-      <pre><code lang="language-cpp">// acquire GIL, blocking for other threads <br>
+<pre><code lang="language-cpp">// acquire GIL, blocking for other threads <br>
 PyGILState_STATE gstate = PyGILState_Ensure(); <br>
 PyObject* p_result = PyObject_CallOneArg(func, args); <br>
 PyGILState_Release(gstate); // release GIL <br>

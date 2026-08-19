@@ -732,7 +732,7 @@ BOOST_PYTHON_MODULE(py_data_modeling)
           class. Lastly, the braces take in the Python internal class name "Tensor". In summary, we have this behavior:
         </p>
 
-<pre><code> # in Python
+<pre><code lang="python"> # in Python
   
 from dl_lib import Tensor # name Tensor defined by first argument in braces
 
@@ -774,7 +774,7 @@ t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
           reference would stay valid for its lifetime, resulting in dangerous dangling pointers. Say we do the following:
         </p>
 
-<pre><code> # in Python
+<pre><code lang="python"> # in Python
 
 dims = t.dims # get reference to dim object
 del t # destroy tensor
@@ -796,7 +796,7 @@ print(dims.get(0)) # safe only if dims keeps t alive
           Below the properties section we see all the method definitions we want to expose:
         </p>
 
-<pre><code>BOOST_PYTHON_MODULE(py_data_modeling)
+<pre><code class="language-cpp">BOOST_PYTHON_MODULE(py_data_modeling)
 {
 // ...
 .def("__getitem__", &Py_DataModeling::tensorGetItem)
@@ -817,12 +817,12 @@ print(dims.get(0)) # safe only if dims keeps t alive
           explicitly into the desired type. This would look something like this:
         </p>
 
-<pre><code>#define WRAP_TENSOR_METHOD_1(method) \
+<pre><code class="language-cpp">&#35;define WRAP_TENSOR_METHOD_1(method) \
 +[](const Tensor& self, const Tensor& other) -&gt; std::shared_ptr&lt;Tensor&gt; { \
   return std::make_shared&lt;Tensor&gt;(self.method(other)); \
 }
 
-#define WRAP_SCALAR(method, T) \
+&#35;define WRAP_SCALAR(method, T) \
 +[](const Tensor& self, T val) -&gt; std::shared_ptr&lt;Tensor&gt; { \
   return std::make_shared&lt;Tensor&gt;(self.method(val)); \
 }
@@ -851,7 +851,8 @@ print(dims.get(0)) # safe only if dims keeps t alive
           is via a free floating friend class. 
         </p>
 
-<pre><code>// src/data_modeling/tensor.h
+<pre><code class="language-cpp">// src/data_modeling/tensor.h
+
 class Tensor final {
 // ...
 public: 
@@ -868,10 +869,10 @@ Tensor operator*(ftype scalar, const Tensor& tensor) {
 
         <p>
           Obviously this function then calls the operator we defined earlier, fixing our issue. Exposing this to our Python interface is then 
-          relatively straight forward:
+          relatively straight forward. 
         </p>
 
-<pre><code>#define WRAP_SCALAR_REVERSE(op, T) \
+<pre><code class="language-cpp">&#35;define WRAP_SCALAR_REVERSE(op, T) \
 +[](const Tensor& self, T val) -&gt; std::shared_ptr&lt;Tensor&gt; { \
   return std::make_shared&lt;Tensor&gt;(val op self); \
 }
@@ -882,18 +883,106 @@ Tensor operator*(ftype scalar, const Tensor& tensor) {
 // more operators...
 ; // we wrap up our tensor class with this
 </code></pre>
+
+    </div>
+
+      <div id="bp-tensor-class-section" class="article-text-div">
+        <h4 class="heading-spaced">Boost.Python and Tensor class interaction</h4>
+
+        <p>
+          We wrap up our tensor class in the end with a semicolon ";", as per usual
+          in C++. With that we are done with the binding around the Tensor class so far. Before we add 
+          a few convenience functions we take a brief look at how things integrate now. The figure 
+          below shows schematically how Boost.Python integrates our whole Tensor class into Python
+          by wrapping a translation layer around it. 
+        </p>
+
+        <figure class="fig-light">
+        <img
+        id="pytorch-boost-python-schematic"
+        class="blog-image"
+        src="./img_1/boost-python-schematic.png"
+        alt="Schematic frontend-backend interaction">
+        <figcaption>
+          Schematic of how Boost.Python manages the interaction between the front- and the backend, 
+          and Python-C++ translation in general.<br>Free functions omitted for simplicity.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-boost-python-schematic-dark"
+        class="blog-image"
+        src="./img_1/boost-python-schematic-dark.png"
+        alt="Schematic frontend-backend interaction">
+        <figcaption>
+          Schematic of how Boost.Python manages the interaction between the front- and the backend, 
+          and Python-C++ translation in general.<br>Free functions omitted for simplicity.
+        </figcaption>
+        </figure>
+
+        <p>
+          One thing we did not mention so far, and what gets hinted at in the figure, is what happens
+          with Python native objects, say a list-type in Python. Luckily we do not need to think about 
+          that yet, since Boost.Python does this automatically in the most common cases. For instance, a 
+          floating point in Python will just get translated into a C++ float or double type. A list type 
+          acts semantically similar to the std::vector type in C++, hence this also gets translated automatically. 
+        </p>
+
+        <p>
+          In other cases we have to do it manually. For instance, we gave it a data type tensorDim_t, that 
+          we take as a template argument for Tensor dimension initialization. During compilation Boost.Python 
+          will complain that it does not know how to translate in between the two, demanding that we have to 
+          instruct it manually how to convert the two. This unfortunately turns out to be rather tedious work, 
+          and I'd rather not clutter this post with cryptic lines of Boost.Python internal ABI calls. Instead I 
+          will encourage the interested reader to take a look at file <i>src/python/py_utility/custom_converters.h</i> 
+          of the source code, and I refer to <a href="https://misspent.wordpress.com/2009/09/27/how-to-write-boost-python-converters/" 
+          target="_blank">this</a> blogpost about it. For the rest it suffices to know that we have to implement a 
+          custom class with the following definitions:
+        </p>
+
+<pre><code class="language-cpp">// src/python/py_utility/custom_converters.h
+
+namespace custom_converters {
+  /**
+   * @brief We use this class to convert Python lists of int into vectors of
+   * internal types, such as tensorDim_t.
+   */
+  template&lt;typename T&gt;
+  requires ( std::is_integral_v&lt;T&gt; || 
+             std::is_floating_point_v&lt;T&gt;)
+  struct PyListToVectorConverter {
+    using rvalueFromPythonData = boost::python::converter::rvalue_from_python_stage1_data;
+
+    PyListToVectorConverter();
+
+    static void* convertible(PyObject* obj_ptr);
+    static void construct(PyObject* obj_ptr,rvalueFromPythonData* data);
+  };
+}
+</code></pre>
+
+        <p>
+          I made it a templated just class just in case we need it for some other type later on as well. 
+          The template-guards are because in the conversion we have to tell it exactly how to convert the 
+          arguments as in <code>if constexpr(std::is_integral_v&lt;T&gt;){auto val = extract&lt;int&gt;(py_list[i]); /*.../*}</code>, 
+          and for safety reasons I put them up, should things change in the future. 
+          We then have to register this new class type with Boost.Python via 
+          <code>custom_converters::PyListToVectorConverter&lt;tensorDim_t&gt;();</code> in the same scope and before we declare 
+          the Boost.Python tensor class. I.e. the first time before we hand Boost.Python a function with a signature asking 
+          for the data type we want to convert to and from.
+        </p>
     </div>
 
     <div id="free-functions-section" class="article-text-div">
         <h4 class="heading-spaced">Free functions and resolving operator overloading</h4>
 
         <p>
-          We wrap up our tensor class in the end with a semicolon ";", as per usual
-          in C++. However, we also want to give our frontend some free 
-          functions. More specifically, we introduce some tensor-creation functions: 
+          Having wrapped up our Tensor class frontend binding, we also want to give our 
+          Python module some free functions. More specifically, we introduce some 
+          tensor-creation functions: 
         </p>  
         
-<pre><code> // src/data_modeling/tensor_creation.h
+<pre><code class="language-cpp"> // src/data_modeling/tensor_creation.h
 
 // creates a tensor with gaussian initialized values, centered around zero with stddev=1
 std::shared_ptr&lt;Tensor&gt; Gaussian(std::vector&lt;tensorDim_t&gt; dims, Device d, const bool requiresGrad=false) {
@@ -914,7 +1003,7 @@ std::shared_ptr&lt;Tensor&gt; Gaussian(std::vector&lt;tensorDim_t&gt; dims, cons
           We achieve this by writing explicit wrapper-methods, one for each overload that we want to have. Those would look like this:
         </p>
 
-<pre><code>// lambda wrappers to resolve default arguments
+<pre><code class="language-cpp">// lambda wrappers to resolve default arguments
 auto GaussianWrapper0(std::vector&lt;tensorDim_t&gt; dims) { 
   return TensorFunctions::Gaussian(std::move(dims)); 
 }
@@ -938,13 +1027,11 @@ std::shared_ptr&lt;Tensor&gt;    (*Gaussian3)(std::vector&lt;tensorDim_t&gt;, De
           and specify which ones we actually do want to expose. Finally, we expose our free floating functions via 
         </p>
 
-<pre><code>def("Gaussian", Py_DataModeling::Gaussian0);
+<pre><code class="language-cpp">def("Gaussian", Py_DataModeling::Gaussian0);
 def("Gaussian", Py_DataModeling::Gaussian1);
 def("Gaussian", Py_DataModeling::Gaussian2);
 def("Gaussian", Py_DataModeling::Gaussian3);
 </code></pre>
-
-        <br>
 
         <details class="pytorch-optional" id="bp-under-hood-section">
         <summary class="pytorch-optional-summary">
@@ -977,7 +1064,7 @@ def("Gaussian", Py_DataModeling::Gaussian3);
           <code>destructor tp_dealloc;</code>, and the following block:
         </p>
 
-<pre><code>struct _typeobject {
+<pre><code class="language-cpp">struct _typeobject {
     // ...
     /* Attribute descriptor and subclassing stuff */
     PyMethodDef *tp_methods;
@@ -995,7 +1082,7 @@ def("Gaussian", Py_DataModeling::Gaussian3);
           functions, members, information about inheritance, and many more. <code>PyMethodDef</code> is rather simple in comparison:
         </p>
 
-<pre><code>struct PyMethodDef {
+<pre><code class="language-cpp">struct PyMethodDef {
     const char  *ml_name;
     PyCFunction  ml_meth;
     int ml_flags;
@@ -1027,19 +1114,20 @@ def("Gaussian", Py_DataModeling::Gaussian3);
           used. The whole thing looks like the following:
         </p>
 
-<pre><code>// src/data_modeling/CMakeLists.txt
+<pre><code>&#35; src/data_modeling/CMakeLists.txt
+
 add_library(DataModeling STATIC
     dim_type.cpp
     tensor.cpp
     tensor_functions.cpp
 )
 
-// src/python/CMakeLists.txt
+&#35; src/python/CMakeLists.txt
 include_directories(
         "${CMAKE_CURRENT_SOURCE_DIR}/python_utility"
         )
 
-# remove the lib... prefix 
+&#35; remove the lib... prefix 
 set(CMAKE_SHARED_MODULE_PREFIX "")
 
 add_library(py_data_modeling MODULE
@@ -1047,7 +1135,7 @@ add_library(py_data_modeling MODULE
             )
 set_target_properties(py_data_modeling PROPERTIES PREFIX "") # don't add "lib" in front
 
-// src/CMakeLists.txt
+&#35; src/CMakeLists.txt
 target_link_libraries(py_data_modeling ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} DataModeling)
 target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 </code></pre>
