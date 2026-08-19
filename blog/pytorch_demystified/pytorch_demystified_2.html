@@ -586,7 +586,7 @@ vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
     <p>
       Interesting is also what happens if we just get a single element from a tensor. Say we wanted to sum over a tensor, 
       something similar to <code>loss_sum = loss.sum()</code>, and then propagating the summed tensor back through the network.
-      We do this via 
+      We do this via the chunk of code below. 
     </p>
 
 <pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/graph_creation.cpp
@@ -594,13 +594,21 @@ vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
 shared_ptr<Tensor> cgraph::sumTensor(const shared_ptr<Tensor> t) {
   auto res = make_shared<Tensor>(std::vector<tensorDim_t>{1}, std::vector<ftype>{0.0}, 
                                  t->getDevice(), t->getRequiresGrad());
-  for(tensorSize_t i=0; i<t->getSize(); i++){
-    res = cgraph::add(res, cgraph::get(t, i)); // cgraph::get() is a wrapper around GetterNode below
+  for(tensorSize_t i = 0; i < t->getSize(); i++){
+    res = cgraph::add(res, cgraph::get(t, i)); // cgraph::get() is a wrapper around get
   }
   return res;
 }
+</code></pre>
 
-// src/backend/computational_graph/tensor_ops/getter_node.cpp
+      <p>
+        This operation will leave a trail of nodes, one for every sum we perform. 
+        When propagating backwards we have to take care of the dimensions, as they need to match those of 
+        the parent:
+      </p>
+
+
+<pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/getter_node.cpp
 
 using namespace std;
 using namespace cgraph;
@@ -610,19 +618,19 @@ vector< shared_ptr<Tensor> > GetterNode::backward(const Tensor& upstreamGrad) {
   assert(!upstreamGrad.getRequiresGrad() && upstreamGrad.getDims().nDims() == 1);
 
   auto res = make_shared<Tensor>(parents[0]->getDims(), parents[0]->getDevice(), false);
-  for(tensorSize_t i = 0; i < res->getSize(); i++){
-    res->set(0, i);
-  }
+  TensorFunctions::ToZeros(*res);
 
-  if(std::holds_alternative<tensorSize_t>(idx)){
+  if(std::holds_alternative<tensorSize_t>(idx)){ // idx is of type std::variant
     res->set(upstreamGrad.get(0), std::get<tensorSize_t>(idx));
   }
   else if(std::holds_alternative<multiDimIdx_t>(idx)){
     res->set(upstreamGrad.get(0), std::get<multiDimIdx_t>(idx));
   }
+&#35;ifndef NDEBUG
   else{
     __throw_runtime_error("Idx variant in unexpected state");
   }
+&#35;endif
 
   return { std::move(res) };
 }
