@@ -36,6 +36,21 @@ mathjax: true
             </li>
           </ul>
         </li>
+        <li>
+          <a href="#activation-functions">Implementing activation functions</a>
+        </li>
+        <li>
+          <a href="#loss-functions">Implementing loss functions</a>
+        </li>
+        <li>
+          <a href="#optimizers">Implementing optimizers</a>
+        </li>
+        <li>
+          <a href="#frontend">Updating the Python frontend</a>
+        </li>
+        <li>
+          <a href="#mnist-example">Implementing an MNIST example</a>
+        </li>
       </ul>
     </div>
 
@@ -196,7 +211,7 @@ assert(C.has_grads() and C.has_grads())
 
 Tensor Tensor::operator+(ftype scalar) const {
   Tensor res(dims, values->getDevice(), false);
-  for(tensorSize_t i = 0; i < values->getSize(); ++i) {
+  for(tensorSize_t i = 0; &lt values->getSize(); ++i) {
     (*res.values)[i] = (*values)[i] + scalar;
   }
 
@@ -295,6 +310,364 @@ Tensor Tensor::operator+(ftype scalar) const {
       <h3 class="heading-spaced">Implementing dynamic graph creation</h3>
 
       <p>
-        Given the 
+        Now that we know what we want to do, we can dive right in. Because we want to separate the graph from the Tensor class, 
+        we give it a new class via
       </p>
+
+<pre><code>// src/backend/computational_graph/graph_node.h
+
+namespace cgraph {
+  class GraphNode {
+    protected:
+      std::vector&lt std::shared_ptr&ltTensor&gt &gt parents;
+      explicit GraphNode(std::vector&lt std::shared_ptr&ltTensor&gt &gt parents) : parents{std::move(parents)}{}
+      
+    public:
+      GraphNode(const GraphNode& other) = delete;
+      GraphNode& operator=(const GraphNode& other) = delete;
+
+      GraphNode(GraphNode&& other) = default;
+      GraphNode& operator=(GraphNode&& other) = default;
+
+      virtual std::vector&ltstd::shared_ptr&ltTensor&gt&gt> backward(const Tensor& upstreamGrad) = 0;
+      
+      const auto& getParents() const noexcept {
+        return parents;
+      }
+  };
+}
+</code></pre>
+
+      <p>
+        We allow for moves but suppress copies, since copies will foreseeably do arcane things to our graph we'd rather not deal with.
+        The class  takes in a vector of pointers to its parents to allow for an arbitrary number of those. We also expose the parents 
+        via a const reference, and give it a backward function taking a reference to the incoming tensor. This is simply due the chain rule 
+        $\frac{\partial}{\partial x} f(g(x)) = f'(g(x)) \cdot g'(x)$. Thus the <code>const Tensor& upstreamGrad</code> argument represents 
+        the incoming $g'(x)$. 
+      </p>
+
+      <p>
+        To make the Tensor class now a part of the computational graph we now have to give it an attribute 
+        <code>std::shared_ptr<cgraph::GraphNode> cgNode = nullptr;</code>, and we expose it via 
+      </p>
+
+<pre><code>// src/data_modeling/tensor.h
+
+class Tensor final {
+// ..
+public:
+  //..
+  void setCgNode(std::shared_ptr<cgraph::GraphNode> node) noexcept {
+    cgNode = std::move(node);
+    requiresGrad = true;
+  }  
+  //..
+};
+</code></pre>
+
+    <p>
+      One detail I just skimmed over so far is why the GraphNode class stores its parents via a shared pointer in 
+      <code>std::vector&lt std::shared_ptr&ltTensor&gt &gt parents;</code>. To do so we have to think about what happens
+      when we actually start training neural networks. Here we will do something along the lines of
+    </p>
+
+<pre><code>x = next_batch()
+y_pred = my_network.forward(x)
+loss = loss_fn(y_pred)
+optim.step(loss)
+</code></pre>
+
+      <p>
+        <b>But what happens here internally?</b> We have a network <code>my_network</code> holding referces to internal tensors and 
+        other modules like activation functions. Internally, on calling forward it will do something like
+      </p>
+
+<pre><code>def forward(self, x):
+  for layer in self._layers:
+    # x now is a newly created tensor holding a reference to its parent
+    x = layer.forward(x)
+  return x
+</code></pre>
+
+      <p>
+        But what happens with x when the loop goes into the next iteration? If we do not take care, then it will be destroyed, 
+        and the second time the loop enters x will be invalid, breaking whatever happens in <code>layer.forward(x)</code>. We thus 
+        need the parent to hold ownership of its child nodes. The last x returning the loop will hold a reference to its preceding
+        x, which in turn will hold a reference to its preceding node, and so on. And once the returned x goes out of 
+        scope the whole invisible chain we built in the backgound disappears. The figure in the following illustrates this schematically.
+      </p>
+
+      <figure class="fig-light">
+        <img
+        id="pytorch-reference-illustration"
+        class="blog-image"
+        src="./img_2/reference-creation.png"
+        alt="Illustration of memory management">
+        <figcaption>
+          Example of the loop illustrated above, and how we solve the ownership problem.<br>As long as the final output
+          tensor remains alive so does the whole chain of tensor.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-reference-illustration-dark"
+        class="blog-image"
+        src="./img_2/reference-creation-dark.png"
+        alt="Illustration of memory management">
+        <figcaption>
+          Example of the loop illustrated above, and how we solve the ownership problem.<br>As long as the final output
+          tensor remains alive so does the whole chain of tensor.
+        </figcaption>
+      </figure>
+
+      <p>
+        We are now faced with two choices. We can either rewrite every operation we created so far, returning a shared 
+        pointer, or we can use wrappers. I decided for the wrappers for two reasons: First of all, it keeps the API
+        clean. Calling matmul internally in the backend has no side effects such as creating a shared pointer and silently 
+        building a computational in the background. Our implemented methods stay slick and lean and to the point. The second
+        reason is that we do need the shared pointers really only for the backward pass. Later, when we finished training a 
+        network and we just want it to spill whatever it was trained to do, we do not need the graph anymore. Shared pointers here
+        introduce slight memory overhead, but more importantly, incur a performance penalty through an additional layer of indirection.
+        Separating graph creation from the Tensor class itself will later enable us to optimize the hell out of the forward pass if we 
+        wish to do so. Without further ado, let us start with a simple addition as implemented in the following:
+      </p>
+
+<pre><code>// src/backend/data_modeling/tensor.cpp
+
+Tensor Tensor::operator*(ftype scalar) const {
+  Tensor res(dims, values->getDevice(), false);
+  for (tensorSize_t i = 0; i &lt values->getSize(); ++i) {
+    (*res.values)[i] = (*values)[i] * scalar;
+  }
+
+  return res;
+}
+</code></pre>
+
+      <p>
+        We write a wrapper around this operation in the following fashion:
+      </p>
+
+<pre><code>// src/backend/computational_graph/tensor_ops/graph_creation.h
+
+namespace cgraph {
+  std::shared_ptr<Tensor> mul(const std::shared_ptr<Tensor> left, ftype scalar); 
+  std::shared_ptr<Tensor> mul(ftype scalar, const std::shared_ptr<Tensor> left);
+}
+
+// src/backend/computational_graph/tensor_ops/graph_creation.cpp
+
+using namespace std;
+
+shared_ptr<Tensor> cgraph::mul(const shared_ptr<Tensor> t, ftype scalar) {
+  auto res = make_shared<Tensor>((*t) * scalar);
+  if(t->getRequiresGrad()){
+    res->setCgNode(make_shared<cgraph::ScalarMulNode>(t, scalar));
+    assert(res->getRequiresGrad());
+  }
+  return res;
+}
+
+shared_ptr<Tensor> cgraph::mul(ftype scalar, const shared_ptr<Tensor> t) {
+  return cgraph::mul(t, scalar);
+}
+</code></pre>
+
+      <p>
+        Here, we do the overload to once again mirror what Python does with its __rmul__. The function itself checks if the input t
+        wants to know its gradients later on, and if yes gives the result of the operation a ScalarMulNode object, holding a 
+        reference (and therefore ownership) to itself. Since t is an input argument it already is a shared tensor, and this just 
+        gives the new ScalarMulNode a copy of this pointer, and reference counting does the rest for us automatically. 
+        However, I still owe you the ScalarMulNode implementation. Interesting here is mainly that it derives from GraphNode to 
+        work, and you see the first implementation of a gradient in the backward() method:
+      </p>
+
+<pre><code>// src/backend/computational_graph/tensor_ops/scalar_op_nodes.h
+namespace cgraph {
+  class ScalarMulNode final : public GraphNode {
+    private:
+      const ftype factor;
+    
+    public:
+      explicit ScalarMulNode(std::shared_ptr<Tensor> t, ftype factor) 
+        : GraphNode({std::move(t)}), factor{factor} {}
+
+      std::vector<std::shared_ptr<Tensor>> backward(const Tensor& upstreamGrad) override;
+  };
+}
+
+// src/backend/computational_graph/tensor_ops/scalar_op_nodes.cpp
+
+using namespace std;
+using namespace cgraph;
+
+vector<shared_ptr<Tensor>> cgraph::ScalarMulNode::backward(const Tensor& upstreamGrad) {
+  assert(!upstreamGrad.getRequiresGrad());
+
+  auto res = make_shared<Tensor>(upstreamGrad.createDeepCopy());
+  for(tensorSize_t i=0; i<res->getSize(); i++){
+    res->set(res->get(i) * factor, i);
+  }
+  return {std::move(res)};
+}
+</code></pre>
+
+    <p>
+      Note that we gave the node the scalar as a constant it stores internally as <code>const ftype factor;</code>. 
+      The backward function simply computes the gradient. For a function $f(g(x))$ here $g(x)$ is simply $c \cdot x$, with 
+      $c$ being a constant. Then, $\frac{\partial}{\partial x} c\cdot x = x$, and $\frac{\partial}{\partial x} f(g(x)) = f'(g(x)) \dot g'(x)
+      = f'(g(x)) \cdot c$, and $f'(g(x))$ is the incoming gradient named upstreamGrad. 
+    </p>
+
+    <p>
+      In the same fashion we can now build wrappers for the remainders of the operations we already have. I will simply drop you 
+      the declarations, the definitions follow the exact same pattern that we just observed. Here they come.
+    </p>
+
+<pre><code>// src/backend/computational_graph/tensor_ops/graph_creation.h
+
+namespace cgraph {
+  // Arithmetic operations
+  std::shared_ptr<Tensor> mul(const std::shared_ptr<Tensor> left, const std::shared_ptr<Tensor> right);
+  std::shared_ptr<Tensor> mul(const std::shared_ptr<Tensor> left, ftype scalar); 
+  std::shared_ptr<Tensor> mul(ftype scalar, const std::shared_ptr<Tensor> left); 
+
+  std::shared_ptr<Tensor> add(const std::shared_ptr<Tensor> left, const std::shared_ptr<Tensor> right);
+  std::shared_ptr<Tensor> add(const std::shared_ptr<Tensor> left, ftype scalar);    
+  std::shared_ptr<Tensor> add(ftype scalar, const std::shared_ptr<Tensor> left);
+
+  std::shared_ptr<Tensor> matmul(const std::shared_ptr<Tensor> left, const std::shared_ptr<Tensor> right);
+
+  std::shared_ptr<Tensor> sub(const std::shared_ptr<Tensor> left, ftype scalar);
+  std::shared_ptr<Tensor> div(const std::shared_ptr<Tensor> left, ftype scalar);
+
+  // Getter methods
+  std::shared_ptr<Tensor> get(const std::shared_ptr<Tensor>& t, tensorSize_t idx);
+  std::shared_ptr<Tensor> get(const std::shared_ptr<Tensor>& t, const std::vector<tensorDim_t>& idx);
+
+  // Composite operations
+  std::shared_ptr<Tensor> sumTensor(const std::shared_ptr<Tensor> t);
+}
+</code></pre>
+
+    <p>
+      You can look up their implementions in the accompanying implementation file. I will restrain 
+      myself to a few interesting ones to point out here. We start with the matrix multiplication node itself, 
+      more precisely the backward function implemented as the following:
+    </p>
+
+<pre><code>// src/backend/computational_graph/tensor_ops/matmul_node.cpp
+
+using namespace std;
+using namespace cgraph;
+
+vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
+    assert(!upstreamGrad.getRequiresGrad());
+    return {
+        make_shared<Tensor>(upstreamGrad.matmul(parents[1]->transpose(-2, -1))), 
+        make_shared<Tensor>(parents[0]->transpose(-2, -1).matmul(upstreamGrad))
+    };
+}
+</code></pre>
+
+    <p>
+      This is interesting for its simplicity. Basically, given two matrices $A$ and $B$, and computing their 
+      matrix multiplication $C = A @ B$, we obtain the following for the derivatives: 
+      $\frac{\partial C}{\partial A} = C @ B^T$ and $\frac{\partial C}{\partial B} = A @ C^T$. Here, $B^T$ and 
+      $C^T$ are the transposed matrices respectively. This result can be verified by hand. For us right now this is 
+      interesting just from a practical point of view, since it saves us what might probably a few hourse of handwriting
+      and debugging a nested array indexing mess. But also, it later will open a door for optimization.
+    </p>
+
+    <p>
+      Interesting is also what happens if we just get a single element from a tensor. Say we wanted to sum over a tensor, 
+      something similar to <code>loss_sum = loss.sum()</code>, and then propagating the summed tensor back through the network.
+      We do this via 
+    </p>
+
+<pre><code>// src/backend/computational_graph/tensor_ops/graph_creation.cpp
+
+shared_ptr<Tensor> cgraph::sumTensor(const shared_ptr<Tensor> t) {
+  auto res = make_shared<Tensor>(std::vector<tensorDim_t>{1}, std::vector<ftype>{0.0}, 
+                                 t->getDevice(), t->getRequiresGrad());
+  for(tensorSize_t i=0; i<t->getSize(); i++){
+    res = cgraph::add(res, cgraph::get(t, i)); // cgraph::get() is a wrapper around GetterNode below
+  }
+  return res;
+}
+
+// src/backend/computational_graph/tensor_ops/getter_node.cpp
+
+using namespace std;
+using namespace cgraph;
+
+vector< shared_ptr<Tensor> > GetterNode::backward(const Tensor& upstreamGrad) {
+  // upstreamGrad is scalar by definition
+  assert(!upstreamGrad.getRequiresGrad() && upstreamGrad.getDims().nDims() == 1);
+
+  auto res = make_shared<Tensor>(parents[0]->getDims(), parents[0]->getDevice(), false);
+  for(tensorSize_t i = 0; i < res->getSize(); i++){
+    res->set(0, i);
+  }
+
+  if(std::holds_alternative<tensorSize_t>(idx)){
+    res->set(upstreamGrad.get(0), std::get<tensorSize_t>(idx));
+  }
+  else if(std::holds_alternative<multiDimIdx_t>(idx)){
+    res->set(upstreamGrad.get(0), std::get<multiDimIdx_t>(idx));
+  }
+  else{
+    __throw_runtime_error("Idx variant in unexpected state");
+  }
+
+  return { std::move(res) };
+}
+</code></pre>
+
+    </div>
+
+    <div id="activation-functions" class="article-text-div">
+      <h2 class="heading-spaced">Implementing activation functions</h2>
+
+      <p>
+        This will be a rather short section compared with the above. The main reason is that it now follows the pattern we just 
+        established. So instead of going into every activation itself, I want to focus on a few that are interesting. 
+      </p>
+
+    </div>
+
+    <div id="loss-functions" class="article-text-div">
+      <h2 class="heading-spaced">Implementing loss functions</h2>
+
+      <p>
+        TODO      
+      </p>
+
+    </div>
+
+    <div id="optimizers" class="article-text-div">
+      <h2 class="heading-spaced">Implementing optimizers</h2>
+
+      <p>
+        TODO      
+      </p>
+
+    </div>
+
+    <div id="frontend" class="article-text-div">
+      <h2 class="heading-spaced">Updating the Python frontend</h2>
+
+      <p>
+        TODO      
+      </p>
+
+    </div>
+
+    <div id="mnist-example" class="article-text-div">
+      <h2 class="heading-spaced">Implementing an MNIST example</h2>
+
+      <p>
+        TODO      
+      </p>
+
     </div>
