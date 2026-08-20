@@ -46,6 +46,9 @@ mathjax: true
               <a href="#activation-functions">Activation functions</a>
             </li>
             <li>
+              <a href="#ff-layer">Feedforward-layer</a>
+            </li>
+            <li>
               <a href="#loss-functions">Loss functions</a>
             </li>
             <li>
@@ -336,6 +339,8 @@ namespace cgraph {
 
       GraphNode(GraphNode&& other) = default;
       GraphNode& operator=(GraphNode&& other) = default;
+
+      ~GraphNode() noexcept = default;
 
       virtual std::vector&ltstd::shared_ptr&ltTensor&gt&gt> backward(const Tensor& upstreamGrad) = 0;
       
@@ -834,36 +839,497 @@ assert t2.grads.getitem(0) == pytest.approx(10.0)
       <h2 class="heading-spaced">Adding deep learning modules</h2>
 
       <p>
-        In the previous section we painstakingly waltzed through memory management, algorithmic decisions,
-        and 
+        In the previous section we painstakingly waltzed through calculus, linear algebra, memory management, algorithms, 
+        and architectural decisions. We walked most of the mountain and now get to enjoy our view, as most of what comes
+        next becomes a simple plug and play into what we just established. We will add a few staples of every 
+        good deep learning framework. I will avoid repeating myself, and instead focus on what's interesting, after 
+        one small slight warmup to establish the routine.
       </p>
 
     </div>
 
     <div id="activation-functions" class="article-text-div">
-      <h3 class="heading-spaced">Activation functions</h2>
+      <h3 class="heading-spaced">Activation functions</h3>
 
       <p>
-        This will be a rather short section compared with the above. The main reason is that it now follows the pattern we just 
-        established. So instead of going into every activation itself, I want to focus on a few that are interesting. 
+        We start off by implementing a few activation functions. Neural networks consist of a more or less heterogenuous 
+        mix of components that form a graph, as we have seen earlier. To bring all those components under one single roof 
+        we use the inheritance model one more time, where we make all those a module via:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/module/module_base.h
+
+namespace module {
+  class ModuleBase {
+    public:
+      ModuleBase() = default;
+
+      ModuleBase(const ModuleBase& other) = delete;
+      ModuleBase& operator=(const ModuleBase& other) = delete;
+
+      ModuleBase(ModuleBase&& other) noexcept = default;
+      ModuleBase& operator=(ModuleBase&& other) noexcept = default;
+
+      ~ModuleBase() noexcept = default;
+
+      // for inference -> no graph creation
+      virtual Tensor operator()(const Tensor& input) const = 0;
+      // for training -> creates graph
+      virtual std::shared_ptr<Tensor> operator()(const std::shared_ptr<Tensor>& input) const = 0;
+
+      virtual std::vector< std::shared_ptr<Tensor> > parameters() const { return {}; }
+  };
+}
+</code></pre>
+
+      <p>
+        We once again suppress copies actively to avoid accidents. More interestingly though
+        we have two call-operators, one for inference and one for training, and one getter
+        that returns an std::vector of pointers to the parameters of the base class. Since not every 
+        module will have parameters we can give it default behavior. Alternatively we could make it 
+        abstract, forcing ourselves to implement it and thus to avoid any mistake that happens from 
+        a forgotten override, but for now we stick with this, since I am a solo developer and also 
+        gotta think about how to make some bread eventually. The first example of a derived class is
+        the all-time famous ReLU function.
       </p>
 
     </div>
 
-    <div id="loss-functions" class="article-text-div">
-      <h3 class="heading-spaced">Loss functions</h2>
+    <div class="article-text-div">
+
+      <h4 class="heading-spaced">ReLU activation function</h4>
+
+<pre><code class="language-cpp">// src/backend/module/activation_functions/relu.h
+  
+namespace module {
+  class ReLu final : public ModuleBase {
+    public:
+      ReLu() = default;
+      
+      Tensor operator()(const Tensor& t) const override;
+      std::shared_ptr<Tensor> operator()(const std::shared_ptr<Tensor>& t) const override;
+  };
+}
+
+// src/backend/module/activation_functions/relu.cpp
+
+using namespace std;
+using namespace module;
+
+Tensor ReLu::operator()(const Tensor& t) const {
+  auto res = t.createDeepCopy();
+
+  for(tensorSize_t i = 0; i < t.getSize(); i++){
+    constexpr ftype zero = 0;
+    if(t[i] < zero){
+      res.set(zero, i);
+    }
+  }
+
+  return res;
+}
+
+shared_ptr<Tensor> ReLu::operator()(const shared_ptr<Tensor>& t) const {
+  auto res = make_shared<Tensor>((*this)(*t));
+  
+  if(t->getRequiresGrad()){
+    res->setCgNode(make_shared<cgraph::ReLuNode>(t));
+    assert(res->getRequiresGrad());
+  }
+
+  return res;  
+}
+</code></pre>
 
       <p>
-        TODO      
+        Because the module functions themselves will always be part of a computational graph
+        we ensured that they could be the wrapper we introduced for the tensor's implicitly.
+        The overload taking the raw tensor does the math, and the overload taking the shared
+        pointer wraps the computational graph around it. 
+        Clean architecture, and everything is where you would look for it (at least I as the 
+        designer hope so). I also note that once again I made use of the final keyword to 
+        enforce flat hierarchies and thus less indirections.
       </p>
+
+      <p>
+        When it comes to the function of the ReLU forward pass there's no
+        surprise here, and neither for the backward function:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/computational_graph/activation_functions/relu_node.h
+
+namespace cgraph {
+  class ReLuNode final : public GraphNode { // we derive from the same class as the tensor-op nodes
+    public:
+      explicit ReLuNode(std::shared_ptr<Tensor> t) 
+        : GraphNode({std::move(t)}) {}
+
+      std::vector<std::shared_ptr<Tensor>> backward(const Tensor& upstreamGrad) override;
+  };
+}
+
+// src/backend/computational_graph/activation_functions/relu_node.cpp
+
+using namespace std;
+using namespace cgraph;
+
+vector<shared_ptr<Tensor>> ReLuNode::backward(const Tensor& upstreamGrad) {
+  assert(!upstreamGrad.getRequiresGrad());
+  constexpr ftype zero = 0.0;
+  
+  auto res = make_shared<Tensor>(upstreamGrad.getDims(), upstreamGrad.getDevice(), false);
+
+  const auto& parent = parents[0];
+  for(tensorSize_t i = 0; i < upstreamGrad.getSize(); i++){
+    res->set((*parent)[i] > zero ? upstreamGrad[i] : zero, i);
+  }
+
+  return {res};
+}
+</code></pre>
+
+    </div>
+
+    <div class="article-text-div">
+
+      <h4 class="heading-spaced">Sigmoid activation function</h4>
+
+      <p>
+        Now that we know where to plug-in our activation functions we can go to 
+        the interesting ones. I will not repeat the architecture itself, but instead go 
+        right into the implementation of the forward pass. As a reminder, we implement
+
+        $$\sigma(x) = \frac{1}{1 + e^{-x}}$$
+
+        The associated source code looks like the following:
+      </p>      
+
+<pre><code class="language-cpp">// src/backend/module/activation_functions/sigmoid.cpp
+
+using namespace std;
+using namespace module;
+
+Tensor Sigmoid::operator()(const Tensor& t) const {
+  auto res = t.createEmptyCopy();
+
+  constexpr ftype one = 1.0;
+  auto compute = [](ftype x){
+    if(x >= 0){
+      return one / (one + exp(-x));
+    }
+
+    auto e = exp(x);
+    return e / (one + e);
+  };
+
+  for(tensorSize_t i = 0; i < t.getSize(); i++){
+    res.set(compute(t[i]), i);
+  }
+
+  return res;
+}
+</code></pre>
+
+      <p>
+        We have split this up into two parts, one where $x \ge 0$, resulting in the standard formula,
+        and one where $x &lt; 0$. In the latter case we transform the formula to 
+        
+        $$\sigma(x) = \frac{1}{1 + e^{-x}} \cdot \frac{e^x}{e^x} = frac{e^x}{e^x + 1}$$
+      
+        The reason for that is with negative values for $x$ the term $e^{-x}$ grows large very quickly,
+        threatning us with numerical fallouts like NaN values and overflows. Before even looking into 
+        the ABI we reduced all the error handling to an alternate execution that incurs no performace 
+        penalties compared with the default formula. The backward pass looks as follows:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/computational_graph/activation_functions/sigmoid_node.h
+
+namespace cgraph {
+  class SigmoidNode final : public GraphNode {
+    private:
+      // cache the result of the forward function
+      std::shared_ptr<const Tensor> sigmoid;
+
+    public:
+      // ...
+  };
+}
+
+// src/backend/computational_graph/activation_functions/sigmoid_node.cpp
+
+using namespace std;
+using namespace cgraph;
+
+vector<shared_ptr<Tensor>> SigmoidNode::backward(const Tensor& upstreamGrad) {
+  assert(!upstreamGrad.getRequiresGrad());
+  constexpr ftype zero = 0.0;
+  
+  auto res = make_shared<Tensor>(upstreamGrad.getDims(), upstreamGrad.getDevice(), false);
+
+  // s is result from forward pass sigmoid
+  auto derivative = [](ftype s){
+    return s * (1 - s);
+  };
+
+  for(tensorSize_t i=0; i<upstreamGrad.getSize(); i++){
+    res->set(derivative((*sigmoid)[i]) * upstreamGrad[i], i);
+  }
+
+  return {res};
+}
+</code></pre>
+
+      <p>
+        By giving it a pointer to the result of the forward pass we make use 
+        of the simplification of the derivative via 
+
+        $$\frac{d}{dx}\sigma(x)=\sigma(x)(1-\sigma(x))$$
+
+        This is already an optimization in and of itself.
+      </p>
+
+    </div>
+
+    <div class="article-text-div">
+
+      <h4 class="heading-spaced">Softmax activation function</h4>
+      
+      <p>
+        Similar to the sigmoid function we just saw, softmax can suffer from 
+        numerical instabilities. A soft reminder of its basic shape:
+
+        $$softmax(x_i)=\frac{e^{x_i}}{\sum_j e^{x_j}}$$
+
+        The crux, just as before, lies in the exponentials, more specifically 
+        in the sum of all of them. We bypass this by first finding the max value 
+        via $x_{max} = max_j{x_j}$, and the we normalize the exponents according 
+        to 
+        
+        $$softmax(x_i)=\frac{e^{x_i}}{\sum_j e^{x_j}} \cdot \frac{e^{-x_{max}}}{e^{-x_{max}}} =
+        \frac{e^{x_i - x_{max}}}{\sum_j e^{x_j - x_{max}}}$$
+      </p>
+
+      <p>
+        I will spare you the code of this, but feel free to look into the source code. 
+        Instead I will drop the simplification for the gradient as well, so that we still
+        have breath for the remainder of this post entry. Similar to the sigmoid activation
+        we can simplify. Because unlike sigmoid the softmax function gives us a distribution, 
+        which we represent as a vector $y = (y_1, y_2, ..., y_n)^T$, $y_i = softmax(x_i)$, we 
+        get a Jacobian matrix instead of a single value. It's entries are 
+
+        $$J_{i, j} = \left \{ \begin{matrix} y_i (1 - y_j) \text{ iff } i=j \text{,} \\
+                              -y_i y_j \text{ else} \end{matrix} \right \}$$
+        
+        The implementation then is very straight forward once the SigmoidNode class implementing
+        the backward function has access to the result of the forward pass.
+      </p>
+
+    </div>
+
+    <div id="ff-layer" class="article-text-div">
+      <h3 class="heading-spaced">Feedforward-layer</h3>
+
+      <p>
+        Similar to the activation functions, the feedforward-layer is a module. 
+        Unlike the activation functions it has weigths to update. The header definition goes as 
+        follows:
+      </p>
+
+<pre><code class="language-cpp">
+
+namespace module {
+  class FfLayer : public ModuleBase {
+    bool requiresGrad = false;
+    bool useBias = false;
+
+    std::shared_ptr<Tensor> weights = nullptr;
+    std::shared_ptr<Tensor> bias = nullptr;
+    
+    public:
+      // constructors here
+
+    Tensor operator()(const Tensor& input) const override;
+    std::shared_ptr<Tensor> operator()(const std::shared_ptr<Tensor>& input) const override;
+      
+    std::vector< std::shared_ptr<Tensor> > parameters() const override {
+      return {weights, bias};
+    }
+
+    // some other utility functions
+  };
+}
+</code></pre>
+
+    <p>
+      The backward functions are as follows:
+    </p>
+
+<pre><code class="language-cpp">// src/backend/module/layers/ff_layer.cpp
+
+using namespace std;
+using namespace module;
+using namespace utility;
+
+Tensor FfLayer::operator()(const Tensor& input) const {
+  auto res = input.matmul(*weights);
+
+  if(useBias){
+    res = res + *bias;
+  }
+
+  return res;
+}
+
+std::shared_ptr<Tensor> FfLayer::operator()(const std::shared_ptr<Tensor>& input) const {
+  auto res = cgraph::matmul(input, weights);
+  if(useBias){
+    res = cgraph::add(res, bias);
+  }
+
+  return res;  
+}
+</code></pre>
+
+      <p>
+        What is new here is that the shared pointer overload this time does not 
+        function as a mere wrapper around the pure tensor reference overload. The 
+        reason is that the operations we perform, a matmul and an add, already
+        create a graph on their own. We thus have to have two functions for now
+        if we want to bank on existing code. Alternatively we could write an 
+        extra kernel for the feedforward class, but we don't have to do unnecessary 
+        work when no one calls for it. Plus on the bright side we actually save 
+        ourselves quite some time, since we don't have to implement a backward node 
+        by hand now.
+      </p>
+
+      <p>
+        One additional thing I want you to see about this class though is hidden in 
+        the constructor:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/module/layers/ff_layer.cpp
+
+FfLayer::FfLayer(tensorDim_t inSize, tensorDim_t outSize, Device d, 
+    bool useBias, bool requiresGrad, shared_ptr<InitializerBase> init)
+  : useBias{useBias}, requiresGrad{requiresGrad} 
+{
+  if(!init){
+    init = make_shared<NormalXavierInitializer>(inSize, outSize);  
+  }
+
+  weights = make_shared<Tensor>(Dimension({inSize, outSize}), d, requiresGrad);
+  weights->reset(init);
+    
+  if(useBias){
+    bias = make_shared<Tensor>(vector<tensorDim_t>{outSize}, d, requiresGrad);
+    TensorFunctions::ToZeros(*bias);
+  }
+}
+</code></pre>
+
+      <p>
+        If we take a look here you'll find a concept I have not touched upon 
+        so far at all, namely the InitializerBase and the NormalXavierInitializer.
+        When creating layers such as feedforward layers, one question that is important
+        to ask is how to initialize the weights. A question which has itself been subject 
+        to research (see e.g. <a href="https://proceedings.mlr.press/v9/glorot10a/glorot10a.pdf"
+        target="_blank">this paper</a>), and which I stumbled upon myself in this project. 
+        Turns out a simple Gaussian initialization centered around zero and with a std-deviation 
+        of one cannot even solve a simple XOR problem reliably.  
+      </p>
+
+      <p>
+        Anyway, in file <i>src/backend/utility/initializers.h</i> I define a few initializers,
+        but so far I do not really expose them. It would just be footwork, but for the sake of 
+        putting my money where my mouth is I have skipped this yet. Feel free to contribute 
+        to my main branch through a merge request (coding and testing should take less than one 
+        hour - don't forget to implement unit tests), or simply wait for me to continue my work 
+        and reach a point where I am forced to expose it for flexibility reasons. For now the 
+        hardcoded version I am using works just fine.
+      </p>
+    </div>
+
+    <div id="loss-functions" class="article-text-div">
+      <h3 class="heading-spaced">Loss functions</h3>
+
+      <p>
+        With that we leave the space of modules and enter the world of training utilities. Loss 
+        functions are their own separate class, hence we introduce another base class:      
+      </p>
+
+<pre><code>// src/backend/training/loss_functions/loss_base.h
+
+namespace train {
+  class LossBase {
+    public:
+      LossBase() = default;
+
+      LossBase(const LossBase& other) = delete;
+      LossBase& operator=(const LossBase& other) = delete;
+
+      LossBase(LossBase&& other) noexcept = default;
+      LossBase& operator=(LossBase&& other) noexcept = default;
+
+      ~LossBase() noexcept = default;
+      
+      virtual std::shared_ptr<Tensor> operator()(const std::shared_ptr<Tensor> y, 
+                                                 const std::shared_ptr<Tensor> ypred) const = 0;
+  };
+}
+</code></pre>
+
+      <p>
+        This could actually be the first time in this whole process that we use inheritance,
+        but it actually was not really necessary. I just happened to start that way because
+        I wanted to write a generic training loop in C++ (and I did) bypassing all the steps 
+        Python gives us for better speed. But if you do not use this or are happy with hardcoding
+        your training loops you might as well take this out. However, the performance penalty 
+        here compared with the rest is also minimal, and one would only be interested in optimizing 
+        this part of the code for the very last few drops of performance. For us that means
+        optimizing this away now is premature, and who knows where else we will want to use the 
+        loss functions. So we will leave them as is. 
+      </p>
+
+      <p>
+        Anyway, the implementation of most loss functions is straight forward, so I will spare 
+        you that. The following optional section is a brief dive into two more optimizations to 
+        be had here, once again with the sigmoid function and the softmax function.
+      </p>
+
+    <details class="pytorch-optional" id="module-pic-section">
+    <summary class="pytorch-optional-summary">
+      <h4>Optional: Two loss function optimizations</h4>
+    </summary>
+
+    <div class="pytorch-optional-collapse-bar">
+      <button type="button" class="pytorch-optional-collapse-btn"
+        onclick="var s=document.getElementById('module-pic-section'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+        &#9650; Collapse
+      </button>
+    </div>
+
+      <h4 class="heading-spaced">Binary cross-entropy loss with sigmoid</h4>
+
+      <p>
+        TODO
+      </p>
+
+
+      <h4 class="heading-spaced">Cross-entropy loss with softmax</h4>
+
+      <p>
+        TODO
+      </p>
+
+    </details>
 
     </div>
 
     <div id="optimizers" class="article-text-div">
-      <h3 class="heading-spaced">Optimizers</h2>
+      <h3 class="heading-spaced">Optimizers</h3>
 
       <p>
-        TODO      
+        TODO - include figure showing how the optimizers integrate all the above
       </p>
 
     </div>
