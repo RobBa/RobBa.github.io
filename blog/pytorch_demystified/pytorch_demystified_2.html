@@ -34,16 +34,24 @@ mathjax: true
             <li>
               <a href="#implementing-graph-creation">Implementing dynamic graph creation</a>
             </li>
+            <li>
+              <a href="#implementing-backprop">Implementing backpropagation</a>
+            </li>
           </ul>
         </li>
         <li>
-          <a href="#activation-functions">Implementing activation functions</a>
-        </li>
-        <li>
-          <a href="#loss-functions">Implementing loss functions</a>
-        </li>
-        <li>
-          <a href="#optimizers">Implementing optimizers</a>
+          <a href="#dl-modules">Adding deep learning modules</a>
+          <ul>
+            <li>
+              <a href="#activation-functions">Activation functions</a>
+            </li>
+            <li>
+              <a href="#loss-functions">Loss functions</a>
+            </li>
+            <li>
+              <a href="#optimizers">Optimizers</a>
+            </li>
+          </ul>
         </li>
         <li>
           <a href="#frontend">Updating the Python frontend</a>
@@ -675,8 +683,18 @@ vector< shared_ptr<Tensor> > GetterNode::backward(const Tensor& upstreamGrad) {
 
     </div>
 
+    <div id="dl-modules" class="article-text-div">
+      <h2 class="heading-spaced">Adding deep learning modules</h2>
+
+      <p>
+        This will be a rather short section compared with the above. The main reason is that it now follows the pattern we just 
+        established. So instead of going into every activation itself, I want to focus on a few that are interesting. 
+      </p>
+
+    </div>
+
     <div id="activation-functions" class="article-text-div">
-      <h2 class="heading-spaced">Implementing activation functions</h2>
+      <h3 class="heading-spaced">Activation functions</h2>
 
       <p>
         This will be a rather short section compared with the above. The main reason is that it now follows the pattern we just 
@@ -686,7 +704,7 @@ vector< shared_ptr<Tensor> > GetterNode::backward(const Tensor& upstreamGrad) {
     </div>
 
     <div id="loss-functions" class="article-text-div">
-      <h2 class="heading-spaced">Implementing loss functions</h2>
+      <h3 class="heading-spaced">Loss functions</h2>
 
       <p>
         TODO      
@@ -695,7 +713,7 @@ vector< shared_ptr<Tensor> > GetterNode::backward(const Tensor& upstreamGrad) {
     </div>
 
     <div id="optimizers" class="article-text-div">
-      <h2 class="heading-spaced">Implementing optimizers</h2>
+      <h3 class="heading-spaced">Optimizers</h2>
 
       <p>
         TODO      
