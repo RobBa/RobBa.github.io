@@ -555,9 +555,29 @@ namespace cgraph {
 </code></pre>
 
     <p>
-      You can look up their implementions in the accompanying implementation file. I will restrain 
-      myself to a few interesting ones to point out here. We start with the matrix multiplication node itself, 
-      more precisely the backward function implemented as the following:
+      You can look up their implementions in the accompanying implementation file. You can skip to the next
+      section if you got everything you want, but if you are willing to bear with me I invite you to 
+      take a brief look into a two more node types which I personally found interesting and 
+      not as straight forward as the rest.
+    </p>
+
+    <details class="pytorch-optional" id="module-pic-section">
+    <summary class="pytorch-optional-summary">
+      <h4>Optional: Two more graph node implementations</h4>
+    </summary>
+
+    <div class="pytorch-optional-collapse-bar">
+      <button type="button" class="pytorch-optional-collapse-btn"
+        onclick="var s=document.getElementById('module-pic-section'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+        &#9650; Collapse
+      </button>
+    </div>
+
+    <p>
+      In this brief subsection we take a look at two more nodes which I found interesting. I won't go into 
+      the whole wrapper-around-the-base-operation pattern, since we naturally will revisit this in the following sections 
+      a few times more. Instead I want to focus on the real meat-and-potatos of the matrix multiplication node, more precisely 
+      the backward function implemented as the following:
     </p>
 
 <pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/matmul_node.cpp
@@ -575,7 +595,7 @@ vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
 </code></pre>
 
     <p>
-      This is interesting for its simplicity. Basically, given two matrices $A$ and $B$, and computing their 
+      This one is interesting for its simplicity. Basically, given two matrices $A$ and $B$, and computing their 
       matrix multiplication $C = A @ B$, we obtain the following for the derivatives: 
       $\frac{\partial C}{\partial A} = C @ B^T$ and $\frac{\partial C}{\partial B} = A @ C^T$. Here, $B^T$ and 
       $C^T$ are the transposed matrices respectively. This result can be verified by hand. For us right now this is 
@@ -591,20 +611,35 @@ vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
 
 <pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/graph_creation.cpp
 
+using namespace std;
+
 shared_ptr<Tensor> cgraph::sumTensor(const shared_ptr<Tensor> t) {
   auto res = make_shared<Tensor>(std::vector<tensorDim_t>{1}, std::vector<ftype>{0.0}, 
                                  t->getDevice(), t->getRequiresGrad());
   for(tensorSize_t i = 0; i < t->getSize(); i++){
-    res = cgraph::add(res, cgraph::get(t, i)); // cgraph::get() is a wrapper around get
+    res = cgraph::add(res, cgraph::get(t, i)); // cgraph::get() shown below
+  }
+  return res;
+}
+
+// there is a second overload of get() which I don't show here, since it can be inferred easily from this
+shared_ptr<Tensor> cgraph::get(const shared_ptr<Tensor>& t, tensorSize_t idx) {
+  ftype val = t->get(idx);
+  auto res = make_shared<Tensor>(std::vector<tensorDim_t>{1}, std::vector<ftype>{val}, 
+                             t->getDevice());
+                             
+  if(t->getRequiresGrad()){
+    res->setCgNode(std::make_shared<cgraph::GetterNode>(t, idx));
+    assert(res->getRequiresGrad());
   }
   return res;
 }
 </code></pre>
 
       <p>
-        This operation will leave a trail of nodes, one for every sum we perform. 
-        When propagating backwards we have to take care of the dimensions, as they need to match those of 
-        the parent:
+        The sum operation will leave a trail of nodes in the same vein as we've seen earlier, 
+        one node for every sum we perform. When propagating backwards we have to take care of 
+        the dimensions, as they need to match those of the parent:
       </p>
 
 
@@ -635,6 +670,8 @@ vector< shared_ptr<Tensor> > GetterNode::backward(const Tensor& upstreamGrad) {
   return { std::move(res) };
 }
 </code></pre>
+
+    </details>
 
     </div>
 
