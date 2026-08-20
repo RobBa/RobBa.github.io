@@ -390,7 +390,7 @@ optim.step(loss)
 </code></pre>
 
       <p>
-        But what happens with x when the loop goes into the next iteration? If we do not take care, then it will be destroyed, 
+        But what happens with x when the loop goes into the next iteration? If we don't watch our steps it will be destroyed, 
         and the second time the loop enters x will be invalid, breaking whatever happens in <code>layer.forward(x)</code>. We thus 
         need the parent to hold ownership of its child nodes. The last x returning the loop will hold a reference to its preceding
         x, which in turn will hold a reference to its preceding node, and so on. And once the returned x goes out of 
@@ -555,9 +555,9 @@ namespace cgraph {
 </code></pre>
 
     <p>
-      You can look up their implementions in the accompanying implementation file. You can skip to the next
-      section if you got everything you want, but if you are willing to bear with me I invite you to 
-      take a brief look into a two more node types which I personally found interesting and 
+      You can look up their implementions in the accompanying implementation file. Feel free to skip to the next
+      optional section if you got everything you want out of this one, but if you are willing to bear with me I 
+      invite you to take a brief look into a two more node types which I personally found interesting and 
       not as straight forward as the rest.
     </p>
 

@@ -660,7 +660,7 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
           <a href="../calling_python_from_cpp/calling_python_from_cpp.html" target="_blank">Calling Python From C++</a>, 
           so lets not repeat that here. Instead let's focus on solutions. There are multiple good frameworks out there
           that are up to the task. While the best choice would probably be 
-          <a href="https://pybind11.readthedocs.io/en/stable/" target="_blank">pybind11</a> I chose to use 
+          <a href="https://pybind11.readthedocs.io/en/stable/" target="_blank">pybind11</a>, I actually chose to use 
           <a href="https://www.boost.org/doc/libs/latest/libs/python/doc/html/index.html" target="_blank">Boost.Python</a>.
           The reason being that as a C++ dev I already was used to Boost, and there was a ready tutorial that made getting started
           very easy. However, for better maintainability the Python frontend and the C++ backend are still separated in code, making it easy
