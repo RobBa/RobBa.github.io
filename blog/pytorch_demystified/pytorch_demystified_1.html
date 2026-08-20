@@ -732,7 +732,7 @@ BOOST_PYTHON_MODULE(py_data_modeling)
           class. Lastly, the braces take in the Python internal class name "Tensor". In summary, we have this behavior:
         </p>
 
-<pre><code lang="python"> # in Python
+<pre><code class="language-python"> # in Python
   
 from dl_lib import Tensor # name Tensor defined by first argument in braces
 
@@ -774,7 +774,7 @@ t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
           reference would stay valid for its lifetime, resulting in dangerous dangling pointers. Say we do the following:
         </p>
 
-<pre><code lang="python"> # in Python
+<pre><code class="language-python"> # in Python
 
 dims = t.dims # get reference to dim object
 del t # destroy tensor

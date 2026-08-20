@@ -113,7 +113,7 @@ mathjax: true
         Thus I personally picked the PyTorch approach. Essentially, what we want to have is something along the lines of
       </p>
 
-<pre><code lang="python">A, B = some_tensors()
+<pre><code class="language-python">A, B = some_tensors()
 C = some_op(A, B)
 C.backward()
 assert(C.has_grads() and C.has_grads())
@@ -379,7 +379,7 @@ public:
       when we actually start training neural networks. Here we will do something along the lines of
     </p>
 
-<pre><code lang="python">x = next_batch()
+<pre><code class="language-python">x = next_batch()
 y_pred = my_network.forward(x)
 loss = loss_fn(y_pred)
 optim.step(loss)
@@ -390,7 +390,7 @@ optim.step(loss)
         other modules like activation functions. Internally, on calling forward it will do something like
       </p>
 
-<pre><code lang="python">def forward(self, x):
+<pre><code class="language-python">def forward(self, x):
   for layer in self._layers:
     # x now is a newly created tensor holding a reference to its parent
     x = layer.forward(x)
@@ -817,7 +817,7 @@ void Tensor::backward() {
         is theoretically possible for now before we move on to turning this into a full training pipeline.
       </p>
 
-<pre><code lang="python">t1 = Tensor([1], [3.0], True)
+<pre><code class="language-python">t1 = Tensor([1], [3.0], True)
 t2 = Tensor([1], [2.0], True)
         
 t3 = t1 + t2
@@ -834,8 +834,8 @@ assert t2.grads.getitem(0) == pytest.approx(10.0)
       <h2 class="heading-spaced">Adding deep learning modules</h2>
 
       <p>
-        This will be a rather short section compared with the above. The main reason is that it now follows the pattern we just 
-        established. So instead of going into every activation itself, I want to focus on a few that are interesting. 
+        In the previous section we painstakingly waltzed through memory management, algorithmic decisions,
+        and 
       </p>
 
     </div>
