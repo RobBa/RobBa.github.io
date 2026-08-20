@@ -889,7 +889,7 @@ namespace module {
         module will have parameters we can give it default behavior. Alternatively we could make it 
         abstract, forcing ourselves to implement it and thus to avoid any mistake that happens from 
         a forgotten override, but for now we stick with this, since I am a solo developer and also 
-        gotta think about how to make some bread eventually. The first example of a derived class is
+        gotta think about how to make some bread eventually. An example of a derived class is
         the all-time famous ReLU function.
       </p>
 
@@ -897,7 +897,7 @@ namespace module {
 
     <div class="article-text-div">
 
-      <h4 class="heading-spaced">ReLU activation function</h4>
+      <h4 class="heading-spaced">Example: ReLU activation function</h4>
 
 <pre><code class="language-cpp">// src/backend/module/activation_functions/relu.h
   
@@ -988,9 +988,30 @@ vector<shared_ptr<Tensor>> ReLuNode::backward(const Tensor& upstreamGrad) {
 }
 </code></pre>
 
+    <p>
+      That concludes our activation functions. Most of the other ones follow the same path. 
+      In the following optional block we take a closer look at the sigmoid and softmax 
+      activation functions, as those two come with numerical instabilities we need to deal with,
+      but also opportunities for some algorithmic optimizations.
+      For the reader who is happy to skip it rest assured that it won't take away from anything
+      you read futher down the line.
+    </p>
+
     </div>
 
     <div class="article-text-div">
+
+    <details class="pytorch-optional" id="module-pic-section">
+    <summary class="pytorch-optional-summary">
+      <h4>Optional: Considerations for sigmoid and softmax</h4>
+    </summary>
+
+    <div class="pytorch-optional-collapse-bar">
+      <button type="button" class="pytorch-optional-collapse-btn"
+        onclick="var s=document.getElementById('module-pic-section'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+        &#9650; Collapse
+      </button>
+    </div>
 
       <h4 class="heading-spaced">Sigmoid activation function</h4>
 
@@ -1087,10 +1108,6 @@ vector<shared_ptr<Tensor>> SigmoidNode::backward(const Tensor& upstreamGrad) {
 
         This is already an optimization in and of itself.
       </p>
-
-    </div>
-
-    <div class="article-text-div">
 
       <h4 class="heading-spaced">Softmax activation function</h4>
       
@@ -1202,9 +1219,25 @@ std::shared_ptr<Tensor> FfLayer::operator()(const std::shared_ptr<Tensor>& input
         by hand now.
       </p>
 
+      </div>
+
+      <div class="article-text-div">
+
+      <details class="pytorch-optional" id="module-pic-section">
+      <summary class="pytorch-optional-summary">
+        <h4>Optional: The weight initialization problem</h4>
+      </summary>
+
+      <div class="pytorch-optional-collapse-bar">
+        <button type="button" class="pytorch-optional-collapse-btn"
+          onclick="var s=document.getElementById('module-pic-section'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
+
       <p>
-        One additional thing I want you to see about this class though is hidden in 
-        the constructor:
+        One detail that I omitted above, but that might be interesting for you to see in this 
+        class though is hidden in the constructor:
       </p>
 
 <pre><code class="language-cpp">// src/backend/module/layers/ff_layer.cpp
@@ -1247,6 +1280,9 @@ FfLayer::FfLayer(tensorDim_t inSize, tensorDim_t outSize, Device d,
         and reach a point where I am forced to expose it for flexibility reasons. For now the 
         hardcoded version I am using works just fine.
       </p>
+
+    </details>
+    
     </div>
 
     <div id="loss-functions" class="article-text-div">
