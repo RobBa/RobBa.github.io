@@ -164,6 +164,11 @@ h4.heading-spaced {
     width: 82%;
 }
 
+#pytorch-backward-order-illustration,
+#pytorch-backward-order-illustration-dark {
+    width: 85%;
+}
+
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     .pytorch-step-row,
     .pytorch-step-row-reverse {
@@ -210,8 +215,12 @@ h4.heading-spaced {
     }
 
     #pytorch-reference-illustration,
-    #pytorch-reference-illustration-dark
-    {
+    #pytorch-reference-illustration-dark {
         width: 90%;
+    }
+
+    #pytorch-backward-order-illustration,
+    #pytorch-backward-order-illustration-dark {
+        width: 95%;
     }
 }

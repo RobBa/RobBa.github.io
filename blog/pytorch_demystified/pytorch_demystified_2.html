@@ -687,9 +687,147 @@ vector< shared_ptr<Tensor> > GetterNode::backward(const Tensor& upstreamGrad) {
       <h3 class="heading-spaced">Implementing backpropagation</h2>
 
       <p>
-        TODO      
+        Having established a computational graph and its memory management it'd be a waste to not put it to use now. 
+        Remember, our goal was to propagate gradients through the graph in a fashion of <code>some_tensor.backward()</code>.
+        Here, we will do exactly this. We start by implementing a backward function:
       </p>
 
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
+
+void Tensor::backward() {
+  if(!requiresGrad || !cgNode){
+    __throw_runtime_error("Invalid invoking of backward()"); // admittedly could be a better message
+  }
+
+  /** 
+   * If this tensor has no built up gradient (invoking tensor without loss-function)
+   * we initialize one with ones.
+   */
+  if (!grads) {
+    grads = make_unique<Tensor>(dims, values->getDevice(), false);
+    for(tensorSize_t i=0; i<values->getSize(); i++){
+      (*grads->values)[i] = 1;
+    }
+  }
+
+  for(/* some method to iterate backwards over graph */){
+    auto incomingGrads = tensor.cgNode->backward(*tensor.grads);
+
+    const auto& parents = tensor.cgNode->getParents();
+
+    for(size_t i = 0; i < parents.size(); i++){
+      auto parent = parents[i];
+      if(!parent->requiresGrad){
+        continue;
+      }
+      else if(!parent->grads){
+        parent->grads = incomingGrads[i];
+      }
+      else{
+        // reminder: multivariate chain rule
+        *parent->grads->values += *incomingGrads[i]->values;
+      }
+    }
+  }
+}
+</code></pre>
+
+      <p>
+        The code is pretty straight forward. If the tensor we call backward() on has
+        no gradient yet, then its gradients will be ones-initialized. This is because due to 
+        the chain rule the parents' nodes' gradients will be multiplied with this gradient, and 
+        any factor other than one will lead to a wrong result obviously. After that we traverse the
+        graph backwards, call each node's backward function and update the gradient of the respective
+        tensors.
+      </p>
+
+      <p>
+        What is an open question is how to traverse the graph? The first algorithms that come to 
+        mind might be depth-first-search (DFS) and breadth-first-search (BFS). However, they can run into a 
+        structural problem on simple graphs already. I outline the problem in the graph depicted in the 
+        coming figure.
+      </p>
+
+      <figure class="fig-light">
+        <img
+        id="pytorch-backward-order-illustration"
+        class="blog-image"
+        src="./img_2/backward-order.png"
+        alt="Backward pass sorting example">
+        <figcaption>
+          An example backward pass through the computational graph. The interesting part is in what order 
+          to process the highlighted nodes.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-backward-order-illustration-dark"
+        class="blog-image"
+        src="./img_2/backward-order-dark.png"
+        alt="Backward pass sorting example">
+        <figcaption>
+          An example backward pass through the computational graph. The interesting part is in what order 
+          to process the highlighted nodes.
+        </figcaption>
+      </figure>
+
+      <p>
+        The question is in what order to process those nodes. Taking a closer look at the three highlighted ones
+        we can see the conundrum both DFS and BFS give us. We already know that the incoming gradient into <b>t6</b>
+        will have to be the sum of the two gradients coming from <b>t3</b> and <b>t4</b>. We therefore have to first 
+        add the gradients of both t3 and t4 into t6, before we pass the gradient of t6 backward. The ideal ordering here
+        is either t3->t4->t6, or alternatively t4->t3->t6.
+      </p>
+
+      <p>
+        Generalizing what we just established we can phrase it in the following: "Before passing a node's gradient to its
+        parent nodes we first have to accumulate the gradients of its child nodes". Digging up forgotten memories of past 
+        traumas incurred by our data structures and algorithms courses (for most of us at least, I for my part enjoyed 
+        those), we might be reminded of <a href="https://en.wikipedia.org/wiki/Topological_sorting" 
+        target="_blank">topological sort</a>. Essentially, a topological sorting of a DAG is a sorting in which child nodes
+        come before parent nodes. The moment we visit a child node we are guaranteed to have visited all of its parent nodes.
+      </p>
+
+      <p>
+        We can implement topological sort using either DFS or Kahn's algorithm, and I will leave it up to you to figure it out,
+        or you just take a look at my implementation (spoiler alert: I went for Kahn's). I will just show you where to use it, 
+        filling the gap of our previous backward implementation:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
+
+void Tensor::backward() {
+  // ...
+
+  // topo-sort starting with this node
+  vector<Tensor*> sortedTensors = cgraph::TopologicalSort::reverseSort(this);
+  
+  for(auto tPtr: sortedTensors){
+    auto& tensor = *tPtr;
+    auto incomingGrads = tensor.cgNode->backward(*tensor.grads);
+
+    // add the grads as previously seen...
+  }
+}
+</code></pre>
+
+      <p>
+        With this we're good to go. If we expose this via our Python frontend now we can readily do our 
+        first gradients, as tested in the unit tests of the project. I provide one here to show what 
+        is theoretically possible for now before we move on to turning this into a full training pipeline.
+      </p>
+
+<pre><code lang="python">t1 = Tensor([1], [3.0], True)
+t2 = Tensor([1], [2.0], True)
+        
+t3 = t1 + t2
+loss = t3 * t3
+
+loss.backward()
+
+assert t1.grads.getitem(0) == pytest.approx(10.0)
+assert t2.grads.getitem(0) == pytest.approx(10.0)
+</code></pre>
     </div>
 
     <div id="dl-modules" class="article-text-div">
