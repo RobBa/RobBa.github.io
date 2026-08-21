@@ -728,9 +728,30 @@ namespace train {
         Unsurprisingly it has a learning rate lr, and it needs to hold references to the parameters 
         is expected to update. The virtual step()-function is the distinguishing branch in between the
         optimizers, and all of them need a way to zero out gradients. We can now implement several 
-        optimizers, in this post we only need to take a look at RMSProp, since that is the one we 
-        will be using in our MNIST example. Its definition looks like this:
+        optimizers. Given that with the API and the backend wrapped up this is a rather mechanical 
+        job now I made this another optional section below. In this one I exemplify via RMSProp, since 
+        this is the one we will be using in our example.
       </p>
+
+    </div>
+
+    <div id="frontend" class="article-text-div">
+
+    <details class="pytorch-optional" id="optim-rmsprop">
+    <summary class="pytorch-optional-summary">
+      <h4>Optional: Implementing RMSProp</h4>
+    </summary>
+
+    <div class="pytorch-optional-collapse-bar">
+      <button type="button" class="pytorch-optional-collapse-btn"
+        onclick="var s=document.getElementById('optim-rmsprop'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+        &#9650; Collapse
+      </button>
+    </div>
+
+    <p>
+      To start off with RMSProp, we take a look at its definition in our C++ backend. It goes as follows:
+    </p>
 
 <pre><code class="language-cpp">// src/backend/training/optimizers/rmsprop.h
 
@@ -812,8 +833,16 @@ void RmsPropOptimizer::step() {
 }
 </code></pre>
 
+      </details>
+
+      </div>
+
+      <div id="frontend" class="article-text-div">
+
+      <h4 class="heading-spaced">Quick overview: How the training components interact</h4>
+
       <p>
-        With the optimizer in place we can now conclude our training loop. We will implement 
+        With the optimizers in place we can now conclude our training loop. We will implement 
         it in Python later, but this is probably a good point to sketch out what it will look 
         like, so we can understand our design decisions a little better.
       </p>
@@ -841,14 +870,184 @@ void RmsPropOptimizer::step() {
         </figcaption>
       </figure>
 
+      <p>
+        In summary, we start out with a network and an optimizer, and giving the optimizer access to the networks
+        parameters to update. Upon a forward pass we build a graph in the background, propagate gradients backward 
+        through it, giving each parameter an associated gradient. The optimizer then updates the weights and zeros
+        out the gradients. To make full use of that we gotta bring it to Python now.
+      </p>
+
     </div>
 
     <div id="frontend" class="article-text-div">
       <h2 class="heading-spaced">Updating the Python frontend</h2>
 
       <p>
-        TODO      
+        Lucky for us, we do not have to do too much in the frontend when updating it. Our tensor functions are 
+        already there, the graph remains invisible to the user, and what is missing is mostly the new modules we created. 
+        For better oversight we add a few modules there according to the tree below:
       </p>
+
+<pre>
+├── src
+│   ├── backend
+│   │   ├── ...
+│   └── python
+│       ├── CMakeLists.txt
+│       ├── py_core
+│       │   ├── py_core.cpp
+│       │   ├── ...
+│       ├── py_nn
+│       │   ├── py_nn.cpp
+│       ├── py_sys
+│       │   └── py_sys.cpp
+│       ├── py_train
+│       │   └── py_train.cpp
+│       └── py_utility
+│           ├── custom_converters.h
+│           └── python_templates.h
+</pre>
+
+      <p>
+        py_core contains the tensor and all its operations. py_nn has the modules we need for building networks, py_sys some 
+        global setters, and py_train has training utilities like the loss-functions and the optimizers. Each of these .cpp
+        files contains a list of methods to expose. For instance, py_nn.cpp looks something like this:
+      </p>
+
+<pre><code class="language-cpp">// src/python/py_nn/py_nn.cpp
+
+BOOST_PYTHON_MODULE(_nn)
+{
+  // ...
+  class_<module::ReLu, std::shared_ptr<module::ReLu>, boost::noncopyable>("ReLU")
+    .def("__call__", WRAP_METHOD_ONE_TENSORARG(module::ReLu, Py_nn::reluF))
+    .def("__str__", &toString<module::ReLu>)
+  ;
+  // ...
+}
+</code></pre>
+
+      <p>
+        So far so good. We want to integrate this into a Python library where we can end up doing something 
+        like <code>from mylib.nn import Sigmoid</code>. In other words, we want a modular Python library. We 
+        start by building an appropriate directory structure as in
+      </p>
+
+<pre>
+.
+├── python_lib
+│   └── dl_lib
+│       ├── __init__.py
+│       ├── nn
+│       │   ├── activation
+│       │   │   └── __init__.py
+│       │   ├── __init__.py
+│       │   └── module.py
+│       ├── sys
+│       │   └── __init__.py
+│       └── train
+│           ├── __init__.py
+│           ├── loss
+│           │   └── __init__.py
+│           └── optim
+│               └── __init__.py
+├── src
+...
+</pre>
+
+      <p>
+        We define a Python module dir <code>set(PYTHON_MODULE_DIR "${CMAKE_SOURCE_DIR}/python_lib/dl_lib/_compiled")</code>
+        to compile our libary into, and then compile our modules into that, exemplified by the following two: 
+      </p>
+
+<pre><code>&#35; src/python/CMakeLists.txt
+
+&#35; remove the lib... prefix 
+set(CMAKE_SHARED_MODULE_PREFIX "")
+
+add_library(_core MODULE
+            py_core/py_core.cpp
+            py_core/py_core_util.cpp
+            )
+
+add_library(_nn MODULE
+            py_nn/py_nn.cpp
+            )
+
+&#35; ...
+
+set_target_properties(_core _nn _sys _train PROPERTIES 
+                      PREFIX ""
+                      INSTALL_RPATH "$ORIGIN" # to find shared backend-core lib
+                      BUILD_WITH_INSTALL_RPATH TRUE # use install RPATH even during build
+                      LIBRARY_OUTPUT_DIRECTORY "${PYTHON_MODULE_DIR}")
+
+set_target_properties(_core PROPERTIES 
+                      OUTPUT_NAME "_core")
+
+set_target_properties(_nn PROPERTIES 
+                      OUTPUT_NAME "_nn")
+</code></pre>
+
+      <p>
+        One problem we have to deal with here is that we have a set of shared module libraries, 
+        but they can share the same definitions. For instance, a tensor created by _core and 
+        passed to an activation function created by _nn should be seen as exactly the same object
+        with exactly the same behavior signature and the same address by both loaded libraries. 
+      </p>
+
+      <p>
+        Enter Run-time Path (RPATH) - essentially what this target property does is tell the 
+        dynamic linker where to search for dependencies. When we do <code>import mylib._nn</code>,
+        then INSTALL_RPATH tells the linker where to look for dependencies that _nn might have, 
+        such as _core. The <code>"$ORIGIN"</code> expands to the same directory where the module 
+        is loaded. BUILD_WITH_INSTALL_RPATH is a flag that tells the module that after the build 
+        to search in that directory, ending up with paths to search in. After the build, RPATH 
+        resolves to where the modules have been built. After the final install has happens, it 
+        resolves to ORIGIN. 
+      </p>
+
+      <p>
+        But we are not done yet. We have to tell Python to import our modules. Continuing with
+        our example we get 
+      </p>
+
+<pre><code class="language-python">&#35; python_lib/dl_lib/__init__.py
+
+&#35; exposing _core
+from ._compiled._core import Tensor, Dimension, Device, fromNumpy, toNumpy
+
+__all__ = ['Tensor', 'Device', 'Dimension']
+
+__version__ = "1.0.0"
+
+&#35; python_lib/dl_lib/nn/__init__.py
+
+&#35; exposing _nn
+
+from dl_lib._compiled._nn import FfLayer
+
+__all__ = ['Module', 'Sequential', 'FfLayer']
+</code></pre>
+
+      <p>
+        This is just standard Python package jargon, so no surprises there. What 
+        is however not so clear is how we can now take all our modules and wrap 
+        them around a cohesive neural network instance. We could write a neural 
+        network class in C++, and that would work. However, if we intend to go beyond
+        plain vanilla networks later then our design decisions will tied to the API 
+        we expose, resulting in what likely will be an arduous "call-this-function, 
+        eat-this-tensor, connect it with that" series of API calls to define a network.
+        Horrible design, but how to do it better. For a lack of ideas we peek a little 
+        bit over to how PyTorch solved this and blatantly copy their approach, as it 
+        works and is elegant. Implementing that happens on the Python front in a file
+        I already included in our tree earlier, the Module.py. But first we need to
+        adjust our Python frontend to allow for inheritance.
+      </p>
+
+<pre><code class="language-cpp">// 
+
+</code></pre>
 
     </div>
 
