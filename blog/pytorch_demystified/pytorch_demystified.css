@@ -169,6 +169,11 @@ h4.heading-spaced {
     width: 85%;
 }
 
+#pytorch-train-loop-illustrated,
+#pytorch-train-loop-illustrated-dark {
+    width: 75%;
+}
+
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     .pytorch-step-row,
     .pytorch-step-row-reverse {
@@ -222,5 +227,10 @@ h4.heading-spaced {
     #pytorch-backward-order-illustration,
     #pytorch-backward-order-illustration-dark {
         width: 95%;
+    }
+
+    #pytorch-train-loop-illustrated,
+    #pytorch-train-loop-illustrated-dark {
+        width: 80%;
     }
 }

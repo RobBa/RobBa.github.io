@@ -610,15 +610,78 @@ namespace train {
       <h4 class="heading-spaced">Binary cross-entropy loss with sigmoid</h4>
 
       <p>
-        TODO
+        A pattern that clearly often occurs in deep learning pipelines is a sigmoid output layer (for binary outputs for example), 
+        accompanied by a binary cross-entropy (BCE) loss function. Remember the definition of BCE through
+        
+        $$BCE(y, \hat{y}) = \hat{y}log(y) + (1 - y)log(1-\hat{y})$$
+
+        Alternatively written in code this becomes
+      </p>
+
+<pre><code class="language-cpp">// src/backend/training/loss_functions/bce_loss.cpp
+
+auto bce = [](ftype y, ftype ypred){
+  constexpr ftype epsBce = 1e-9;
+  return y * log(std::max(ypred, epsBce)) + (1 - y) * log(std::max(1 - ypred, epsBce));
+};
+</code></pre>
+
+      <p>
+        This works, but we have to compute $\hat{y}$ first. However, given how the log and the exponent in sigmoid interact 
+        we can shorten it into an integrated loss function that computes the loss directly (if this was a GPU implementation, 
+        where functions are called kernels, we would call this step <b>kernel fusion</b> - we will come back at this in a later post).
+        Plugging $\hat{y} = \frac{1}{1+e^{x}}$ into the formula for the BCE gives us the following in code, where we once again 
+        did some restructuring for both $x &lt; 0$ and $x \ge 0$, this time in the shape of an std::abs() operation. Here it is 
+      </p>
+
+<pre><code class="language-cpp">// src/backend/training/loss_functions/bce_sigmoid_loss.cpp
+
+auto bceSimplified = [](ftype y, ftype logit){
+  constexpr ftype zero = 0;
+  return std::max(logit, zero) - logit * y + log(1 + exp(-std::abs(logit)));
+};
+</code></pre>
+
+      <p>
+        A logit is simply the argument $x$ passed to the sigmoid (and similar in case of a softmax). 
       </p>
 
 
       <h4 class="heading-spaced">Cross-entropy loss with softmax</h4>
 
       <p>
-        TODO
+        Just as in the case of the sigmoid, we often find the softmax in combination with the 
+        cross-entropy (CE) loss function. CE is defined as 
+        
+        $$CE(y, \hat{y}) = \sum_i y_i log(\hat{y}_i)$$
+
+        Plugging in the softmax as we've come to love it ealier leaves us with the following implementation:
       </p>
+
+<pre><code class="language-cpp">// src/backend/training/loss_functions/crossentropy_softmax_loss.cpp
+
+// ...
+ftype lsum = 0;
+for(tensorSize_t i = 0; i &lt; logits.size(); i++){
+  lsum += tmp[i]; // tmp[i] = exp(x[i]) - maxV
+}
+lsum = log(lsum);
+
+for(tensorSize_t i = 0; i &lt; logits.size(); i++){
+  if((*y)[i] > 0){ // y either zero or one
+    loss += -(*logits)[i] + maxV + lsum; 
+  }
+}
+// ...
+</code></pre>
+
+    <p>
+      Just like as we did with the softmax itself, we first compute the max-value, and adjust
+      the exponents accordingly for numerical stability. The rest follows from the definitions.
+      (I should mention that I simplified this a little compared with what you find in my code.
+      In my code I deal with batches as well, which I took out in the snippet above to avoid
+      confusion and keep it simple).
+    </p>
 
     </details>
 
@@ -628,8 +691,155 @@ namespace train {
       <h3 class="heading-spaced">Optimizers</h3>
 
       <p>
-        TODO - include figure showing how the optimizers integrate all the above
+        Now we have got everything together for a training loop. The only thing that is really missing are the optimizers
+        tying together what we just worked out. We once again give it an abstract base class, and once again that might 
+        not have been necessary, but here we are. The class goes as follows:
       </p>
+
+<pre><code class="language-cpp">// src/backend/training/optimizers/optimizer_base.h
+
+namespace train {
+  class OptimizerBase {
+    protected:
+      const ftype lr;
+      const std::vector< std::shared_ptr<Tensor> > params;
+
+    public:
+      OptimizerBase(std::vector< std::shared_ptr<Tensor> > params, ftype lr) 
+        : params{std::move(params)}, lr{lr} 
+        { }
+      
+      ~OptimizerBase() noexcept = default;
+
+      OptimizerBase(const OptimizerBase& other) = delete;
+      OptimizerBase& operator=(const OptimizerBase& other) = delete;
+
+      OptimizerBase(OptimizerBase&& other) noexcept = default;
+      OptimizerBase& operator=(OptimizerBase&& other) noexcept = default;
+
+      virtual void step() = 0;
+
+      void zeroGrad() noexcept;
+  };
+}
+</code></pre>
+
+      <p>
+        Unsurprisingly it has a learning rate lr, and it needs to hold references to the parameters 
+        is expected to update. The virtual step()-function is the distinguishing branch in between the
+        optimizers, and all of them need a way to zero out gradients. We can now implement several 
+        optimizers, in this post we only need to take a look at RMSProp, since that is the one we 
+        will be using in our MNIST example. Its definition looks like this:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/training/optimizers/rmsprop.h
+
+namespace train {
+  class RmsPropOptimizer final : public OptimizerBase {
+    private:
+      const ftype decay;
+      std::unordered_map<Tensor*, std::unique_ptr<Tensor>> movingAvg;
+
+    public:
+        RmsPropOptimizer(std::vector< std::shared_ptr<Tensor> > params, ftype lr, ftype decay) 
+          : OptimizerBase(std::move(params), lr), decay{decay} 
+          {
+            for(const auto& param: params) {
+              movingAvg[param.get()] = nullptr; // lazy initialization
+            }
+          }
+
+        void step() override;
+  };
+}
+</code></pre>
+
+      <p>
+        The moving average here comes from how the optimizer works. Apart from the 
+        gradients it maintains a field of moving averages of squared gradients through
+
+        $$E[g^2]_t = \gamma E[g^2]_{t-1} + (1 - \gamma)$$
+
+        $\gamma$ is the decay rate <code>const ftype decay;</code>. The update rule then becomes 
+
+        $$\theta_{t+1} = \theta_t - \frac{\eta}{\sqrt{E[g^2]_t + \epsilon}}$$
+
+        Here, $\theta_t$ are the weights at time step $t$, $\eta$ is the learning rate, and 
+        $\epsilon$ is a constant added for numerical stability. I note here that once again I found 
+        out that the value of $\epsilon$ has a large impact on the whole optimizer. A good value is
+        $\epsilon = 1e-8$. I started out with 1e-9, and my training loop did not work, and neither did 
+        a value of 1e-7.
+      </p>
+
+      <p>
+        Anyway, we do have to track the moving averages of each gradient, so I decided to go with
+        a map <code>std::unordered_map<Tensor*, std::unique_ptr<Tensor>> movingAvg;</code> mapping
+        a tensor to its moving averages. Updating the weights once then looks like the following:
+      </p>
+
+<pre><code>
+
+void RmsPropOptimizer::step() {
+  constexpr ftype eps = 1e-8;
+  for(const auto& param: params){
+    auto tPtr = param.get();
+    const auto gPtr = tPtr->getGrads().get();
+    auto vPtr = movingAvg[tPtr].get();
+
+    // update moving avg
+    if(vPtr!=nullptr) { // hot path
+      for(tensorSize_t i = 0; i < gPtr->getSize(); i++){ 
+        auto g = (*gPtr)[i];
+        auto update = decay * (*vPtr)[i] + (1 - decay) * g * g;
+        vPtr->set(update, i);
+      }
+    }
+    else { // init loop
+      movingAvg[tPtr] = make_unique<Tensor>(tPtr->getDims(), tPtr->getDevice(), false); // create empty tensor
+      vPtr = movingAvg[tPtr].get();
+      for(tensorSize_t i = 0; i < tPtr->getSize(); i++) {
+        auto g = (*gPtr)[i];
+        vPtr->set((1 - decay) * g * g, i);
+      }
+    }
+
+    // update gradients
+    for(tensorSize_t i = 0; i < tPtr->getSize(); i++) {
+      auto update = (*tPtr)[i] - lr * (*gPtr)[i] / ((*vPtr)[i] + eps);
+      tPtr->set(update, i);
+    }
+  }
+}
+</code></pre>
+
+      <p>
+        With the optimizer in place we can now conclude our training loop. We will implement 
+        it in Python later, but this is probably a good point to sketch out what it will look 
+        like, so we can understand our design decisions a little better.
+      </p>
+
+      <figure class="fig-light">
+        <img
+        id="pytorch-train-loop-illustrated"
+        class="blog-image"
+        src="./img_2/train-loop-illustrated.png"
+        alt="Illustration of a train loop">
+        <figcaption>
+          Illustration of one training loop. Shows how the components we just implemented 
+          integrate with each other.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-train-loop-illustrated-dark"
+        class="blog-image"
+        src="./img_2/train-loop-illustrated-dark.png"
+        alt="Illustration of a train loop">
+        <figcaption>
+          Illustration of one training loop. Shows how the components we just implemented 
+          integrate with each other.
+        </figcaption>
+      </figure>
 
     </div>
 
