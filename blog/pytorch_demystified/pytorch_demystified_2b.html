@@ -45,7 +45,7 @@ mathjax: true
           <a href="#frontend">Updating the Python frontend</a>
           <ul>
             <li>
-              <a href="#frontend-library-structure">Library structure</a>
+              <a href="#frontend-library-structure">Python package structure</a>
             </li>
             <li>
               <a href="#frontend-inheritance-module">Inheritance based Python-Module</a>
@@ -892,13 +892,16 @@ void RmsPropOptimizer::step() {
 
     <div id="frontend" class="article-text-div">
       <h2 class="heading-spaced">Updating the Python frontend</h2>
+    </div>
 
-      <h3 id="frontend-library-structure" class="heading-spaced">Library structure</h3>
+    <div class="article-text-div">
+      <h3 id="frontend-library-structure" class="heading-spaced">Python package structure</h3>
 
       <p>
         Lucky for us, we do not have to do too much in the frontend when updating it. Our tensor functions are 
-        already there, the graph remains invisible to the user, and what is missing is mostly the new modules we created. 
-        For better oversight we add a few modules there according to the tree below:
+        already there, the graph remains invisible to the user, and what is missing is mostly the new modules we created
+        and the translation we have to do now that we added more types. To make it all nice for the user we wrap our library
+        as a Python package, the casual Python rules apply here. We structure the package according to the filetree below:
       </p>
 
 <pre>
@@ -1052,10 +1055,12 @@ __all__ = ['Module', 'Sequential', 'FfLayer']
         we expose, resulting in what likely will be an arduous "call-this-function, 
         eat-this-tensor, connect it with that" series of API calls to define a network 
         on the C++ side. Lots of code, design tied closely with the C++ side. A better
-        idea is to push the network design onto the Python side for now. More flexible 
+        idea is to push the network design onto the Python side for now. More flexible
         to use for non-backend-programmers, faster prototyping and experimentation.
       </p>
+    </div>
 
+    <div class="article-text-div">
       <h3 id="frontend-inheritance-module" class="heading-spaced">Inheritance based Python-Module</h3>
 
       <p>
@@ -1188,10 +1193,12 @@ class Sequential(Module):
 </code></pre>
 
       <p>
-        While this is not the most flexible design and we might have to revisit at a later point in 
+        While this is not the most flexible design and we might have to revisit at a later point in
         time when moving toward the PyTorch way, for our small initial networks this works just fine.
       </p>
+    </div>
 
+    <div class="article-text-div">
       <h3 id="frontend-type-conversions" class="heading-spaced">Fixing type conversions between backend and frontend</h3>
 
       <p>
@@ -1342,9 +1349,39 @@ BOOST_PYTHON_MODULE(_nn)
         structure we set up earlier. An example is in python_lib/dl_lib/train/optim/__init__.py, where we 
         import the backend module via <code>from dl_lib._compiled._train import SGD, RmsProp</code>. Optionally,
         we can support an <code>from dl_lib.train.optim import *</code> via a sleek <code>__all__ = ['SGD', 'RmsProp']</code>
-        in the same file. That concludes our Python frontend, and we can move to the last step now, a full 
+        in the same file. A depiction of the final Python library and how it integrates with the C++ backend is shown in the 
+        image below. And that concludes our Python frontend, and we can move to the last step now, a full 
         training pipeline.
       </p>
+
+      <figure class="fig-light">
+      <img
+      id="pytorch-library-diagram"
+      class="blog-image pytorch-step-img"
+      src="./img_2/library-structure.png"
+      alt="Diagram of part 2: Autograd and training pipeline">
+      <figcaption>
+        Structure of the final library. On the left we see the library as structured by Python, on the right the shared modules 
+        the backend generates. Arrows depict what Python frontend module wraps what shared object of the C++ library. Note that 
+        train has two non-overlapping modules that both see _train on the backend side, but each exposes a different set of 
+        functionalities to the frontend, representing a virtual split of the same library. The right side also shows dependencies
+        of backend modules, where both _nn and _train need to see _core upon loading.
+      </figcaption>
+      </figure>
+      <figure class="fig-dark">
+      <img
+      id="pytorch-library-diagram-dark"
+      class="blog-image pytorch-step-img"
+      src="./img_2/library-structure-dark.png"
+      alt="Diagram of part 2: Autograd and training pipeline">
+      <figcaption>
+        Structure of the final library. On the left we see the library as structured by Python, on the right the shared modules 
+        the backend generates. Arrows depict what Python frontend module wraps what shared object of the C++ library. Note that 
+        train has two non-overlapping modules that both see _train on the backend side, but each exposes a different set of 
+        functionalities to the frontend, representing a virtual split of the same library. The right side also shows dependencies
+        of backend modules, where both _nn and _train need to see _core upon loading.
+      </figcaption>
+      </figure>
 
     </div>
 
