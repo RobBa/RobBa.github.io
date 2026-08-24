@@ -12,8 +12,8 @@ mathjax: true
     <br>
 
     <blockquote class="article-quote">
-      "TODO"
-      <cite>&mdash; TODO</cite>
+      "Life is too short for perfect plans."
+      <cite>&mdash; Cidolfus Telamon (Final Fantasy XVI)</cite>
     </blockquote>
 
     <br>
@@ -1327,7 +1327,11 @@ BOOST_PYTHON_MODULE(_nn)
 </code></pre>
 
       <p>
-        That concludes our Python frontend, and we can move to the last step now, a full 
+        We then have to import all those new functionalities in our Python lib, respecting the 
+        structure we set up earlier. An example is in python_lib/dl_lib/train/optim/__init__.py, where we 
+        import the backend module via <code>from dl_lib._compiled._train import SGD, RmsProp</code>. Optionally,
+        we can support an <code>from dl_lib.train.optim import *</code> via a sleek <code>__all__ = ['SGD', 'RmsProp']</code>
+        in the same file. That concludes our Python frontend, and we can move to the last step now, a full 
         training pipeline.
       </p>
 
@@ -1337,8 +1341,104 @@ BOOST_PYTHON_MODULE(_nn)
       <h2 class="heading-spaced">Implementing an MNIST example</h2>
 
       <p>
-        TODO
+        Now that we have everything ready to go, there's one thing we still need to do. We have a Python lib 
+        defining tensors and training utilities, but what about getting the data in first place and representing 
+        it properly? Luckily we can lean on existing infrastructure: Scikit-Learn already gives us datasets we can 
+        readily import, as well as utility such as train-test-splitting, scalers for data normalization, and many
+        more. It runs on NumPy, so all we have to do is write some conversion from NumPy to our Tensor class.
       </p>
+
+      <p>
+        Numpy gives us <a href="https://numpy.org/doc/2.5/user/c-info.html" target="_blank">documentation</a> for that,
+        alternatively we can follow one of many tutorials or blogposts found on that through a quick Google search. 
+        A quick implementation can be found in file src/python/py_core/py_core_util.h, where two functions exist:
+        fromNumpy() and toNumpy(), through the signatures <code>boost::python::object Py_DataModeling::toNumpy(const Tensor &t)</code>
+        and the templated <code>std::shared_ptr<Tensor> Py_DataModeling::fromNumpy(boost::python::object npArray)</code>. 
+        After implementing those we have to expose them in Python through
+      </p>
+
+<pre><code class="language-cpp">
+
+BOOST_PYTHON_MODULE(_core)
+{
+  // ...
+
+  // must call this before using numpy C API
+  Py_DataModeling::initNumpy();  // numpy initialization
+  def("fromNumpy", &Py_DataModeling::fromNumpy<ftype>);
+  def("toNumpy", &Py_DataModeling::toNumpy);
+}
+</code></pre>
+
+      <p>
+        With that we can now implement our basic training-loop. The lines containing our library are outlined below, for a 
+        complete example please visit the file in my repo.
+      </p>
+
+<pre><code class="language-python">&#35; examples/mnist.py
+
+from dl_lib import Tensor, fromNumpy, toNumpy
+from dl_lib.nn import Sequential, FfLayer
+from dl_lib.nn.activation import LeakyReLU
+from dl_lib.train.loss import CrossEntropyWithSoftmax
+from dl_lib.train.optim import RmsProp
+
+def make_net():
+    net = Sequential()
+    net.append(FfLayer(784, 256))
+    net.append(LeakyReLU(0.01))
+    net.append(FfLayer(256, 128))
+    net.append(LeakyReLU(0.01))
+    net.append(FfLayer(128, 10))
+    return net
+
+def train_epoch(net, loss_fn, optim, x, y, batch_size=64):
+
+    total_loss = 0.0
+    n_batches = 0
+    max_batches = math.ceil(x.shape[0] / batch_size)
+    for xb, yb in make_batches(x, y, batch_size):
+        xTensor = fromNumpy(xb)
+        yTensor = fromNumpy(yb)
+
+        pred = net.forward(xTensor)
+        loss = loss_fn(yTensor, pred)
+        loss.backward()
+
+        optim.clipGradients(1.0)
+        optim.step()
+        optim.zeroGrad()
+
+        total_loss += loss.getitem(0)
+        n_batches += 1
+        if n_batches == 1 or n_batches % 10 == 0:
+            print(f"Batch {n_batches} / {max_batches}, loss {loss.getitem(0)}")
+
+    return total_loss / n_batches
+
+if __name__ == "__main__":
+    x, y_int = load_mnist()
+    y = to_one_hot(y_int)
+
+    x_train, x_val, y_train, y_val = train_test_split(
+        x, y, test_size=0.1, random_state=42
+    )
+
+    net = make_net()
+    loss_fn = CrossEntropyWithSoftmax()
+    optim = RmsProp(net.parameters(), 0.00001, 0.95)  # lr and decay
+
+    n_epochs = 10
+    for epoch in range(n_epochs):
+        train_loss = train_epoch(net, loss_fn, optim, x_train, y_train)
+        val_acc = evaluate(net, x_val, y_val)
+        print(
+            f"Epoch {epoch+1}/{n_epochs} "
+            f"loss={train_loss:.4f} "
+            f"val_acc={val_acc:.4f}"
+        )
+
+</code></pre>
 
     </div>
 
@@ -1347,21 +1447,25 @@ BOOST_PYTHON_MODULE(_nn)
 
       <p>
         That wraps up Part 2 of the PyTorch demystified series. Across
-        <a href="pytorch_demystified_2a.html" target="_blank">2a</a> and this post we went from a completely
-        inert Tensor class to a fully functional deep learning framework: an autograd engine with dynamic
-        graph construction and backpropagation, activation functions, a feedforward layer, loss functions,
-        optimizers, a Python frontend, and a training loop, all tied together in a working MNIST example.
+        <a href="pytorch_demystified_2a.html" target="_blank">part 2a</a> and this post we went from a 
+        Tensor class with basic arithmetics all the way to a fully functional training framework. With 
+        this you can now readily train a network on the MNIST dataset and evaluate your outputs. However, 
+        when running it you will find that it is still a wee slow, too slow in fact to be considered something
+        you'd actually want to use on a real-world dataset.   
       </p>
 
       <p>
-        What we have not touched at all so far is performance. The framework works, but it is far from fast.
-        That is exactly where the series goes next: part 3 implements a CUDA backend, and part 4 optimizes
-        the CPU backend using profilers and architecture-aware techniques.
+        The next two entries of this series are directly aimed at that. In part 3 we will implement a CUDA 
+        backend. We will write CUDA kernels from scratch for every operation that actually matters, and then we 
+        will optimize it until we get satisfying performance out of it. We will go step by step, showing what 
+        the profilers tell us, what we conclude, and how we fix it then, showing a clear before and after. And for 
+        all those who do not have a CUDA capable GPU we will do the same with the CPU driven C++ backend we just
+        implemented.
       </p>
 
       <p>
-        The source code for this part lives in the same
-        <a href="https://github.com/RobBa/dl_lib" target="_blank">GitHub repository</a> as the rest of the
-        series. Feedback is always welcome, so feel free to reach out via LinkedIn or E-mail. Cheers.
+        The source code for this part lives as a release on my 
+        <a href="https://github.com/RobBa/dl_lib/releases/tag/TrainLoop" target="_blank">GitHub repository</a>. 
+        Feedback is always welcome, so feel free to reach out via LinkedIn or E-mail. Cheers.
       </p>
     </div>
