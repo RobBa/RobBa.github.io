@@ -900,8 +900,8 @@ void RmsPropOptimizer::step() {
       <p>
         Lucky for us, we do not have to do too much in the frontend when updating it. Our tensor functions are 
         already there, the graph remains invisible to the user, and what is missing is mostly the new modules we created
-        and the translation we have to do now that we added more types. To make it all nice for the user we wrap our library
-        as a Python package, the casual Python rules apply here. We structure the package according to the filetree below:
+        and the translation we have to do now that we added more types. Staying true to how we structured the backend we 
+        create the following structure for the Boost.Python binding:
       </p>
 
 <pre>
@@ -945,8 +945,9 @@ BOOST_PYTHON_MODULE(_nn)
 
       <p>
         So far so good. We want to integrate this into a Python library where we can end up doing something 
-        like <code>from mylib.nn import Sigmoid</code>. In other words, we want a modular Python library. We 
-        start by building an appropriate directory structure as in
+        like <code>from mylib.nn import Sigmoid</code>. In other words, we want a modular Python library. 
+        We wrap our library as a Python package, the casual Python rules apply here. We structure the package 
+        according to the filetree below:
       </p>
 
 <pre>
