@@ -882,6 +882,8 @@ void RmsPropOptimizer::step() {
     <div id="frontend" class="article-text-div">
       <h2 class="heading-spaced">Updating the Python frontend</h2>
 
+      <h3 class="heading-spaced">Library structure</h3>
+
       <p>
         Lucky for us, we do not have to do too much in the frontend when updating it. Our tensor functions are 
         already there, the graph remains invisible to the user, and what is missing is mostly the new modules we created. 
@@ -1037,17 +1039,297 @@ __all__ = ['Module', 'Sequential', 'FfLayer']
         network class in C++, and that would work. However, if we intend to go beyond
         plain vanilla networks later then our design decisions will tied to the API 
         we expose, resulting in what likely will be an arduous "call-this-function, 
-        eat-this-tensor, connect it with that" series of API calls to define a network.
-        Horrible design, but how to do it better. For a lack of ideas we peek a little 
-        bit over to how PyTorch solved this and blatantly copy their approach, as it 
-        works and is elegant. Implementing that happens on the Python front in a file
-        I already included in our tree earlier, the Module.py. But first we need to
-        adjust our Python frontend to allow for inheritance.
+        eat-this-tensor, connect it with that" series of API calls to define a network 
+        on the C++ side. Lots of code, design tied closely with the C++ side. A better
+        idea is to push the network design onto the Python side for now. More flexible 
+        to use for non-backend-programmers, faster prototyping and experimentation.
       </p>
 
-<pre><code class="language-cpp">// 
+      <h3 class="heading-spaced">Inheritance based Python-Module</h3>
 
+      <p>
+        To push the design of the networks onto the Python stack we need some definitions
+        in Python. I foreshadowed that in a file hidden in the filetree I gave you earlier, 
+        the Module.py. To wrap our head around what happens here let's start by giving it what we would need.
+        We want a base class on the Python side, that we can derive from. We follow Boost.Python's 
+         <a href="https://www.boost.org/doc/libs/latest/libs/python/doc/html/tutorial/tutorial/exposing.html#tutorial.exposing.inheritance" 
+         target="_blank">tutorial</a> and define a base class wrapper to expose:
+      </p>
+
+<pre><code class="language-cpp">// src/python/py_nn/py_nn_util.h
+
+namespace Py_nn {
+  using namespace boost::python;
+  struct ModuleBaseWrapper : module::ModuleBase, wrapper<module::ModuleBase> {
+    std::shared_ptr<Tensor> operator()(const std::shared_ptr<Tensor>& input) const override {
+      return this->get_override("forward")(input);   
+    }
+
+    Tensor operator()(const Tensor& input) const override {
+      std::__throw_runtime_error("This function should never be called from within Python");   
+    }
+  };
+
+  // to resolve the overload of the struct
+  inline std::shared_ptr<Tensor> (ModuleBaseWrapper::*moduleForward)(const std::shared_ptr<Tensor>&) const  = &ModuleBaseWrapper::operator();
+
+  // ...
+}
 </code></pre>
+
+      <p>
+        We now expose it in Python, along with the modules we derive from it:
+      </p>
+
+<pre><code class="language-cpp">// src/python/py_nn/py_nn.cpp
+
+BOOST_PYTHON_MODULE(_nn)
+{
+  using namespace Py_Util;
+  using namespace boost::python;
+
+  &#35;define WRAP_METHOD_ONE_TENSORARG(T, method) \
+  +[](const T& self, Tensor& t) -> std::shared_ptr<Tensor> { \
+    return (self.*method)(t.getSharedPtr()); \
+  }
+
+  class_<Py_nn::ModuleBaseWrapper, std::shared_ptr<Py_nn::ModuleBaseWrapper>, boost::noncopyable>("_Module", no_init)
+    // methods  
+    .def("_own_parameters", &module::ModuleBase::parameters)
+    // operators
+    .def("forward", pure_virtual(WRAP_METHOD_ONE_TENSORARG(Py_nn::ModuleBaseWrapper, Py_nn::moduleForward)))
+  ;
+
+  // expose the other modules as well...
+}
+</code></pre>
+
+      <p>
+        If you read part one of this blogpost series most of these lines are already familiar to you. 
+        I want to shift your focus instead to the following pieces of information: First, we give the 
+        base class (<code>struct ModuleBaseWrapper</code>) a way to expose the parameters. Classes 
+        deriving from it implicitly inherit this method. We also give it not constructor, making it 
+        an abstract base class effectively.
+      </p>
+
+      <p>
+        Most interestingly is the forward method. We give it to the base class via
+        <code>.def("forward", pure_virtual(WRAP_METHOD_ONE_TENSORARG(Py_nn::ModuleBaseWrapper, Py_nn::moduleForward)))</code>.
+        This is the classical pattern we have seen, with the exception of a pure_virtual Boost.Python instruction, and a pointer 
+        that points to a function implemented as in <code>return this->get_override("forward")(input);</code>. The pure_virtual
+        tells Boost.Python that this is a purely virtual function. We don't have to do that, but it will make our code safer. For
+        instance, it can help Boost.Python enforce overrides on the Python side. The get_override("forward") looks up the 
+        forward function from a derived class as defined in Python, where naming must obviously match in Python, and then calls that 
+        one. With this we just enabled polymorphism in the Python-frontend, that we can use in the following:
+      </p>
+
+<pre><code class="language-python">&#35; python_lib/dl_lib/nn/module.py
+
+from .._compiled._nn import _Module
+
+class Module(_module):
+  def __init__(self):
+    pass
+
+class Sequential(Module):
+  def __init__(self):
+    super().__init__()
+
+  def forward(self, x):
+    for layer in self._layers:
+      x = layer(x)
+    return x
+</code></pre>
+
+      <p>
+        Next we need a way to store layers as attributes, which we then can iterate over, and we need to be able to 
+        expose all the parameters we do have, so we can pass them to the optimizers we implemented above. We can lean 
+        on our C++ backend, but for debugging and inspection we can also do that on the Python frontend. Use a shortcut 
+        and go the path of least resistance via
+      </p>
+
+<pre><code>&#35; python_lib/dl_lib/nn/module.py
+class Sequential(Module):
+  def __init__(self):
+    super().__init__()
+    object.__setattr__(self, "_layers", [])
+
+  def append(self, module):
+    self._layers.append(module)
+
+  def forward(self, x):
+    for layer in self._layers:
+      x = layer(x)
+    return x
+
+  def parameters(self):
+    params = []
+    for layer in self._layers:
+      if hasattr(layer, 'parameters'):
+        result = layer.parameters()
+        if isinstance(result, list):
+          params.extend(result)
+        else:
+          params.extend(list(result))  # force conversion from BP proxy
+      elif hasattr(layer, 'params'):
+        params.extend(list(layer.params))
+    return params
+</code></pre>
+
+      <p>
+        While this is not the most flexible design and we might have to revisit at a later point in 
+        time when moving toward the PyTorch way, for our small initial networks this works just fine.
+      </p>
+
+      <h3 class="heading-spaced">Fixing type conversions between backend and frontend</h3>
+
+      <p>
+        We need to deal with the conversion of a list of Tensors here to the C++ backend. Remember that 
+        in the C++ backend we use <code>std::vector< std::shared_ptr<Tensor> > parameters()</code>, so 
+        Boost.Python needs to know how to convert that into the Python frontend. 
+      </p>
+
+<pre><code class="language-cpp">// src/python/py_nn/py_nn.cpp
+
+BOOST_PYTHON_MODULE(_nn)
+{
+  // ...
+
+  // register vector of shared_ptr<Tensor> converter; needed for ModuleBase::parameters()
+  class_<std::vector<std::shared_ptr<Tensor>>>("TensorList")
+    .def(vector_indexing_suite<std::vector<std::shared_ptr<Tensor>>>())
+  ;
+
+  // convert python list of tensors back to c++ 
+  converter::registry::push_back(
+    &custom_converters::TensorListFromPython::convertible,
+    &custom_converters::TensorListFromPython::construct,
+    type_id<std::vector<std::shared_ptr<Tensor>>>());
+
+  // ...
+    }
+</code></pre>
+
+      <p>
+        Additionally, because we compile using different .so units, we need to tell _nn about what happened in 
+        _core. To do so we import _core into _nn, forcing an initialization of _core in _nn. This ensures that 
+        _nn knows about the Tensor we exposed in _core in part one of this series. We import via 
+        <code>boost::python::object coreModule = boost::python::import("dl_lib._compiled._core");</code>.
+      </p>
+
+      <p>
+        Lastly we also need to make sure that the functions we call actually also convert in between the shared
+        pointers and the Python frontend. I have hinted at that in the macro I showed you earlier. For reference, 
+        here is it's implementation and its call again:
+      </p>
+
+<pre><code class="language-cpp">// src/python/py_nn/py_nn.cpp
+
+BOOST_PYTHON_MODULE(_nn)
+{
+  // ...
+  &#35;define WRAP_METHOD_ONE_TENSORARG(T, method) \
+  +[](const T& self, Tensor& t) -> std::shared_ptr<Tensor> { \
+    return (self.*method)(t.getSharedPtr()); \
+  }
+
+  // ... 
+  .def("forward", pure_virtual(WRAP_METHOD_ONE_TENSORARG(Py_nn::ModuleBaseWrapper, Py_nn::moduleForward)))
+  // ...
+}
+
+// src/python/py_nn/py_nn_util.h
+namespace Py_nn {
+  // ...
+  inline std::shared_ptr<Tensor> (ModuleBaseWrapper::*moduleForward)(const std::shared_ptr<Tensor>&) const  = &ModuleBaseWrapper::operator();
+  // ...
+}
+</code></pre>
+
+      <p>
+        We can see that moduleForward needs a shared pointer. But while Boost.Python manages our tensors as shared pointers
+        beneath the hood, it treats them as raw objects in the frontend. We need to bridge this gap, and we do it 
+        by giving giving the C++ backend an explicit shared pointer to self whenever we call a function that expects the shared
+        pointer. We do this in line  <code>return (self.*method)(t.getSharedPtr());</code>, and we have to give our tensor the ability
+        to create shared pointers to itself. This is a classic pattern where we have to derive from std::enable_shared_from_this, and 
+        then create a shared pointer. The code looks like this this:
+      </p>
+
+<pre><code>// src/backend/data_modeling/tensor.h
+
+class Tensor final : public std::enable_shared_from_this<Tensor>
+{
+  // ...
+
+public:
+  std::shared_ptr<Tensor> getSharedPtr() const
+  {
+    try {
+      return std::const_pointer_cast<Tensor>(shared_from_this());
+    }
+    catch (const std::bad_weak_ptr&) {
+      throw std::runtime_error(
+          "Tensor must be managed by shared_ptr for autograd operations");
+    }
+  }
+};
+</code></pre>
+
+      <p>
+        We now have to wrap every call we do to a function taking a shared pointer into 
+        one of these. For instance, for all the graph creation methods we defined ealier we do have
+        to wrap them into a lambda doing the manual coversion to a shared pointer, and instead of 
+        calling the method of the Tensor class we have to call the wrapper around it that creates the 
+        computational graph. Exercised on our example of the multiplication with a scalar value we have
+        to do the following:
+      </p>
+
+<pre><code class="language-cpp">// src/python/py_core/py_core.cpp
+
+BOOST_PYTHON_MODULE(_nn)
+{
+  // a wrapper around the function resolving overloads of cggrapg::mul
+  inline std::shared_ptr<Tensor> (*scalarmul)
+  (const std::shared_ptr<Tensor>, ftype)                                              = &(cgraph::mul);
+
+  // a wrapper lambda doing the conversion in between the shared pointer and Python
+  #define WRAP_FREE_FUNC_4(fPtr, T) \
+  +[](const Tensor& self, T val) -> std::shared_ptr<Tensor> { \
+    return (*fPtr)(self.getSharedPtr(), val); \
+  }
+
+  // a redefinition of the API given to the Tensor class
+  .def("__mul__", WRAP_FREE_FUNC_4(Py_DataModeling::scalarmul, ftype))
+}
+</code></pre>
+
+      <p>
+        And lastly, we can now simply throw all our new modules and classes we implemented into our 
+        frontend. Because this follows what we already established earlier here are simple two examples:
+      </p>
+
+<pre><code>// src/python/py_nn/py_nn.cpp
+
+  // ...
+  class_<module::ReLu, std::shared_ptr<module::ReLu>, boost::noncopyable>("ReLU")
+    .def("__call__", WRAP_METHOD_ONE_TENSORARG(module::ReLu, Py_nn::reluF))
+    .def("__str__", &toString<module::ReLu>)
+  ;
+  // ...
+
+// src/python/py_train/py_train.cpp
+
+  // ...
+  class_<train::CrossEntropyLoss, std::shared_ptr<train::CrossEntropyLoss>, boost::noncopyable>("CrossEntropy")
+    .def("__call__", &train::CrossEntropyLoss::operator())
+  ;
+  // ...
+</code></pre>
+
+      <p>
+        That concludes our Python frontend, and we can move to the last step now, a full 
+        training pipeline.
+      </p>
 
     </div>
 
