@@ -7,7 +7,7 @@ mathjax: true
 ---
 
     <h1 class="heading-spaced">PyTorch demystified 2b -<br>Deep learning modules and the training pipeline</h1>
-    <p class="article-date">Published: Jul. 2026</p>
+    <p class="article-date">Published: Aug. 2026</p>
 
     <br>
 
@@ -151,8 +151,7 @@ namespace module {
 
       virtual std::vector&lt; std::shared_ptr&lt;Tensor&gt; &gt; parameters() const { return {}; }
   };
-}
-</code></pre>
+}</code></pre>
 
       <p>
         We once again suppress copies actively to avoid accidents. More interestingly though
@@ -210,8 +209,7 @@ shared_ptr&lt;Tensor&gt; ReLu::operator()(const shared_ptr&lt;Tensor&gt;& t) con
   }
 
   return res;  
-}
-</code></pre>
+}</code></pre>
 
       <p>
         Because the module functions themselves will always be part of a computational graph
@@ -257,8 +255,7 @@ vector&lt;shared_ptr&lt;Tensor&gt;&gt; ReLuNode::backward(const Tensor& upstream
   }
 
   return {res};
-}
-</code></pre>
+}</code></pre>
 
     <p>
       That concludes our activation functions. Most of the other ones follow the same path. 
@@ -320,8 +317,7 @@ Tensor Sigmoid::operator()(const Tensor& t) const {
   }
 
   return res;
-}
-</code></pre>
+}</code></pre>
 
       <p>
         We have split this up into two parts, one where $x \ge 0$, resulting in the standard formula,
@@ -369,8 +365,7 @@ vector&lt;shared_ptr&lt;Tensor&gt;&gt; SigmoidNode::backward(const Tensor& upstr
   }
 
   return {res};
-}
-</code></pre>
+}</code></pre>
 
       <p>
         By giving it a pointer to the result of the forward pass we make use 
@@ -448,8 +443,7 @@ namespace module {
 
     // some other utility functions
   };
-}
-</code></pre>
+}</code></pre>
 
     <p>
       The backward functions are as follows:
@@ -478,8 +472,7 @@ std::shared_ptr&lt;Tensor&gt; FfLayer::operator()(const std::shared_ptr&lt;Tenso
   }
 
   return res;  
-}
-</code></pre>
+}</code></pre>
 
       <p>
         What is new here is that the shared pointer overload this time does not 
@@ -531,8 +524,7 @@ FfLayer::FfLayer(tensorDim_t inSize, tensorDim_t outSize, Device d,
     bias = make_shared&lt;Tensor&gt;(vector&lt;tensorDim_t&gt;{outSize}, d, requiresGrad);
     TensorFunctions::ToZeros(*bias);
   }
-}
-</code></pre>
+}</code></pre>
 
       <p>
         If we take a look here you'll find a concept I have not touched upon 
@@ -585,8 +577,7 @@ namespace train {
       virtual std::shared_ptr&lt;Tensor&gt; operator()(const std::shared_ptr&lt;Tensor&gt; y, 
                                                  const std::shared_ptr&lt;Tensor&gt; ypred) const = 0;
   };
-}
-</code></pre>
+}</code></pre>
 
       <p>
         This could actually be the first time in this whole process that we use inheritance,
@@ -634,8 +625,7 @@ namespace train {
 auto bce = [](ftype y, ftype ypred){
   constexpr ftype epsBce = 1e-9;
   return y * log(std::max(ypred, epsBce)) + (1 - y) * log(std::max(1 - ypred, epsBce));
-};
-</code></pre>
+};</code></pre>
 
       <p>
         This works, but we have to compute $\hat{y}$ first. However, given how the log and the exponent in sigmoid interact 
@@ -650,8 +640,7 @@ auto bce = [](ftype y, ftype ypred){
 auto bceSimplified = [](ftype y, ftype logit){
   constexpr ftype zero = 0;
   return std::max(logit, zero) - logit * y + log(1 + exp(-std::abs(logit)));
-};
-</code></pre>
+};</code></pre>
 
       <p>
         A logit is simply the argument $x$ passed to the sigmoid (and similar in case of a softmax). 
@@ -683,8 +672,7 @@ for(tensorSize_t i = 0; i &lt; logits.size(); i++){
     loss += -(*logits)[i] + maxV + lsum; 
   }
 }
-// ...
-</code></pre>
+// ...</code></pre>
 
     <p>
       Just like we did with the softmax itself, we first compute the max-value, and adjust
@@ -732,8 +720,7 @@ namespace train {
 
       void zeroGrad() noexcept;
   };
-}
-</code></pre>
+}</code></pre>
 
       <p>
         Unsurprisingly it has a learning rate lr, and it needs to hold references to the parameters
@@ -783,8 +770,7 @@ namespace train {
 
         void step() override;
   };
-}
-</code></pre>
+}</code></pre>
 
       <p>
         The moving average here comes from how the optimizer works. Apart from the 
@@ -841,8 +827,7 @@ void RmsPropOptimizer::step() {
       tPtr-&gt;set(update, i);
     }
   }
-}
-</code></pre>
+}</code></pre>
 
       </details>
 
@@ -940,8 +925,7 @@ BOOST_PYTHON_MODULE(_nn)
     .def("__str__", &toString&lt;module::ReLu&gt;)
   ;
   // ...
-}
-</code></pre>
+}</code></pre>
 
       <p>
         So far so good. We want to integrate this into a Python library where we can end up doing something 
@@ -1003,8 +987,7 @@ set_target_properties(_core PROPERTIES
                       OUTPUT_NAME "_core")
 
 set_target_properties(_nn PROPERTIES 
-                      OUTPUT_NAME "_nn")
-</code></pre>
+                      OUTPUT_NAME "_nn")</code></pre>
 
       <p>
         One problem we have to deal with here is that we have a set of shared module libraries,
@@ -1044,8 +1027,7 @@ __version__ = "1.0.0"
 
 from dl_lib._compiled._nn import FfLayer
 
-__all__ = ['Module', 'Sequential', 'FfLayer']
-</code></pre>
+__all__ = ['Module', 'Sequential', 'FfLayer']</code></pre>
 
       <p>
         This is just standard Python package jargon, so no surprises there. What 
@@ -1091,8 +1073,7 @@ namespace Py_nn {
   inline std::shared_ptr&lt;Tensor&gt; (ModuleBaseWrapper::*moduleForward)(const std::shared_ptr&lt;Tensor&gt;&) const  = &ModuleBaseWrapper::operator();
 
   // ...
-}
-</code></pre>
+}</code></pre>
 
       <p>
         We now expose it in Python, along with the modules we derive from it:
@@ -1118,8 +1099,7 @@ BOOST_PYTHON_MODULE(_nn)
   ;
 
   // expose the other modules as well...
-}
-</code></pre>
+}</code></pre>
 
       <p>
         If you read part one of this blogpost series most of these lines are already familiar to you. 
@@ -1155,8 +1135,7 @@ class Sequential(Module):
   def forward(self, x):
     for layer in self._layers:
       x = layer(x)
-    return x
-</code></pre>
+    return x</code></pre>
 
       <p>
         Next we need a way to store layers as attributes, which we then can iterate over, and we need to be able to 
@@ -1190,8 +1169,7 @@ class Sequential(Module):
           params.extend(list(result))  # force conversion from BP proxy
       elif hasattr(layer, 'params'):
         params.extend(list(layer.params))
-    return params
-</code></pre>
+    return params</code></pre>
 
       <p>
         While this is not the most flexible design and we might have to revisit at a later point in
@@ -1228,8 +1206,7 @@ BOOST_PYTHON_MODULE(_nn)
     type_id&lt;std::vector&lt;std::shared_ptr&lt;Tensor&gt;&gt;&gt;());
 
   // ...
-    }
-</code></pre>
+    }</code></pre>
 
       <p>
         Additionally, because we compile using different .so units, we need to tell _nn about what happened in 
@@ -1264,8 +1241,7 @@ namespace Py_nn {
   // ...
   inline std::shared_ptr&lt;Tensor&gt; (ModuleBaseWrapper::*moduleForward)(const std::shared_ptr&lt;Tensor&gt;&) const  = &ModuleBaseWrapper::operator();
   // ...
-}
-</code></pre>
+}</code></pre>
 
       <p>
         We can see that moduleForward needs a shared pointer. But while Boost.Python manages our tensors as shared pointers
@@ -1293,8 +1269,7 @@ public:
           "Tensor must be managed by shared_ptr for autograd operations");
     }
   }
-};
-</code></pre>
+};</code></pre>
 
       <p>
         We now have to wrap every call we do to a function taking a shared pointer into 
@@ -1321,8 +1296,7 @@ BOOST_PYTHON_MODULE(_nn)
 
   // a redefinition of the API given to the Tensor class
   .def("__mul__", WRAP_FREE_FUNC_4(Py_DataModeling::scalarmul, ftype))
-}
-</code></pre>
+}</code></pre>
 
       <p>
         And lastly, we can now simply throw all our new modules and classes we implemented into our 
@@ -1344,8 +1318,7 @@ BOOST_PYTHON_MODULE(_nn)
   class_&lt;train::CrossEntropyLoss, std::shared_ptr&lt;train::CrossEntropyLoss&gt;, boost::noncopyable&gt;("CrossEntropy")
     .def("__call__", &train::CrossEntropyLoss::operator())
   ;
-  // ...
-</code></pre>
+  // ...</code></pre>
 
       <p>
         We then have to import all those new functionalities in our Python lib, respecting the 
@@ -1418,8 +1391,7 @@ BOOST_PYTHON_MODULE(_core)
   Py_DataModeling::initNumpy();  // numpy initialization
   def("fromNumpy", &Py_DataModeling::fromNumpy&lt;ftype&gt;);
   def("toNumpy", &Py_DataModeling::toNumpy);
-}
-</code></pre>
+}</code></pre>
 
       <p>
         With that we can now implement our basic training-loop. The lines containing our library are outlined below, for a 
@@ -1487,9 +1459,7 @@ if __name__ == "__main__":
             f"Epoch {epoch+1}/{n_epochs} "
             f"loss={train_loss:.4f} "
             f"val_acc={val_acc:.4f}"
-        )
-
-</code></pre>
+        )</code></pre>
 
     </div>
 

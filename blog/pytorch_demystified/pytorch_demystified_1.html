@@ -263,8 +263,7 @@ using ftype = float;
 using tensorDim_t = std::uint16_t; // represent one dimension of a tensor
 using tensorSize_t = std::uint32_t; // represent the total size of a tensor
 
-static_assert(sizeof(tensorSize_t) &gt;= sizeof(tensorDim_t));
-</code></pre>
+static_assert(sizeof(tensorSize_t) &gt;= sizeof(tensorDim_t));</code></pre>
 
     </div>
 
@@ -291,8 +290,7 @@ private:
 
 public:
   // stuff goes here
-}
-</code></pre>
+}</code></pre>
 
       <p>
         Here, we implicitly use two new datatypes we have yet to define: <code>tensorValues_t</code> and 
@@ -339,8 +337,7 @@ class Dimension final {
     }
 
     // also add some operators for convenience: !=, ==, &lt;&lt; for printing
-}
-</code></pre>
+}</code></pre>
 
       <p>
         There are no real surprises here. Worth noting is probably only that we gave
@@ -366,8 +363,7 @@ class Dimension final {
 enum class Device {
     CPU,
     CUDA
-};
-</code></pre>
+};</code></pre>
 
       <p>
         With this in mind, we define the <code>tensorValues_t</code> as a private nested class inside the tensor class, 
@@ -425,8 +421,7 @@ private:
   };
 
 // Tensor continues here...
-}
-</code></pre>   
+}</code></pre>   
 
       <p>
         The things worth noting are the <code>resize()</code> method, which could be better named 
@@ -450,8 +445,7 @@ namespace sys {
   Device getDevice() noexcept {
     return Tensor::getDefaultDevice();
   }
-}
-</code></pre>   
+}</code></pre>   
 
       <p>
         The probably most interesting thing about the tensor's values is that they are represented 
@@ -479,8 +473,7 @@ tensorSize_t Tensor::computeLinearIdx(const std::vector&lt;tensorDim_t&gt;& idx,
   }
 
   return res;
-}
-</code></pre>   
+}</code></pre>   
 
       <p>
         If this didn't make it clear yet, we refer e.g. to the 
@@ -540,8 +533,7 @@ Tensor Tensor::operator*(const Tensor& other) const {
   }
 
   return res;
-}
-</code></pre>
+}</code></pre>
 
         <p>
           The drill is pretty clear in between those, and no surprises. The only one we need
@@ -590,8 +582,7 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right) {
   }
 
   return res;
-}
-</code></pre>
+}</code></pre>
 
         <p>
           Next we multiply the individual matrices together. We will revisit this piece of code later,
@@ -627,8 +618,7 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
       resIdx++;
     }
   }
-}
-</code></pre>
+}</code></pre>
 
         <p>
           We note that we already did a minor optimization here. Instead of traversing the rows of the 
@@ -708,8 +698,7 @@ BOOST_PYTHON_MODULE(py_data_modeling)
         .def("__radd__", WRAP_SCALAR_REVERSE(+, float))
         // add more operations
     ;
-}
-</code></pre>
+}</code></pre>
 
         <p>
           There obviously is a lot to unwrap here, so we go into it bit by bit.
@@ -737,8 +726,7 @@ BOOST_PYTHON_MODULE(py_data_modeling)
 from dl_lib import Tensor # name Tensor defined by first argument in braces
 
 t1 = Tensor() # holds the tensor as a shared_ptr
-t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
-</code></pre>
+t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr</code></pre>
     </div>
 
     <div id="constructors-section" class="article-text-div">
@@ -778,8 +766,7 @@ t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr
 
 dims = t.dims # get reference to dim object
 del t # destroy tensor
-print(dims.get(0)) # safe only if dims keeps t alive
-</code></pre>
+print(dims.get(0)) # safe only if dims keeps t alive</code></pre>
 
         <p>
           Holding a non-owning reference would mean that dims would be a dangling pointer, resulting in a crash. <code>return_internal_reference</code>
@@ -805,8 +792,7 @@ print(dims.get(0)) # safe only if dims keeps t alive
 .def("__mul__", WRAP_TENSOR_METHOD_1(operator*))
 .def("__mul__", WRAP_SCALAR(operator*, float))
 // ...
-}
-</code></pre>
+}</code></pre>
 
         <p>
           These are the methods we give our Tensor object. First we give it the names. All the names we give it here are reserved 
@@ -825,8 +811,7 @@ print(dims.get(0)) # safe only if dims keeps t alive
 &#35;define WRAP_SCALAR(method, T) \
 +[](const Tensor& self, T val) -&gt; std::shared_ptr&lt;Tensor&gt; { \
   return std::make_shared&lt;Tensor&gt;(self.method(val)); \
-}
-</code></pre>
+}</code></pre>
 
         <p>
           In other words, we define lambdas. The first argument is always a reference to the object we call the method on,
@@ -864,8 +849,7 @@ public:
 // src/data_modeling/tensor.cpp
 Tensor operator*(ftype scalar, const Tensor& tensor) {
   return tensor * scalar;
-}
-</code></pre>
+}</code></pre>
 
         <p>
           Obviously this function then calls the operator we defined earlier, fixing our issue. Exposing this to our Python interface is then 
@@ -881,8 +865,7 @@ Tensor operator*(ftype scalar, const Tensor& tensor) {
 // Add to tensor class:
 .def("__rmul__", WRAP_SCALAR_REVERSE(*, float))
 // more operators...
-; // we wrap up our tensor class with this
-</code></pre>
+; // we wrap up our tensor class with this</code></pre>
 
     </div>
 
@@ -958,8 +941,7 @@ namespace custom_converters {
     static void* convertible(PyObject* obj_ptr);
     static void construct(PyObject* obj_ptr,rvalueFromPythonData* data);
   };
-}
-</code></pre>
+}</code></pre>
 
         <p>
           I made it a templated just class just in case we need it for some other type later on as well. 
@@ -995,8 +977,7 @@ std::shared_ptr&lt;Tensor&gt; Gaussian(std::vector&lt;tensorDim_t&gt; dims, cons
   return Gaussian(std::move(dims), Tensor::getDefaultDevice(), requiresGrad);
 }
 
-// also functions for creating zero- and ones-initialized tensors
-</code></pre>
+// also functions for creating zero- and ones-initialized tensors</code></pre>
           
         <p>One problem that arises in Boost.Python is that when we give it function pointers as above 
           it cannot tell what overload we need. Therefore Boost.Python needs an explicit function pointer to an unambiguous function name.
@@ -1016,8 +997,7 @@ auto GaussianWrapper1(std::vector&lt;tensorDim_t&gt; dims, Device d) {
 std::shared_ptr&lt;Tensor&gt;    (*Gaussian0)(std::vector&lt;tensorDim_t&gt;)                     = &amp;GaussianWrapper0;
 std::shared_ptr&lt;Tensor&gt;    (*Gaussian1)(std::vector&lt;tensorDim_t&gt;, Device)             = &amp;GaussianWrapper1;
 std::shared_ptr&lt;Tensor&gt;    (*Gaussian2)(std::vector&lt;tensorDim_t&gt;, const bool)         = &(TensorFunctions::Gaussian);
-std::shared_ptr&lt;Tensor&gt;    (*Gaussian3)(std::vector&lt;tensorDim_t&gt;, Device, const bool) = &(TensorFunctions::Gaussian);
-</code></pre>
+std::shared_ptr&lt;Tensor&gt;    (*Gaussian3)(std::vector&lt;tensorDim_t&gt;, Device, const bool) = &(TensorFunctions::Gaussian);</code></pre>
 
         <p>
           Here we did two things: Firstly, we have default arguments we introduced in our two overloads, in both cases the 
@@ -1030,8 +1010,7 @@ std::shared_ptr&lt;Tensor&gt;    (*Gaussian3)(std::vector&lt;tensorDim_t&gt;, De
 <pre><code class="language-cpp">def("Gaussian", Py_DataModeling::Gaussian0);
 def("Gaussian", Py_DataModeling::Gaussian1);
 def("Gaussian", Py_DataModeling::Gaussian2);
-def("Gaussian", Py_DataModeling::Gaussian3);
-</code></pre>
+def("Gaussian", Py_DataModeling::Gaussian3);</code></pre>
 
         <details class="pytorch-optional" id="bp-under-hood-section">
         <summary class="pytorch-optional-summary">
@@ -1074,8 +1053,7 @@ def("Gaussian", Py_DataModeling::Gaussian3);
     PyTypeObject *tp_base;
     PyObject *tp_dict;
     // ...
-};
-</code></pre>
+};</code></pre>
 
         <p>
           It becomes clear that the struct itself is a wrapper around a datatype, with members for initialization, allocation, destructor like 
@@ -1087,8 +1065,7 @@ def("Gaussian", Py_DataModeling::Gaussian3);
     PyCFunction  ml_meth;
     int ml_flags;
     const char  *ml_doc;
-};
-</code></pre>
+};</code></pre>
 
         <p>
           It has a name, a pointer to the actual function, some flags and a docstring. We can see where this is headed. In the next section 
@@ -1137,8 +1114,7 @@ set_target_properties(py_data_modeling PROPERTIES PREFIX "") # don't add "lib" i
 
 &#35; src/CMakeLists.txt
 target_link_libraries(py_data_modeling ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} DataModeling)
-target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
-</code></pre>
+target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})</code></pre>
 
         <p>
           I plead guilty for the redundant second time I removed the prefix here. Since we just added a shared library via 
