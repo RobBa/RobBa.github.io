@@ -85,11 +85,8 @@ mathjax: false
         on a branch of the repository. You can find it <a href="https://github.com/RobBa/dl_lib/tree/dev/cuda_optimization" 
         target="_blank">here</a>. Every finished optimization is clearly marked in its commit message, starting with an 
         "Opt. [number]: 'Name of the fix'". In the end we will have improved our code execution on our benchmark from roughly 
-        997.691s down to 0.206s, reaching a speedup with a factor of 4800. So let's get started building something we can optimize.
-      </p>
-
-      <p>
-        TODO: benchmark the starting point clearly to indicate how much you improved on the benchmark.
+        997.691s, and after an initial fix 2.399s, down to 0.206s, a speedup with a factor of 4800x and 11.6x respectively. 
+        So let's get started building something we can optimize.
       </p>
     </div>
 
@@ -407,39 +404,39 @@ namespace cuda_impl {
 <pre><code class="language-cpp">// src/backend/shared/cuda/common_kernels.cuh
 
 namespace cuda_impl {
-   template<typename T>
+   template&lt;typename T&gt;
   __device__ __forceinline__ ftype cudaSigmoid(const ftype x) {
-    if constexpr (std::is_same_v<T, float>) {
+    if constexpr (std::is_same_v&lt;T, float&gt;) {
       ftype z = expf(-fabsf(x));
       ftype s = 1.0f / (1.0f + z);
-      return (x >= 0.f) ? s : z * s; // x < 0 => e^x/(e^x+1) 
+      return (x &gt;= 0.f) ? s : z * s; // x &lt; 0 =&gt; e^x/(e^x+1) 
     } 
-    else if constexpr (std::is_same_v<T, double>) {
+    else if constexpr (std::is_same_v&lt;T, double&gt;) {
       ftype z = exp(-abs(x));
       ftype s = 1.0 / (1.0 + z);
-      return (x >= 0.0) ? s : z * s; // x < 0 => e^x/(e^x+1) 
+      return (x &gt;= 0.0) ? s : z * s; // x &lt; 0 =&gt; e^x/(e^x+1) 
     }
     else {
-      static_assert(always_false<T>, "Unexpected value for ftype encountered");
+      static_assert(always_false&lt;T&gt;, "Unexpected value for ftype encountered");
     }
   }
 }
 </code></pre>
 
       <p>
-        The kernel is in shared because it is used both in a forward pass, as well as in the backward pass.
-        A forced inline ensures that we do not call kernels from within kernel, and a templated overload 
-        distinguishes whether to single-precision specific instructions (expf, fabsf) or generic instructions
+        The kernel lives in shared because it is used both in the forward pass and in the backward pass.
+        A forced inline ensures that we do not call kernels from within a kernel, and a templated overload
+        distinguishes whether to use single-precision-specific instructions (expf, fabsf) or generic instructions
         (exp, abs). The generic instructions take both single- and double-precision values, but we can play 
         with other functions exposed through the <a 
         href="https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/mathematical-functions.html#non-standard-cuda-mathematical-functions" 
         target="_blank">CUDA API</a>. While I did not verify this myself at this point we can later resume here
         and play with these functions to squeeze out performance. In theory we would expect the expf to be faster
         though, since it is <a href="https://docs.nvidia.com/cuda/cuda-math-api/cuda_math_api/group__CUDA__MATH__SINGLE.html"
-        target="_blank">explicity designed</a> for single-precision-floating-point numbers. In general for floating
+        target="_blank">explicitly designed</a> for single-precision floating-point numbers. In general for floating
         points there is a trade-off between accuracy and speed. The larger our representation the better our results, 
         but the slower the computation itself. NVIDIA provides intrinsics for this that reduce the number of operations 
-        even further, at the cost of precision then.
+        even further, at the cost of precision.
       </p>
 
       <details class="pytorch-optional" id="optional-floating-points">
@@ -492,7 +489,7 @@ namespace cuda_impl {
       </p>
 
       <p>
-        The same time the IEEE called for a unified standard, and Intel allowed Kahan to submit his work, which lead to what is 
+        The same time the IEEE called for a unified standard, and Intel allowed Kahan to submit his work, which led to what is 
         now called the <a href="https://ieeexplore.ieee.org/document/8766229/" target="_blank">IEEE-754 standard</a>. It is a 
         standard that generally put up the scaffolding for how FPs are computed nowadays, which is why if you work on code that 
         is a little closer to hardware you've probably seen the name many times already. It starts out with how to represent numbers,
@@ -541,7 +538,7 @@ namespace cuda_impl {
       <p>
         However, the story of floating point numbers does not end here. For decades this has worked just fine. Whoever follows recent 
         movements however noticed that we all of a sudden encountered a new wave of floating point representations. For instance, the 
-        C++ standard just got enhanced with a few new <a href="en.cppreference.com/cpp/types/floating-point" target="_blank">FP types</a>.
+        C++ standard just got enhanced with a few new <a href="https://en.cppreference.com/w/cpp/types/floating-point" target="_blank">FP types</a>.
         Most are not a surprise, but looking closer we find an std::bfloat16_t type. CUDA supports a range of
         <a href="https://docs.nvidia.com/cuda/cuda-math-api/index.html" target="_blank">smaller types</a>, mainly FP4, FP6, and FP8, along with
         the brainfloat C++ also has. But how come?   
@@ -553,9 +550,9 @@ namespace cuda_impl {
         target="_blank">quantization</a>. Here smaller data types have been used to perform the floating point operations in LLMs, reaching good 
         results with higher compute throughput and cutting the memory footprint. Google's brainfloat (BFloat) adapts the floating points a little more from 
         that. Given that the absolute number (mantissa) does not matter that much, but the exponents in LLMs can cover a wide range, this data 
-        type moves the bits a little. For instance, the IEEE-754 standard assigns 11 bits to the mantissa, and 5 bits to the exponent. The BFloat-16 
-        data type gives each 8, reducing the mantissa by three bits and increasing the exponent by the same number. These are however very recent events
-        and can change in the future, so it's worth it keeping an eye out.
+        type moves the bits a little. For instance, the IEEE-754 standard assigns 10 bits to the mantissa and 5 bits to the exponent. The BFloat-16 
+        data type removes the sign bit and gives each 8, reducing the mantissa by two bits and increasing the exponent by three. These are however very 
+        recent events and can change in the future, so it's worth it keeping an eye out.
       </p>
 
       </details>
