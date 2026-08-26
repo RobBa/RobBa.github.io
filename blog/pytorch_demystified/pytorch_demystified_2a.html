@@ -7,7 +7,7 @@ mathjax: true
 ---
 
     <h1 class="heading-spaced">PyTorch demystified 2a -<br>Building the autograd engine</h1>
-    <p class="article-date">Published: Jul. 2026</p>
+    <p class="article-date">Published: Aug. 2026</p>
 
     <br>
 
@@ -108,8 +108,7 @@ mathjax: true
 <pre><code class="language-python">A, B = some_tensors()
 C = some_op(A, B)
 C.backward()
-assert(C.has_grads() and C.has_grads())
-</code></pre>
+assert(C.has_grads() and C.has_grads())</code></pre>
 
       <p>
         We can extend this arbitrarily long, having a chain of operations, and in the end we have to propagate the operations backward 
@@ -216,8 +215,7 @@ Tensor Tensor::operator+(ftype scalar) const {
   }
 
   return res;
-}
-</code></pre>
+}</code></pre>
 
     <p>
       Here, we are creating a new tensor object, filling it with meaningful content, and returning it. That is, in our framework $C$ is a result of $A$ and $B$,
@@ -337,8 +335,7 @@ namespace cgraph {
         return parents;
       }
   };
-}
-</code></pre>
+}</code></pre>
 
       <p>
         We allow for moves but suppress copies, since copies will foreseeably do arcane things to our graph we'd rather not deal with.
@@ -364,8 +361,7 @@ public:
     requiresGrad = true;
   }  
   //..
-};
-</code></pre>
+};</code></pre>
 
     <p>
       One detail I just skimmed over so far is why the GraphNode class stores its parents via a shared pointer in 
@@ -376,8 +372,7 @@ public:
 <pre><code class="language-python">x = next_batch()
 y_pred = my_network.forward(x)
 loss = loss_fn(y_pred)
-optim.step(loss)
-</code></pre>
+optim.step(loss)</code></pre>
 
       <p>
         <b>But what happens here internally?</b> We have a network <code>my_network</code> holding references to internal tensors and
@@ -388,8 +383,7 @@ optim.step(loss)
   for layer in self._layers:
     # x now is a newly created tensor holding a reference to its parent
     x = layer.forward(x)
-  return x
-</code></pre>
+  return x</code></pre>
 
       <p>
         But what happens with x when the loop goes into the next iteration? If we don't watch our steps it will be destroyed, 
@@ -443,8 +437,7 @@ Tensor Tensor::operator*(ftype scalar) const {
   }
 
   return res;
-}
-</code></pre>
+}</code></pre>
 
       <p>
         We write a wrapper around this operation in the following fashion:
@@ -472,8 +465,7 @@ shared_ptr&lt;Tensor&gt; cgraph::mul(const shared_ptr&lt;Tensor&gt; t, ftype sca
 
 shared_ptr&lt;Tensor&gt; cgraph::mul(ftype scalar, const shared_ptr&lt;Tensor&gt; t) {
   return cgraph::mul(t, scalar);
-}
-</code></pre>
+}</code></pre>
 
       <p>
         Here, we do the overload to once again mirror what Python does with its __rmul__. The function itself checks if the input t
@@ -512,8 +504,7 @@ vector&lt;shared_ptr&lt;Tensor&gt;&gt; cgraph::ScalarMulNode::backward(const Ten
     res-&gt;set(res-&gt;get(i) * factor, i);
   }
   return {std::move(res)};
-}
-</code></pre>
+}</code></pre>
 
     <p>
       Note that we gave the node the scalar as a constant it stores internally as <code>const ftype factor;</code>. 
@@ -553,8 +544,7 @@ namespace cgraph {
 
   // Composite operations
   std::shared_ptr&lt;Tensor&gt; sumTensor(const std::shared_ptr&lt;Tensor&gt; t);
-}
-</code></pre>
+}</code></pre>
 
     <p>
       You can look up their implementations in the accompanying implementation file. Feel free to skip to the next
@@ -593,8 +583,7 @@ vector&lt;shared_ptr&lt;Tensor&gt;&gt; MatMulNode::backward(const Tensor& upstre
         make_shared&lt;Tensor&gt;(upstreamGrad.matmul(parents[1]-&gt;transpose(-2, -1))), 
         make_shared&lt;Tensor&gt;(parents[0]-&gt;transpose(-2, -1).matmul(upstreamGrad))
     };
-}
-</code></pre>
+}</code></pre>
 
     <p>
       This one is interesting for its simplicity. Basically, given two matrices $A$ and $B$, and computing their 
@@ -635,8 +624,7 @@ shared_ptr&lt;Tensor&gt; cgraph::get(const shared_ptr&lt;Tensor&gt;& t, tensorSi
     assert(res-&gt;getRequiresGrad());
   }
   return res;
-}
-</code></pre>
+}</code></pre>
 
       <p>
         The sum operation will leave a trail of nodes in the same vein as we've seen earlier, 
@@ -670,8 +658,7 @@ vector&lt; shared_ptr&lt;Tensor&gt; &gt; GetterNode::backward(const Tensor& upst
 &#35;endif
 
   return { std::move(res) };
-}
-</code></pre>
+}</code></pre>
 
     </details>
 
@@ -723,8 +710,7 @@ void Tensor::backward() {
       }
     }
   }
-}
-</code></pre>
+}</code></pre>
 
       <p>
         The code is pretty straight forward. If the tensor we call backward() on has
@@ -802,8 +788,7 @@ void Tensor::backward() {
 
     // add the grads as previously seen...
   }
-}
-</code></pre>
+}</code></pre>
 
       <p>
         With this we're good to go. If we expose this via our Python frontend now we can readily do our
@@ -821,8 +806,7 @@ loss = t3 * t3
 loss.backward()
 
 assert t1.grads.getitem(0) == pytest.approx(10.0)
-assert t2.grads.getitem(0) == pytest.approx(10.0)
-</code></pre>
+assert t2.grads.getitem(0) == pytest.approx(10.0)</code></pre>
 
     </div>
 

@@ -24,6 +24,17 @@ mathjax: false
         <li>
           <a href="#introduction">Introduction</a>
         </li>
+        <li>
+          <a href="#cuda-backend-basics">Building a basic CUDA backend</a>
+          <ul>
+            <li>
+              <a href="#cuda-structure">Setting up a basic structure</a>
+            </li>
+            <li>
+              <a href="#cuda-adding-kernels">CUDA memory management and custom kernels</a>
+            </li>
+          </ul>
+        </li>
       </ul>
     </div>
 
@@ -31,6 +42,341 @@ mathjax: false
       <h2 class="heading-spaced">Introduction</h2>
 
       <p>
-        Text here
+        Now that we have built our basic infrastructure, and we have a full pipeline, it is time for our long awaited
+        part where we get to speed things up. This part will consist of two subparts. In part one, this post, we implement 
+        a CUDA backend and optimize it. We will use NSight and NCU, two tools provided by NVIDIA, to profile our CUDA 
+        implementation, make deductions about bottlenecks, and do fixes.
       </p>
+
+      <div class="pytorch-step-row pytorch-step-row-compact">
+        <div class="pytorch-step-text">
+          <p>
+            The structure of this post is as follows: We first have a brief introduction into the main architecture and how
+            we incorporate the CUDA backend. Because most of the CUDA implementation is straight forward I will outline how 
+            to do most, and we will exemplify with a few kernels that are a little more interesting. We will end up with a
+            version of the backend that has a full CUDA backend and can be run end-to-end on the same MNIST instance we 
+            wrapped up in the <a href="pytorch_demystified_2b.html" target="_blank">previous post</a>. For convenience I 
+            have made this a special release on my <a href="https://github.com/RobBa/dl_lib/releases/tag/Naive_CUDA" 
+            target="_blank">GitHub</a>.
+          </p>
+        </div>
+        <div class="pytorch-step-figs">
+          <figure class="fig-light">
+          <img
+          id="pytorch-step-3"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_3.png"
+          alt="Diagram of part 3: CUDA backend and optimization">
+          </figure>
+          <figure class="fig-dark">
+          <img
+          id="pytorch-step-3-dark"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_3_dark.png"
+          alt="Diagram of part 3: CUDA backend and optimization">
+          </figure>
+        </div>
+      </div>
+
+      <p>
+        In part two we will optimize those kernels. Each optimization step is clearly marked by its headline, and we will
+        see profiling outputs both before and after the fix, showing how much each step actually improved on our pipeline.
+        Additionally for those who want to follow along or maybe do even better fixes I have left every optimization step 
+        on a branch of the repository. You can find it <a href="https://github.com/RobBa/dl_lib/tree/dev/cuda_optimization" 
+        target="_blank">here</a>. Every finished optimization is clearly marked in its commit message, starting with an 
+        "Opt. [number]: 'Name of the fix'". In the end we will have improved our code execution on our benchmark from roughly 
+        ... down to 0.206s, reaching a speedup with a factor of ... So let's get started building something we can optimize.
+      </p>
+
+      <p>
+        TODO: benchmark the starting point clearly to indicate how much you improved on the benchmark.
+      </p>
+    </div>
+
+    <div id="cuda-backend-basics" class="article-text-div">
+      <h2 class="heading-spaced">Building a basic CUDA backend</h2>
+
+    <p>
+      We build our CUDA backend in two steps. At first we have to set up the basic infrastructure needed to include everything. 
+      Following that we implement the missing kernels step by step.
+    </p>
+    </div>
+
+    <div id="cuda-structure" class="article-text-div">
+      <h3 class="heading-spaced">Setting up a basic structure</h3>
+
+      <p>
+        At first we do have to include CUDA code against our project. We have to tell CMake to find CUDA and where its libraries
+        are. Additionally, because not everyone has a CUDA capable GPU or simply may not want to use it we give it flag that is 
+        enabled by default and switches off automatically if CUDA could not be found on the machine. We do so by 
+      </p>
+
+<pre><code>&#35; CMakeLists.txt
+
+if (CUDA)  
+  include(CheckLanguage)
+  check_language(CUDA)
+
+  if(CMAKE_CUDA_COMPILER)
+    add_definitions(-D__CUDA)
+    enable_language(CUDA)
+    
+    set(CMAKE_CUDA_STANDARD 20)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+  else()
+    message(WARNING "Could not find CUDA on system. Compiling without CUDA enabled")
+  endif()
+endif()</code></pre>
+
+      <p>
+        Note that we introduced a definition here as well through <code>add_definitions(-D__CUDA)</code>. This will help 
+        us identify whether CUDA has been compile time enabled, and we will use it for compile time dependent branches in code.
+        We have to make the CUDA headers accessible to the backend, and link CUDA against it. We are a little lazy here, so we 
+        go a little unorthodox in CMake and simply look for all .cpp files and all .cu files and append those if desired. We do 
+        get for the backend
+      </p>
+
+<pre><code>
+
+file(GLOB_RECURSE CORE_SOURCES
+    computational_graph/*.cpp
+    data_modeling/*.cpp
+    module/*.cpp
+    system/*.cpp
+    training/*.cpp
+    utility/*.cpp
+)
+
+if(CMAKE_CUDA_COMPILER)
+    file(GLOB_RECURSE CUDA_SOURCES
+        computational_graph/*.cu
+        data_modeling/*.cu
+        module/*.cu
+        system/*.cu
+        training/*.cu
+        utility/*.cu
+    )
+    list(APPEND CORE_SOURCES ${CUDA_SOURCES})
+endif()
+
+add_library(BackendCore SHARED ${CORE_SOURCES})
+
+target_include_directories(BackendCore PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+set_target_properties(BackendCore PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${PYTHON_MODULE_DIR}" # make sure Python-modules see backend
+)
+
+if(CMAKE_CUDA_COMPILER)
+    set_target_properties(BackendCore PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+        CMAKE_CUDA_ARCHITECTURES native &#35; we can target alternative architectures here
+    )
+
+    find_package(CUDAToolkit REQUIRED)
+    target_include_directories(BackendCore PRIVATE 
+        ${CUDAToolkit_INCLUDE_DIRS}
+    )
+    target_link_libraries(BackendCore 
+        CUDA::cudart
+    )
+endif()</code></pre>
+
+      <p>
+        With that we now should be able to readily include our first CUDA files into our C++ 
+        backend. Remember the definition we introduced in CMake? We will now use it and include 
+        our first kernel. The casual scalar multiplication will serve as a base example illustrating 
+        the workflow. Our Tensor class will get the following enhancements:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
+
+#ifdef __CUDA
+#include "utility/cuda/cuda_common.cuh"
+#include "data_modeling/cuda/tensor_ops.cuh"
+#endif
+
+// ... 
+
+Tensor Tensor::operator*(const ftype scalar) const {
+  Tensor res(dims, values-&gt;getDevice(), requiresGrad);
+  switch(values-&gt;getDevice()){
+    case Device::CPU:
+      for (tensorSize_t i = 0; i &lt; values-&gt;getSize(); ++i) {
+        res.values-&gt;data()[i] = values-&gt;data()[i] * scalar;
+      }
+      break;
+    case Device::CUDA:
+      #ifdef __CUDA
+        cuda_impl::scalarmul(res, *this, scalar);
+      #else
+        __throw_runtime_error("Not compiled with CUDA");
+      #endif
+      break;
+  }
+
+  return res;
+}
+
+// ...</code></pre>
+
+    <p>
+      What we do here is check the device of the tensor we call the operation on, and either allocate the 
+      result on the GPU or in host RAM. A switch-case is either gonna call the CPU version or the CUDA version.
+      Additionally, we guard against errors with a conditional compilation, giving us meaningful output when 
+      CUDA has been requested, but the code has not been compiled against. We will use this structure, i.e. the 
+      switch-case with the error output in virtually every operation where we intend to branch off into CUDA code.
+    </p>
+
+    <p>
+      We also have to store the CUDA kernels somewhere. In the example we did a conditional include that only 
+      uses the CUDA headers when the compile time flag has been enabled. For ease of architecture we write kernels 
+      exactly where they belong. That is, respective CUDA kernels are in a directory named cuda in the same directory
+      where the CPU version resides in. CUDA kernels that can be shared by multiple modules of the backend are in 
+      a folder with path src/backend/shared/cuda. Therefore the directory structure looks like the following now:
+    </p>
+
+<pre>.
+├── src
+│   ├── CMakeLists.txt
+│   ├── backend
+│   │   ├── computational_graph
+│   │   │   ├── activation_functions
+│   │   │   │   └── cuda
+│   │   │   ├── loss_functions
+│   │   │   │   └── cuda
+│   │   │   ├── tensor_ops
+│   │   │   │   └── cuda
+│   │   ├── data_modeling
+│   │   │   └── cuda
+│   │   ├── module
+│   │   │   ├── activation_functions
+│   │   │   │   └── cuda
+│   │   │   ├── layers
+│   │   │   │   └── cuda
+│   │   ├── shared
+│   │   │   └── cuda
+│   │   ├── system
+│   │   ├── training
+│   │   │   ├── loss_functions
+│   │   │   │   └── cuda
+│   │   └── utility
+│   │       └── cuda
+...</pre>
+
+      <p>
+        Note that I only show directories in the tree above. An exception to the rule is the cuda folder in 
+        utility, but I'd wager this also contains what you would expect it contains. Mainly some wrappers
+        for better error messaging and some generic functions checking device capability. With that we can now
+        bring CUDA alive in our backend.
+      </p>
+
+    </div>
+
+    <div id="cuda-adding-kernels" class="article-text-div">
+      <h3 class="heading-spaced">CUDA memory management and custom kernels</h3>
+
+      <p>
+        As previously mentioned, we don't really have to work out every kernel for this blogpost. For us now 
+        it is mostly important to look at the main points, and point out some kernels that are of more interest
+        to us. The previous section introduced the basic pattern we will apply through our CUDA implementations.
+        But it did not show yet how we get CUDA tensors in the first place. Given our preliminary thoughts in part 1
+        of this series this is rather a plug-and-play operation. There, we came up with a tensorValues_t struct,
+        whose purpose was to manage the underlying data of the tensors. We gave it a resize operation that every
+        tensor constructor called, and malloc'ed memory in there. All we have to do now is to give it the device and 
+        call cudaMalloc instead, as in 
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
+
+void Tensor::tensorValues_t::resize(const tensorSize_t size) {
+  this-&gt;size = size;
+  switch (device) {
+    case Device::CPU:
+      values = static_cast&lt;ftype*&gt;(std::malloc(this-&gt;size * sizeof(ftype)));
+      break;
+    case Device::CUDA:
+      #ifdef __CUDA
+        cudaErrchk(cudaMalloc((void**) &values, this-&gt;size * sizeof(ftype)));
+      #else
+        std::__throw_invalid_argument("Not compiled with CUDA.");
+      #endif
+      break;
+  }
+}</code></pre>
+
+      <p>
+        After this we also have to make sure that we update the constructor of tensorValues_t accordingly, as well as
+        all the copy operations and set-device operations. The latter has two ways: If we are on the GPU and we move to 
+        the CPU we have to malloc, copy from the device to the host, and free memory on the GPU. If we start out on the 
+        CPU and move to the GPU we have to go the other way. No surprises there essentially. Lastly we update our getters 
+        and setters of the tensorValues_t to fetch elements from either the CPU or the GPU. And that already concludes our
+        memory management.
+      </p>
+      
+      <p>
+        Because we designed our frontend forward we do not have to update the Python binding and can 
+        simply instantiate a tensor now, telling it that it is a GPU resident as in <code>t = Tensor.ones([2, 2], Device.CUDA)</code>, 
+        and we will have a tensor that lives on the GPU. 
+      </p>
+
+      <p>
+        Adding a few kernels is just what you think it is. In the previous section we took a look at how CUDA kernels are called 
+        through a switch-case statement, here is the CUDA implementation of the kernel we showed there:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cuh
+
+#ifndef __CUDA
+static_assert(false, "File should not be included without CUDA enabled"); // for safety reasons
+#endif // __CUDA
+
+// includes here...
+
+class Tensor;
+
+namespace cuda_impl {
+  void scalarmul(Tensor& res, const Tensor& src, ftype scalar);
+}
+
+// src/backend/data_modeling/cuda/tensor_ops.cu
+
+namespace {
+  __global__ void scalarmulKernel(ftype* const res, const ftype* const left, ftype scalar, tensorSize_t size) {
+    int gid = blockDim.x * blockIdx.x + threadIdx.x;
+    if(gid &gt;= size)
+      return;
+    
+    res[gid] = left[gid] * scalar;
+  }
+}
+
+namespace cuda_impl {
+  void scalarmul(Tensor& res, const Tensor& src, ftype scalar) {
+    constexpr int threadsPerBlock = 256;
+    const int blocksPerGrid = (src.getSize() + threadsPerBlock - 1) / threadsPerBlock;
+
+    scalarmulKernel&lt;&lt;&lt;blocksPerGrid, threadsPerBlock&gt;&gt;&gt;(res.getData(), src.getData(), scalar, src.getSize());
+    cudaErrchk(cudaDeviceSynchronize());
+  }
+}</code></pre>
+
+      <p>
+        We have this modular design for clean code reasons, but also just because CUDA demands it. Essentially, 
+        when implementing CUDA kernels we have to use .cu file endings, to signal NVCC that it's time for it to shine.
+        We could now either rename all our .cpp files to .cu, which would force every user to have a CUDA toolchain on
+        their machine, or we do what I did here: Have separate .cu files with conditional compilation, and we cleanly
+        separate CUDA code from pure C++ code. I note here that cudaMalloc and other utility functions given by CUDA 
+        are pure C++ code included through <code>#include "cuda_runtime.h"</code> and can reside in .cpp files.
+      </p>
+
+      TODO: add a figure here showing how this separates .cpp from .cu
+
+      <p>
+        I also note here that the custom kernel we just implemented above is what CUDA engineers like to call
+        "embarrassingly parallel". In other words, pretty trivial to implement functionally.
+      </p>
+
     </div>
