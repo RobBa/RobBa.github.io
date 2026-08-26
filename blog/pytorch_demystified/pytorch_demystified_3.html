@@ -372,11 +372,196 @@ namespace cuda_impl {
         are pure C++ code included through <code>#include "cuda_runtime.h"</code> and can reside in .cpp files.
       </p>
 
-      TODO: add a figure here showing how this separates .cpp from .cu
+      <figure class="fig-light">
+        <img
+        id="pytorch-cpp-cuda-separation"
+        class="blog-image"
+        src="./img_3/cpp-cuda-separation.png"
+        alt="Illustration of compiler separation">
+        <figcaption>
+          Illustration of how the conditional include header separates CUDA code from C++ code, enabling 
+          separation between the C++ and the CUDA toolchains.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-cpp-cuda-separation-dark"
+        class="blog-image"
+        src="./img_3/cpp-cuda-separation-dark.png"
+        alt="Illustration of compiler separation">
+        <figcaption>
+          Illustration of how the conditional include header separates CUDA code from C++ code, enabling 
+          separation between the C++ and the CUDA toolchains.
+        </figcaption>
+      </figure>
 
       <p>
         I also note here that the custom kernel we just implemented above is what CUDA engineers like to call
-        "embarrassingly parallel". In other words, pretty trivial to implement functionally.
+        "embarrassingly parallel". In other words, pretty trivial to implement functionally. Most of the kernels
+        introduced in this new version follow this pattern, making for a quick win. A few exceptions however stand
+        out, and I will present them optionally below. However, one thing I want to note is that the kernels have 
+        not been written all too terrible to start with. For instance, I used hardware intrinsics when possible.
+        For instance, inside the sigmoid kernel we compute a single element using this kernel:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/shared/cuda/common_kernels.cuh
+
+namespace cuda_impl {
+   template<typename T>
+  __device__ __forceinline__ ftype cudaSigmoid(const ftype x) {
+    if constexpr (std::is_same_v<T, float>) {
+      ftype z = expf(-fabsf(x));
+      ftype s = 1.0f / (1.0f + z);
+      return (x >= 0.f) ? s : z * s; // x < 0 => e^x/(e^x+1) 
+    } 
+    else if constexpr (std::is_same_v<T, double>) {
+      ftype z = exp(-abs(x));
+      ftype s = 1.0 / (1.0 + z);
+      return (x >= 0.0) ? s : z * s; // x < 0 => e^x/(e^x+1) 
+    }
+    else {
+      static_assert(always_false<T>, "Unexpected value for ftype encountered");
+    }
+  }
+}
+</code></pre>
+
+      <p>
+        The kernel is in shared because it is used both in a forward pass, as well as in the backward pass.
+        A forced inline ensures that we do not call kernels from within kernel, and a templated overload 
+        distinguishes whether to single-precision specific instructions (expf, fabsf) or generic instructions
+        (exp, abs). The generic instructions take both single- and double-precision values, but we can play 
+        with other functions exposed through the <a 
+        href="https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/mathematical-functions.html#non-standard-cuda-mathematical-functions" 
+        target="_blank">CUDA API</a>. While I did not verify this myself at this point we can later resume here
+        and play with these functions to squeeze out performance. In theory we would expect the expf to be faster
+        though, since it is <a href="https://docs.nvidia.com/cuda/cuda-math-api/cuda_math_api/group__CUDA__MATH__SINGLE.html"
+        target="_blank">explicity designed</a> for single-precision-floating-point numbers. In general for floating
+        points there is a trade-off between accuracy and speed. The larger our representation the better our results, 
+        but the slower the computation itself. NVIDIA provides intrinsics for this that reduce the number of operations 
+        even further, at the cost of precision then.
+      </p>
+
+      <details class="pytorch-optional" id="optional-floating-points">
+      <summary class="pytorch-optional-summary">
+        <h4>Optional: A story of floating point numbers</h4>
+      </summary>
+
+      <div class="pytorch-optional-collapse-bar">
+        <button type="button" class="pytorch-optional-collapse-btn"
+          onclick="var s=document.getElementById('optional-floating-points'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
+
+      <p>
+        This optional is a brief historical breakdown of floating point numbers and how they evolved over time. A short 
+        disclaimer: This is obviously for the younger generation of engineers, including spoiled millenials like me, and 
+        I have not personally lived through all those events I describe in the following. It is based on my personal 
+        research through the wild west the internet has become, and could be wrong. I am confident the information is 
+        correct, but if you find something wrong please let me know.
+      </p>
+
+      <p>
+        Essentially, when representing numbers we distinguish two kinds of operands roughly: Integer values and floating 
+        point numbers (FPs). Normally we learn the integer representation first, since that is the easier one - binary 
+        representation, conversion between decimal, octal, hexadecimal, and binary format, addition and subtraction in 
+        the respective number systems, and signed representation, nowadays the 2's complement (enabling us to push both 
+        addition and subtraction through an adder, hence saving silicon). Pretty straight forward once you get the idea. 
+      </p>
+
+      <p>
+        FPs on the other hand are not that easy. I for myself have never had an introduction into actual circuitry doing
+        basic arithmetics on FPs, and the reason is that even basic operations get much more complicated than on integer
+        values. On top of that, floating points come with a much larger set of operations we want to perform on those. 
+        Integers are normally constraint to addition and multiplication plus their inverse, unless you want to do something
+        more fancy. Floating points on that trigonometrics (sine, cosine, tangent), taking roots such as the square root, 
+        exponentials, logarithms, and any other hip operation you can come up with. This makes it inherently harder to find
+        an optimal representation for those that works well with all operations we are aiming for, and for all intended 
+        purposes.
+      </p>
+
+      <p>
+        The result was that in the beginning of computing (relative from our modern standpoint that is) vendors had different 
+        ways to represent floats, mostly disagreeing how many bits for representation and how to distribute them (see figure below). 
+        Intel CPUs did different than IBM did different than Seymour Cray etc., leading to problems
+        such as incompatibilities in between hardware of different vendors, different user facing results on each system, 
+        while each representation had its own set of problems. To tackle the challenge Intel took in Canadian mathematician 
+        <a href="https://en.wikipedia.org/wiki/William_Kahan" target="_blank">William Kahan</a>, and secretly they began 
+        working on an 'ultimate FP representation'.
+      </p>
+
+      <p>
+        The same time the IEEE called for a unified standard, and Intel allowed Kahan to submit his work, which lead to what is 
+        now called the <a href="https://ieeexplore.ieee.org/document/8766229/" target="_blank">IEEE-754 standard</a>. It is a 
+        standard that generally put up the scaffolding for how FPs are computed nowadays, which is why if you work on code that 
+        is a little closer to hardware you've probably seen the name many times already. It starts out with how to represent numbers,
+        see the figure below. In addition, it also provides rules for how to round, how to control rounding errors, and exception 
+        handling. The two special FP types you have probably seen already, NaN and Infty, have their root in this standard. The 
+        standard also defines a positive and negative zero FP representation, indicating whether we approached zero from the positive
+        or the negative side.   
+      </p>
+
+      <figure class="fig-light">
+        <img
+        id="pytorch-ieee-reps"
+        class="blog-image"
+        src="./img_3/ieee-reps.png"
+        alt="IEEE-754 standard">
+        <figcaption>
+          Floating point representations and distribution of bits according to IEEE-754. The 128-bit representation 
+          got added later.        
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-ieee-reps-dark"
+        class="blog-image"
+        src="./img_3/ieee-reps-dark.png"
+        alt="IEEE-754 standard">
+        <figcaption>
+          Floating point representations and distribution of bits according to IEEE-754. The 128-bit representation 
+          got added later.
+        </figcaption>
+      </figure>
+
+      <p>
+        Intel on its side developed the Intel 8087 math co-processor in 1980, 5 years before IEEE-754 officially launched. The 
+        centerpiece of it was the x87 architecture, which uses a stack based register. Kahan determined that an 80-bit representation
+        of floating is enough to remove numerical errors that arise from chaining floating point operations, which is why x86-64 
+        processors still support 80-bit wide FP operations today. However, while mathematically sound, 80-bit sits awkward in a computer,
+        since it is not a natural power of two. Computers however tend to fetch from addresses starting with a power of two, resulting in 
+        alignment problems outside of the floating point unit. Modern computers that need genuine higher precision than 80-bits bank on 
+        the fact that computers got a whole lot more efficient than they used to be back in the day, and moved directly up to 128-bit.
+        Practically it also turned out that for most of us 32-bit and in some cases 64-bit are more than sufficient, making the 80-bit 
+        standard obsolete today. Intel used later capability upgrades of its processors, starting with MMX, to softly phase out the 
+        x87 FP unit, and carries it only for backward compatibility reasons. 
+      </p>
+
+      <p>
+        However, the story of floating point numbers does not end here. For decades this has worked just fine. Whoever follows recent 
+        movements however noticed that we all of a sudden encountered a new wave of floating point representations. For instance, the 
+        C++ standard just got enhanced with a few new <a href="en.cppreference.com/cpp/types/floating-point" target="_blank">FP types</a>.
+        Most are not a surprise, but looking closer we find an std::bfloat16_t type. CUDA supports a range of
+        <a href="https://docs.nvidia.com/cuda/cuda-math-api/index.html" target="_blank">smaller types</a>, mainly FP4, FP6, and FP8, along with
+        the brainfloat C++ also has. But how come?   
+      </p>
+
+      <p>
+        The answer lies in the rise of modern LLMs. Researchers found that for large models shorter representations are enough to still yield
+        good results, leading to the notion of <a href="https://huggingface.co/docs/optimum/concept_guides/quantization" 
+        target="_blank">quantization</a>. Here smaller data types have been used to perform the floating point operations in LLMs, reaching good 
+        results with higher compute throughput and cutting the memory footprint. Google's brainfloat (BFloat) adapts the floating points a little more from 
+        that. Given that the absolute number (mantissa) does not matter that much, but the exponents in LLMs can cover a wide range, this data 
+        type moves the bits a little. For instance, the IEEE-754 standard assigns 11 bits to the mantissa, and 5 bits to the exponent. The BFloat-16 
+        data type gives each 8, reducing the mantissa by three bits and increasing the exponent by the same number. These are however very recent events
+        and can change in the future, so it's worth it keeping an eye out.
+      </p>
+
+      </details>
+
+      <p>
+
       </p>
 
     </div>

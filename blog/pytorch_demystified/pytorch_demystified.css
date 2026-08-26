@@ -179,6 +179,11 @@ h4.heading-spaced {
     width: 90%;
 }
 
+#pytorch-cpp-cuda-separation,
+#pytorch-cpp-cuda-separation-dark {
+    width: 85%;
+}
+
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     .pytorch-step-row,
     .pytorch-step-row-reverse {
@@ -242,5 +247,10 @@ h4.heading-spaced {
     #pytorch-library-diagram,
     #pytorch-library-diagram-dark {
         width: 95%;
+    }
+
+    #pytorch-cpp-cuda-separation,
+    #pytorch-cpp-cuda-separation-dark {
+        width: 85%;
     }
 }
