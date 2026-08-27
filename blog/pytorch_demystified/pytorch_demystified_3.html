@@ -814,7 +814,7 @@ namespace cuda_impl {
           due to the exponential functions it employs. To tackle that one can first find the maximum value, over which we 
           normalize both numerator and denominator of a fraction, a standard math trick looking generically like 
 
-          $$\frac{e^x}{e^y} = \frac{e^x}{e^y} \cdot 1 = \frac{e^x}{e^y} \cdot \frac{e^-a}{e^-a} = \frac{e^{x-a}}{e^{y-a}}$$
+          $$\frac{e^x}{e^y} = \frac{e^x}{e^y} \cdot 1 = \frac{e^x}{e^y} \cdot \frac{e^{-a}}{e^{-a}} = \frac{e^{x-a}}{e^{y-a}}$$
 
           The steps of a softmax are then
 
@@ -1131,7 +1131,7 @@ namespace {
           <code>for(tensorSize_t offset = blockDim.x; offset > 32; offset >>= 1)</code>. The reduction
           works until the offset is 32, and in each iteration we divide by two via a bitshift to the right
           through <code>offset >>= 1</code>. That is a classical pattern we can employ in reduction algorithms,
-          but it only works cleanly when blockDim.x is a $2^n$ with $n$ of course being an integer. Otherwise we 
+          but it only works cleanly when blockDim.x is a $2^n$ - with $n$ of course being an integer. Otherwise we 
           will likely miss values, because a bitshift to the right is really a floor division by two. Additionally
           we'd have to perform boundary checks in the following warp level reduction. Say for example we had 
           blockDim.x==100. Then we'd get 50 for offset after one iteration, and then 25. In the raw reduction pattern 
