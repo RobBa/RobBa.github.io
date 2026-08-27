@@ -5,16 +5,20 @@ section: Python from C++
 highlight: true
 ---
 
-    <br>
-
-    <h1>Calling Python scripts from within C++</h1>
+    <h1 class="heading-spaced">Calling Python scripts from within C++</h1>
     <p class="article-date">Published: Jan. 2026 - Updated: March 2026</p>
 
     <br>
 
+    <blockquote class="article-quote">
+      "The greatest illusion of this world is the illusion of separation.<br>
+      Things you think are separate and different are actually one and the same."
+      <cite>&mdash; Guru Pathik (Avatar: The Last Airbender)</cite>
+    </blockquote>
+
     <div class="article-content-div">
-      <h2>Content</h2>
-      <ul>
+      <h2 class="heading-spaced">Content</h2>
+      <ol>
         <li>
           <a href="#introduction-python-cpp">Introduction</a>
         </li>
@@ -41,14 +45,11 @@ highlight: true
         <li>
           <a href="#summary-calling-python-from-within-cpp">Summary</a>
         </li>
-      </ul>
+      </ol>
     </div>
 
-    <br>
-
     <div id="introduction-python-cpp" class="article-text-div">
-
-      <h2>Introduction</h2>
+      <h2 class="heading-spaced">Introduction</h2>
 
       <p>
         In this article we explore how to call Python scripts from within C++ code, and how to
@@ -83,7 +84,7 @@ highlight: true
       <img
       id="calling-network-from-cpp"
       class="blog-image"
-      src="./calling_python_from_cpp/network_calls.png"
+      src="./img/network_calls.png"
       alt="Calling Python script from flexfringe">
       <figcaption>Simplified control flow of the application</figcaption>
       </figure>
@@ -91,18 +92,15 @@ highlight: true
       <img
       id="calling-network-from-cpp-dark"
       class="blog-image"
-      src="./calling_python_from_cpp/network-calls-dark.png"
+      src="./img/network-calls-dark.png"
       alt="Calling Python script from flexfringe">
       <figcaption>Simplified control flow of the application</figcaption>
       </figure>
 
     </div>
 
-    <br>
-
     <div id="cpython-primer" class="article-text-div">
-
-      <h2>CPython</h2>
+      <h2 class="heading-spaced">CPython</h2>
 
       <p>
         I will give a small primer on CPython that will be enough to understand all the contents of
@@ -133,16 +131,14 @@ highlight: true
       <img
       id="python-execution-path"
       class="blog-image"
-      src="./calling_python_from_cpp/python_execution.png"
+      src="./img/python_execution.png"
       alt="Python execution path">
       <figcaption>Steps to run a Python-script</figcaption>
       </figure>
     </div>
 
-    <br>
-
     <div id="setting-up-cpp-python-project" class="article-text-div">
-      <h2>Setting up the project and importing the Python script</h2>
+      <h2 class="heading-spaced">Setting up the project and importing the Python script</h2>
 
       <p>
         The basis for any object in CPython is the PyObject. We get access to this datatype by first
@@ -164,7 +160,8 @@ highlight: true
       </p>
 
       <p>
-      <pre><code class="language-cpp">// init
+
+<pre><code class="language-cpp">// init
 Py_Initialize();<br>
 PyRun_SimpleString("import sys");<br>
 PyRun_SimpleString("import os");<br>
@@ -187,10 +184,8 @@ PyRun_SimpleString(cmd.str().c_str());<br>
       </p>
     </div>
 
-    <br>
-
     <div id="garbage-collection-and-error-handling" class="article-text-div">
-      <h2>Ownership rules and error handling in CPython</h2>
+      <h2 class="heading-spaced">Ownership rules and error handling in CPython</h2>
 
       <p>
         To understand the ownership rules we first have to have a look at the PyObject-type. In the
@@ -259,17 +254,15 @@ PyRun_SimpleString(cmd.str().c_str());<br>
       <img
       id="memory-management-cpp-vs-cpython"
       class="blog-image"
-      src="./calling_python_from_cpp/cpp_vs_python.png"
+      src="./img/cpp_vs_python.png"
       alt="C++ vs CPython memory model">
       <figcaption>Contrasting ownership and memory management of C++ and CPython</figcaption>
       </figure>
 
     </div>
 
-    <br>
-
     <div id="loading-python-functions-into-cpp" class="article-text-div">
-      <h2>Loading Python-script and functions into C++</h2>
+      <h2 class="heading-spaced">Loading Python-script and functions into C++</h2>
 
       <p>
         Now that we understand memory-management and error handling, we can load our Python code
@@ -284,7 +277,7 @@ PyRun_SimpleString(cmd.str().c_str());<br>
         target="_blank">in our code</a>, and that we use to query the output of neural networks):
       </p>
 
-      <pre><code lang="python">def do_query(x: list):<br>
+<pre><code class="language-python">def do_query(x: list):<br>
 &nbsp; &nbsp; # do something<br>
 &nbsp; &nbsp; return some_list_of_ints<br>
 </code></pre>
@@ -299,7 +292,7 @@ PyRun_SimpleString(cmd.str().c_str());<br>
         is some boilerplate in CPython):
       </p>
 
-      <pre><code lang="language-cpp">query_func = PyObject_GetAttrString(p_module, "do_query");<br>
+<pre><code lang="language-cpp">query_func = PyObject_GetAttrString(p_module, "do_query");<br>
 if (query_func == NULL || !PyCallable_Check(query_func)) {<br>
 &nbsp; &nbsp; Py_DECREF(p_name);<br>
 &nbsp; &nbsp; Py_DECREF(p_module);<br>
@@ -307,12 +300,11 @@ if (query_func == NULL || !PyCallable_Check(query_func)) {<br>
 &nbsp; &nbsp; exit(1);<br>
 }
 </code></pre>
+
     </div>
 
-    <br>
-
     <div id="calling-python-function-with-argument" class="article-text-div">
-      <h2>Calling the Python function and receiving the argument</h2>
+      <h2 class="heading-spaced">Calling the Python function and receiving the argument</h2>
 
       <p>
         Lastly we want to call the Python script and translate its return value back into a C++
@@ -343,7 +335,7 @@ if (query_func == NULL || !PyCallable_Check(query_func)) {<br>
         purposes we omit the error checking when translating our vector to a Python list and back.
       </p>
 
-      <pre><code lang="language-cpp">// step 1: Prepare the input<br>
+<pre><code lang="language-cpp">// step 1: Prepare the input<br>
 PyObject* p_list = PyList_New(cpp_list.size());<br>
 for(int i=0; i&lt;cpp_list.size(); i++){<br>
 &nbsp; &nbsp; PyObject p_int = PyLong_FromLong(cpp_list[i]);<br>
@@ -390,7 +382,7 @@ Py_DECREF(p_result);
         script, holding the GIL would look like this:
       </p>
 
-      <pre><code lang="language-cpp">// acquire GIL, blocking for other threads <br>
+<pre><code lang="language-cpp">// acquire GIL, blocking for other threads <br>
 PyGILState_STATE gstate = PyGILState_Ensure(); <br>
 PyObject* p_result = PyObject_CallOneArg(func, args); <br>
 PyGILState_Release(gstate); // release GIL <br>

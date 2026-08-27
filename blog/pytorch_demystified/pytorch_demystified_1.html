@@ -1,0 +1,1205 @@
+---
+layout: default
+title: "PyTorch demystified 1: Tensor interface and Python bindings"
+section: Pytorch demystified - 1
+highlight: true
+mathjax: false
+---
+
+    <h1 class="heading-spaced">PyTorch demystified 1 -<br>Tensor interface and Python bindings</h1>
+    <p class="article-date">Published: Aug. 2026</p>
+
+    <br>
+
+    <blockquote class="article-quote">
+      "Got to make sure it's right, until tomorrow, goodnight, oh."
+      <cite>&mdash; John Mayer</cite>
+    </blockquote>
+
+    <br>
+    
+    <div class="article-content-div">
+      <h2 class="heading-spaced">Content</h2>
+      <ol>
+        <li>
+          <a href="#introduction">Introduction</a>
+        </li>
+        <li>
+          <a href="#preliminary-thoughts">Preliminary thoughts</a>
+        </li>
+
+        <li>
+          <a href="#tensor-backend">Designing the tensor backend</a>
+          <ol>
+            <li>
+              <a href="#data-layout">Designing the data layout</a>
+            </li>
+            <li>
+              <a href="#tensor-operations">Adding operations to the tensor</a>
+            </li>
+          </ol>
+
+        </li>
+        <li>
+          <a href="#python-frontend">Adding the Python frontend</a>
+          <ol>
+            <li>
+              <a href="#basic-frontend">Implementing the basic frontend</a>
+            </li>
+            <li>
+              <a href="#bp-under-hood">Optional: Boost.Python under the hood</a>
+            </li>
+          </ol>
+        </li>
+
+        <li><a href="#build-project">Building and importing the project</a></li>
+        <li><a href="#summary">Summary</a></li>
+      </ol>
+    </div>
+
+    <div id="introduction" class="article-text-div">
+      <h2 class="heading-spaced">Introduction</h2>
+
+      <p>
+        If you are like me then chances are things are a whole lot more fun when you
+        understand how they work from the ground up. Having used PyTorch and Tensorflow/Keras for 
+        a while I never really understood why things are the way they are in those. So I decided
+        to implement my own small library to train neural networks. It turned out to be quite 
+        similar to PyTorch in its frontend, making me like PyTorch a whole lot better in the end. This 
+        multi-part series will walk you step-by-step through the components that are necessary
+        to build your own library. The posts planned so far are: 
+      </p>
+      
+
+      <h4 class="pytorch-step-heading heading-spaced">Part 1 - Tensor & Python frontend</h4>
+      <div class="pytorch-step-row">
+        <div class="pytorch-step-text">
+          <p>
+              <b class="pytorch-step-heading-mobile">Part 1 - Tensor & Python frontend: </b>
+              First we introduce the basic structure of the Tensor. By the end of this one
+              we will have basic Python interface to instantiate Tensors and do basic operations
+              on them such as MatMul, addition, and elementwise multiplication. This will be the easiest
+              to grasp blogpost, as we lay the foundation for the more specialized ones that follow, and will
+              be mainly about software design.
+          </p>
+        </div>
+        <div class="pytorch-step-figs">
+          <figure class="fig-light">
+          <img
+          id="pytorch-step-1"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_1.png"
+          alt="Diagram of part 1: Tensor and Python frontend">
+          <figcaption>Part 1: Tensor interface and Python bindings.</figcaption>
+          </figure>
+          <figure class="fig-dark">
+          <img
+          id="pytorch-step-1-dark"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_1_dark.png"
+          alt="Diagram of part 1: Tensor and Python frontend">
+          <figcaption>Part 1: Tensor interface and Python bindings.</figcaption>
+          </figure>
+        </div>
+      </div>
+
+      <h4 class="pytorch-step-heading heading-spaced">Part 2 - Autograd and training pipeline</h4>
+      <div class="pytorch-step-row pytorch-step-row-reverse">
+        <div class="pytorch-step-text">
+          <p>
+              <b class="pytorch-step-heading-mobile">Part 2 - Autograd and training pipeline: </b>
+              Part 2 will be all about training. We will introduce the
+              computational graph, show how we can build it dynamically during run-time, how to use it to enable autograd,
+              and everything that we need for a basic network implementation. It will conclude in a running MNIST end-to-end
+              training pipeline built from scratch.
+          </p>
+        </div>
+        <div class="pytorch-step-figs">
+          <figure class="fig-light">
+          <img
+          id="pytorch-step-2"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_2.png"
+          alt="Diagram of part 2: Autograd and training pipeline">
+          <figcaption>Part 2: Autograd and training pipeline.</figcaption>
+          </figure>
+          <figure class="fig-dark">
+          <img
+          id="pytorch-step-2-dark"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_2_dark.png"
+          alt="Diagram of part 2: Autograd and training pipeline">
+          <figcaption>Part 2: Autograd and training pipeline.</figcaption>
+          </figure>
+        </div>
+      </div>
+
+      <h4 class="pytorch-step-heading heading-spaced">Part 3 - CUDA backend implementation and optimization</h4>
+      <div class="pytorch-step-row">
+        <div class="pytorch-step-text">
+          <p>
+              <b class="pytorch-step-heading-mobile">Part 3 - CUDA backend implementation and optimization: </b>
+              Having built a minimal MNIST example,
+              we take a break from ML itself and will start to
+              make it actually practical to use. The main challenge for anything ML from the users
+              perspective are performance and energy/hardware efficiency. To do so we will enable the
+              GPU by implementing our backend in CUDA. We will then optimize the CUDA backend step-by-step
+              using profilers (NSYS and NCU).
+          </p>
+        </div>
+        <div class="pytorch-step-figs">
+          <figure class="fig-light">
+          <img
+          id="pytorch-step-3"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_3.png"
+          alt="Diagram of part 3: CUDA backend implementation and optimization">
+          <figcaption>Part 3: CUDA backend implementation and optimization.</figcaption>
+          </figure>
+          <figure class="fig-dark">
+          <img
+          id="pytorch-step-3-dark"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_3_dark.png"
+          alt="Diagram of part 3: CUDA backend implementation and optimization">
+          <figcaption>Part 3: CUDA backend implementation and optimization.</figcaption>
+          </figure>
+        </div>
+      </div>
+
+      <h4 class="pytorch-step-heading heading-spaced">Part 4 - CPU backend optimization</h4>
+      <div class="pytorch-step-row pytorch-step-row-reverse">
+        <div class="pytorch-step-text">
+          <p>
+              <b class="pytorch-step-heading-mobile">Part 4 - CPU backend optimization: </b>
+              For everyone who does not have an NVIDIA GPU at hand,
+              but also for the fun of it, we will
+              optimize our C++ backend for the CPU version as well. We will use techniques such as cache
+              optimization, thread pools, and hardware accelerators such as AVX to achieve better runtime.
+          </p>
+        </div>
+        <div class="pytorch-step-figs">
+          <figure class="fig-light">
+          <img
+          id="pytorch-step-4"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_4.png"
+          alt="Diagram of part 4: CPU backend optimization">
+          <figcaption>Part 4: CPU backend optimization.</figcaption>
+          </figure>
+          <figure class="fig-dark">
+          <img
+          id="pytorch-step-4-dark"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_4_dark.png"
+          alt="Diagram of part 4: CPU backend optimization">
+          <figcaption>Part 4: CPU backend optimization.</figcaption>
+          </figure>
+        </div>
+      </div>
+
+      <p>
+        If we still have time we can then continue implementing advanced models such as transformers (the basis for LLMs)
+        and modern computer vision modules, and provide further optimization techniques guided by larger models.
+      </p>
+
+      <p>
+        The blogposts themselves explain the main points, programming techniques, and design choices, 
+        while everything is backed up by a real
+        <a href="https://github.com/RobBa/dl_lib" target="_blank">GitHub repository</a> that has been 
+        built in real time and can be used for a full executable example. Git commits and release notes index 
+        the correct versions.
+      </p>
+    </div>
+
+    <div id="preliminary-thoughts" class="article-text-div">
+      <h2 class="heading-spaced">Preliminary thoughts</h2>
+
+      <p>
+        Before we start we want to think about the overall structure that we want to have. We want our 
+        design to be flexible for maintenance, modular, and easy to change. In short, we want to obey 
+        the <a href="https://en.wikipedia.org/wiki/SOLID" target="_blank">SOLID principles</a>. 
+        Because neither of us can anticipate what is going to happen in the future we can make decisions 
+        now that minimize the risk of major overhauls with a little bit of foreshadowing. While thinking
+        about everything is probably beyond the scope of this project, we can consider the following trends 
+        to hedge ourselves a little against gruesome refactoring sessions.
+
+        <figure class="fig-light">
+        <img
+        id="pytorch-trends-in-ml"
+        class="blog-image"
+        src="./img_1/trends_in_ml.png"
+        alt="Trends in machine learning">
+        <figcaption>Current trends shaping machine learning system design.</figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-trends-in-ml-dark"
+        class="blog-image"
+        src="./img_1/trends_in_ml_dark.png"
+        alt="Trends in machine learning">
+        <figcaption>Current trends shaping machine learning system design.</figcaption>
+        </figure>
+
+        Securing our camp, we want the following:
+        <ul>
+          <li>Do not settle for a datatype yet, but use a generic one we can quickly find and exchange.</li>
+          <li>Same goes for tensor representations for edge devices.</li>
+          <li>Keep the data management device agnostic to support GPUs and other types of special hardware.</li>
+          <li>Make things as modular as possible to incorporate new research as quickly as possible.</li>
+        </ul>
+
+        We will go further into those below, but two things to start with: Because we can see that the dimensions and
+        the fundamental data types of representation are changing we can make our future lives easier by using aliases.
+        While two of them might look confusing we can easily make them signed or unsigned, whatever suits our purpose 
+        better, and as for <code>ftype</code>, we can either change the data type completely throughout the whole project,
+        or we can adjust punctually very easily. After all, a global search for "ftype" will give us better results than a 
+        global search for "float" or "double", helping us refactoring later if we wanted to.
+      </p>
+
+<pre><code class="language-cpp">// src/utility/global_parameters.h -&gt; will be renamed util.h later
+using ftype = float;
+
+using tensorDim_t = std::uint16_t; // represent one dimension of a tensor
+using tensorSize_t = std::uint32_t; // represent the total size of a tensor
+
+static_assert(sizeof(tensorSize_t) &gt;= sizeof(tensorDim_t));</code></pre>
+
+    </div>
+
+    <div id="tensor-backend" class="article-text-div">
+      <h2 class="heading-spaced">Designing the tensor backend</h2>
+
+      <h4 id="data-layout">Designing the data layout</h4>
+
+      <p>
+        The heart of deep learning is always the tensor data structure. What sounds fancy at first actually
+        becomes pretty quickly just plain and simple linear algebra in spirit. Basically, a tensor is a 
+        generalized matrix with an arbitrary large number of dimension. So, basically a tensor is a data 
+        structure of the form $\mathbb{R}^n$, $n \in \mathbb{N}^+$. In code, this will be a multidimensional 
+        array of a floating point type, for which we have to figure out the best shape. The beginning of the 
+        tensor then looks like this:
+      </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.h
+
+class Tensor final { // final to promote flat hierarchies
+private:
+  Dimension dims;
+  std::unique_ptr&lt;tensorValues_t&gt; values = nullptr; // contained values of tensor
+
+public:
+  // stuff goes here
+}</code></pre>
+
+      <p>
+        Here, we implicitly use two new datatypes we have yet to define: <code>tensorValues_t</code> and 
+        <code>Dimension</code>. We start with the latter, since it is easier to explain. Basically, what it 
+        does is represent the dimensions of our tensor. Because we want a Python binding later, there's no 
+        implicit conversion method from any Python datatype to our Dimension data type, thus we use a 
+        <code>std::vector&lt;tensorDim_t&gt;</code> as an argument. The data type looks like this for now:
+      </p>
+
+<pre><code class="language-cpp">// src/data_modeling/dimension.h
+
+class Dimension final {
+  private:
+    std::vector&lt;tensorDim_t&gt; dims;
+    tensorSize_t size = 0;
+
+  public:
+    Dimension(const std::vector&lt;tensorDim_t&gt;& dims);
+
+    Dimension(const Dimension& other);
+    Dimension& operator=(const Dimension& other);
+
+    Dimension(Dimension&& other) noexcept;
+    Dimension& operator=(Dimension&& other) noexcept;
+
+    ~Dimension() noexcept = default;
+
+    void resize(const std::vector&lt;tensorDim_t&gt;& dims);
+      
+    tensorSize_t getSize() const noexcept {
+      return size;
+    }
+
+    tensorDim_t get(int idx) const {
+      return (*this)[idx];
+    }
+
+    tensorDim_t operator[](int idx) const {
+      if(idx &lt; 0){
+        idx = dims.size() + idx; // -1 is last idx, -2 second last and so forth
+      }
+
+      return dims[idx];
+    }
+
+    // also add some operators for convenience: !=, ==, &lt;&lt; for printing
+}</code></pre>
+
+      <p>
+        There are no real surprises here. Worth noting is probably only that we gave
+        the data type implicitly a second function apart from representing the dimensions, 
+        namely through the attribute <code>tensorSize_t size</code>. Whether the total size, 
+        which is the product of the input to the constructor 
+        <code>Dimension(const std::vector&lt;tensorDim_t&gt;& dims)</code>, should be part of the dimension
+        or the tensor itself is more a matter of taste. We leave it here for now, and shifting it over
+        will be an easy task. The Dimension data type will become more interesting later, when 
+        we use strided access patterns to represent transposed or permuted tensors. For now we keep it 
+        simple. 
+      </p>
+
+      <p>
+        The second data structure <code>tensorValues_t</code> is the more interesting one for now. Its main
+        purpose is to manage the underlying data. Whether the tensor's data sits on a GPU, the computer's memory, 
+        or any other device such as a TPU should not matter to the tensor. And managing that is the job of this one.
+        Because we already plan concretely to use CUDA later on we encode the device in an enum value via
+      </p>
+
+<pre><code class="language-cpp">// src/data_modeling/device.h
+
+enum class Device {
+    CPU,
+    CUDA
+};</code></pre>
+
+      <p>
+        With this in mind, we define the <code>tensorValues_t</code> as a private nested class inside the tensor class, 
+        as only the tensor should have access to the values. Anybody else who wants to see the data has to knock 
+        first and ask friendly. The implementation of this one goes as follows:
+      </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.h
+
+class Tensor final { // final to promote flat hierarchies
+private:
+  // ...
+
+  class tensorValues_t final
+  {
+  private:
+    tensorSize_t size = 0;
+    ftype *values = nullptr;
+
+    Device device;
+    inline static Device defaultDevice = Device::CPU;
+
+  public:
+    explicit tensorValues_t();
+    explicit tensorValues_t(Device d);
+    ~tensorValues_t() noexcept;
+
+    tensorValues_t(const tensorValues_t& other) = delete;
+    tensorValues_t& operator=(const tensorValues_t& other) = delete;
+
+    tensorValues_t(tensorValues_t&& other) noexcept;
+    tensorValues_t& operator=(tensorValues_t&& other) noexcept;
+
+    tensorSize_t getSize() const noexcept;
+
+    // this is still templated in the commit
+    void resize(const tensorSize_t size)
+    {
+      this-&gt;size = size;
+      switch (this-&gt;device)
+      {
+      case Device::CPU:
+        values = static_cast&lt;ftype* &gt;(std::malloc(this-&gt;size * sizeof(ftype)));
+        break;
+      case Device::CUDA:
+        std::__throw_invalid_argument("Not implemented yet.");
+        break;
+      }
+    }
+
+    void setDevice(const Device d) noexcept;
+    Device getDevice() const noexcept;
+
+    // also add access functions [] and/or get(tensorSize_t idx) and set(tensorSize_t idx)
+  };
+
+// Tensor continues here...
+}</code></pre>   
+
+      <p>
+        The things worth noting are the <code>resize()</code> method, which could be better named 
+        <code>init()</code> at this stage, since it does implicit allocation. The choice for resize will 
+        make sense later. Also note that we enable moving, but disable copying. We do not accidentally want
+        to copy potentially huge arrays by accident, so this will help us make our code safer.
+      </p>
+      
+      <p>
+        Interesting is also the static field <code>defaultDevice</code>. We enable a 
+        default device via a global field. When I was a kid my grandma used to always tell me "A few lines
+        of code say more than a thousand words", so in this spirit here we go:
+      </p>
+
+<pre><code class="language-cpp">// src/system/system_functions.h
+
+namespace sys {
+  void setDevice(Device d) noexcept {
+    Tensor::setDefaultDevice(d);
+  }
+  Device getDevice() noexcept {
+    return Tensor::getDefaultDevice();
+  }
+}</code></pre>   
+
+      <p>
+        The probably most interesting thing about the tensor's values is that they are represented 
+        by a single pointer/array, not a multidimensional one. This has mainly performance reasons. 
+        Say we implemented it as a 2D array as in <code>std::vector&lt;std::vector&lt;ftype&gt;&gt;</code>:
+        In this case we would access a value via <code>values[i][j]</code>, leading to two pointer chasings.
+        Same for the case <code>ftype** values;</code>. And with higher dimensional tensors this gets a mess really 
+        quick. Thus, linear indexing provides a clean solution with only one pointer, that also happens to be 
+        much more cache friendly. To index into the array we do the following:
+      </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.cpp
+
+// static method
+tensorSize_t Tensor::computeLinearIdx(const std::vector&lt;tensorDim_t&gt;& idx, const Dimension& dims) {
+  assert(idx.size() != dims.nDims() || idx.size() &gt; 0);
+
+  const auto lastIdx = idx.size() - 1;
+  tensorSize_t offsetFactor = dims.get(lastIdx);
+  
+  tensorSize_t res = idx[lastIdx];
+  for(int i = lastIdx - 1; i &gt;= 0; i--){
+    res += idx[i] * offsetFactor;
+    offsetFactor *= dims.get(i);
+  }
+
+  return res;
+}</code></pre>   
+
+      <p>
+        If this didn't make it clear yet, we refer e.g. to the 
+        <a href="https://web.cs.hacettepe.edu.tr/~bbm201/Lectures/BBM201-Lecture3.pdf" target="_blank">following presentation</a>.
+        It is important to grasp this concept now, since it will haunt us for the rest of this tutorial. We conclude this part with
+        a final overview via a class diagram, showing the relationships in between the three classes we just created, and
+        what each of them is responsible for.
+      </p>
+
+      <figure class="fig-light">
+      <img
+      id="pytorch-class-diagram"
+      class="blog-image"
+      src="./img_1/class_diagram.png"
+      alt="Class diagram of the three tensor modules">
+      <figcaption>(Non-UML) class diagram showing the three modules and what each is for.</figcaption>
+      </figure>
+      <figure class="fig-dark">
+      <img
+      id="pytorch-class-diagram-dark"
+      class="blog-image"
+      src="./img_1/class_diagram_dark.png"
+      alt="Class diagram of the three tensor modules">
+      <figcaption>(Non-UML) class diagram showing the three modules and what each is for.</figcaption>
+      </figure>
+
+    </div>
+
+    <div id="tensor-operations-section" class="article-text-div">
+      <h4 id="tensor-operations" class="heading-spaced">Adding operations to the tensor</h4>
+
+      <p>
+        Now that we have the initial data layout down we can embellish the class with more functions.
+        The tensor itself is nice, but if it doesn't do anything but represent data it'll be useless for 
+        us. For a good start we can gobble up some math operations we expect to happen. To keep things simple
+        we start with basic operations, exemplified via the following:
+      </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.cpp
+
+Tensor Tensor::operator+(ftype scalar) const {
+  Tensor res(dims, values-&gt;getDevice(), false);
+  for (tensorSize_t i = 0; i &lt; values-&gt;getSize(); ++i) {
+    (*res.values)[i] = (*values)[i] + scalar;
+  }
+
+  return res;
+}
+
+Tensor Tensor::operator*(const Tensor& other) const {
+  assert(values-&gt;getDevice() == other.values-&gt;getDevice() &&
+         values-&gt;getSize()==other.values-&gt;getSize());
+
+  Tensor res(dims, values-&gt;getDevice(), false);
+  for(tensorSize_t i=0; i&lt;values-&gt;getSize(); i++){
+    (*res.values)[i] = (*values)[i] * (*other.values)[i];
+  }
+
+  return res;
+}</code></pre>
+
+        <p>
+          The drill is pretty clear in between those, and no surprises. The only one we need
+          to look out for so far is the matrix multiplication. Given two matrices $A \in \mathbb{R}^N$ 
+          and $B \in \mathbb{R}^N$, we have space requirement $\mathcal{O}(N^2)$, but a whopping cubic computational
+          complexity of $\mathcal{O}(N^3)$ (taking 
+          <a href="https://en.wikipedia.org/wiki/Strassen_algorithm" target="_blank">Strassen's algorithm</a> aside, 
+          which is more of a theoretically impressive result than something that gets used in practice). 
+          Because in deep learning so many matrix multiplications are performed this is widely considered the 
+          main slug of deep learning. In fact, most of the hardware accelerators focus exactly on making this 
+          operation as fast as possible, such as Google's TPU or AMD's NPUs. For now we compute the matmul in 
+          two steps: Step one is isolating the individual multiplications if the dimensions of the tensors are 
+          larger than two, e.g. for batched tensors. 
+        </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.cpp
+  
+Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right) {
+  if(left.dims.get(-1) != right.dims.get(-2)){
+    __throw_runtime_error("Tensor dimensions do not match");
+  }
+
+  // broadcasting
+  auto resDims = left.dims.nDims() &gt; right.dims.nDims() ? left.dims.toVector() : right.dims.toVector();
+  resDims[resDims.size()-2] = left.dims.get(-2); // rows
+  resDims[resDims.size()-1] = right.dims.get(-1); // cols
+
+  Tensor res(resDims, left.values-&gt;getDevice(), false);
+
+  // sizes of the 2D matrices respectively
+  const tensorSize_t leftSize = left.dims.get(-1) * left.dims.get(-2); 
+  const tensorSize_t rightSize = right.dims.get(-1) * right.dims.get(-2);
+  const tensorSize_t resSize = left.dims.get(-2) * right.dims.get(-1);
+
+  tensorSize_t leftOffset = 0;
+  tensorSize_t rightOffset = 0;
+  tensorSize_t resOffset = 0;
+
+  while(leftOffset &lt; left.getSize()){
+    // this is the matmul itself
+    matMul2DCpu(res, left, right, resOffset, leftOffset, rightOffset);
+
+    leftOffset += leftSize;
+    rightOffset += rightSize;
+    resOffset += resSize;
+  }
+
+  return res;
+}</code></pre>
+
+        <p>
+          Next we multiply the individual matrices together. We will revisit this piece of code later,
+          as we will be able to harvest a lot of performance improvements from this piece of code. 
+          The naive version we use for now is as follows:
+        </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.cpp
+
+void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, const tensorSize_t resOffset, 
+                           const tensorSize_t leftOffset, const tensorSize_t rightOffset) {
+  
+  const auto nRowsLeft = static_cast&lt;tensorSize_t&gt;(left.dims.get(-2));
+  const auto nColsLeft = static_cast&lt;tensorSize_t&gt;(left.dims.get(-1));
+  const auto nRowsRight = static_cast&lt;tensorSize_t&gt;(right.dims.get(-2));
+  const auto nColsRight = static_cast&lt;tensorSize_t&gt;(right.dims.get(-1));
+
+  tensorSize_t resIdx = resOffset;
+  for(tensorSize_t lrow = 0; lrow &lt; nRowsLeft; lrow++){
+
+    for(tensorSize_t rcol = 0; rcol &lt; nColsRight; rcol++){
+      tensorSize_t leftIdx = leftOffset + lrow * nColsLeft;
+      tensorSize_t rightIdx = rightOffset + rcol;
+
+      ftype scalar = 0.0;
+      for(tensorSize_t lcol = 0; lcol &lt; nColsLeft; lcol++){
+        scalar += (*left.values)[leftIdx] * (*right.values)[rightIdx];
+        leftIdx++;
+        rightIdx += nColsRight;
+      }
+      
+      (*res.values)[resIdx] = scalar;
+      resIdx++;
+    }
+  }
+}</code></pre>
+
+        <p>
+          We note that we already did a minor optimization here. Instead of traversing the rows of the 
+          right tensor, we go column wise. This way we avoid strided access into the right column, which 
+          makes this implementation more memory access friendly. We will go deeper into this part of the 
+          code when we optimize, so for now we will leave it as is and move on to exposing our tensor and 
+          its operations to Python next.
+        </p>
+
+    </div>
+
+    <div id="python-frontend" class="article-text-div">
+        <h2 class="heading-spaced">Adding the Python frontend</h2>
+
+        <p>
+          Most of today's ML runs in Python, not in C++. Reasons are vast, but Python's ability to change code and
+          therefore fast prototyping is probably the main reason. That and that support for scientific software was 
+          large before modern ML came into play even, through libraries like Scikit-learn, NumPy, Matplotlib, and 
+          SciPy. When writing ML applications
+          it is genuinely easy to mess up dimensions or wanting to experiment with different configurations
+          quickly. If all that was written in C++ we'd spend a lot of time on simple try-and-error loops, wasting lots
+          of time on unnecessary complicated prototyping and compilation. Python on the other hand circumvents all 
+          these problems and is in general just a fast-prototyping powerhouse. 
+        </p>
+
+        <p>
+          A challenge of building Python code on top of C++ code is managing two different memory management systems.
+          I already talked about this in my article 
+          <a href="../calling_python_from_cpp/calling_python_from_cpp.html" target="_blank">Calling Python From C++</a>, 
+          so lets not repeat that here. Instead let's focus on solutions. There are multiple good frameworks out there
+          that are up to the task. While the best choice would probably be 
+          <a href="https://pybind11.readthedocs.io/en/stable/" target="_blank">pybind11</a>, I actually chose to use 
+          <a href="https://www.boost.org/doc/libs/latest/libs/python/doc/html/index.html" target="_blank">Boost.Python</a>.
+          The reason being that as a C++ dev I already was used to Boost, and there was a ready tutorial that made getting started
+          very easy. However, for better maintainability the Python frontend and the C++ backend are still separated in code, making it easy
+          for us to exchange either if we wanted to. With that we can start exposing the tensor object into Python.
+        </p>
+    </div>
+
+    <div id="basic-frontend-section" class="article-text-div">
+        <h3 id="basic-frontend" class="heading-spaced">Implementing the basic frontend</h3>
+
+        <p>
+          We start with 
+          an easy one that we will refine in the autograd section of the next post. To expose the tensor we simply have to write  
+        </p>
+
+<pre><code class="language-cpp">// src/python/data_modeling/py_data_modeling.h
+
+#include &lt;boost/python.hpp&gt;
+#include &lt;boost/python/enum.hpp&gt;
+#include &lt;boost/python/return_internal_reference.hpp&gt;
+#include &lt;boost/python/object.hpp&gt;
+
+BOOST_PYTHON_MODULE(py_data_modeling)
+{    
+    enum_&lt;Device&gt;("Device")
+        .value("CPU", Device::CPU)
+        .value("CUDA", Device::CUDA)
+    ;
+
+    // register dim type here in between
+ 
+    class_&lt;Tensor, std::shared_ptr&lt;Tensor&gt;, boost::noncopyable&gt;("Tensor", no_init)
+        .def(init&lt;const std::vector&lt;tensorDim_t&gt;&, optional&lt;bool&gt; &gt;())
+        .def(init&lt;const std::vector&lt;tensorDim_t&gt;&, optional&lt;Device, bool&gt; &gt;())
+        .add_property("device", &Tensor::getDevice, &Tensor::setDevice)
+        .add_property("dims", make_function(&Tensor::getDims, return_internal_reference&lt;&gt;()))
+        .def("__getitem__", &Py_DataModeling::tensorGetItem)
+        .def("__setitem__", &Py_DataModeling::tensorSetItem)
+        .def("__matmul__", WRAP_TENSOR_METHOD_1(matmul))
+        .def("__add__", WRAP_TENSOR_METHOD_1(operator+))
+        .def("__mul__", WRAP_TENSOR_METHOD_1(operator*))
+        .def("__mul__", WRAP_SCALAR(operator*, float))
+        .def("__rmul__", WRAP_SCALAR_REVERSE(*, float))
+        .def("__add__", WRAP_SCALAR(operator+, float))
+        .def("__radd__", WRAP_SCALAR_REVERSE(+, float))
+        // add more operations
+    ;
+}</code></pre>
+
+        <p>
+          There obviously is a lot to unwrap here, so we go into it bit by bit.
+        </p>
+    </div>
+
+    <div id="class-definition-section" class="article-text-div">
+        <h4 class="heading-spaced">Class definition and object management</h4>
+
+        <p>
+          The <code>class_&lt;&gt;("ClassName", {ctor_signature})</code> is the
+          call that manages our class. The first argument is what class we manage. The second template argument, the 
+          <code>std::shared_ptr&lt;Tensor&gt;</code>, tells Boost.Python how we want to manage our object in the background (the 
+          choice for a shared pointer will become clearer in the next blogpost). We will scratch on how this works internally in
+          the optional segment below, but for the uninterested reader, this basically means that internally, when calling say 
+          <code>t = Tensor()</code> in Python, then <code>t</code> is an object that holds a reference to a shared pointer holding
+          our tensor. The third argument <code>boost::noncopyable</code> now prevents Boost.Python from creating elaborate copies, 
+          i.e. it does not call the copy-constructor for the Python frontend. Instead it hands over the reference only. Removing the 
+          template argument will likely end up with a compiler error anyway, since we manually deleted the copy-operations for our Tensor
+          class. Lastly, the braces take in the Python internal class name "Tensor". In summary, we have this behavior:
+        </p>
+
+<pre><code class="language-python"> # in Python
+  
+from dl_lib import Tensor # name Tensor defined by first argument in braces
+
+t1 = Tensor() # holds the tensor as a shared_ptr
+t2 = t1 # no copy-ctor invoked, t2 merely holds a reference to t1 via shared_ptr</code></pre>
+    </div>
+
+    <div id="constructors-section" class="article-text-div">
+        <h4 class="heading-spaced">Constructors</h4>
+
+        <p>
+          There was one thing I lied about here though. Looking at the next pieces of code, we realize we add the constructors.
+          The second argument in the braces enables us to define a constructor. I chose to give it a <code>no_init</code>, 
+          because giving it one here would visually emphasize on that ctor. Giving the class more constructors however is
+          done via calling .def, as in <code>.def(init&lt;const std::vector&lt;tensorDim_t&gt;&, optional&lt;bool&gt; &gt;())</code>
+          and in <code>.def(init&lt;const std::vector&lt;tensorDim_t&gt;&, optional&lt;Device, bool&gt; &gt;())</code>. The leading 
+          <code>init</code> tells Boost.Python that this is a constructor, and the <code>optional</code> is an easy way to 
+          give it optional arguments. The lie in my earlier code therefore consisted in calling a non-existent default constructor
+          that has no arguments. More on that can be taken from 
+          <a href="https://www.boost.org/doc/libs/latest/libs/python/doc/html/tutorial/tutorial/exposing.html#tutorial.exposing.constructors"
+          target="_blank">the official website</a>.
+        </p>
+    </div>
+
+    <div id="class-properties-section" class="article-text-div">
+        <h4 class="heading-spaced">Adding class properties</h4>
+
+        <p>
+          Going further then we can see that these next lines of code represent the properties and methods we give our tensor class.
+          We start with two properties via <code>.add_property</code>, namely the device and the dimensions. We take extra care of the 
+          dimensions here, returning them via <code>make_function(&Tensor::getDims, return_internal_reference&lt;&gt;())</code>. We have to 
+          do this since our original method has the following signature <code>const Dimension& getDims() const noexcept;</code>. The 
+          interesting part here is the return value, being a constant reference. Python does not allow for constant values by design, 
+          and by default the return value of Python is a copy of the object. Mirroring the C++ backend then we have to tell Boost.Python 
+          what to do with this one. <code>return_internal_reference</code> does two things then: Firstly it tells Python to not return a 
+          copy of the dimension object (necessary if we deleted the copy-operations for that one), and secondly, it tells Python to 
+          keep the tensor alive so long the reference to the dimensions object exists. Otherwise there would be no guarantee that the 
+          reference would stay valid for its lifetime, resulting in dangerous dangling pointers. Say we do the following:
+        </p>
+
+<pre><code class="language-python"> # in Python
+
+dims = t.dims # get reference to dim object
+del t # destroy tensor
+print(dims.get(0)) # safe only if dims keeps t alive</code></pre>
+
+        <p>
+          Holding a non-owning reference would mean that dims would be a dangling pointer, resulting in a crash. <code>return_internal_reference</code>
+          prevents this explicitly, making our code safer. For more on call-policies I refer to the Boost.Python 
+          <a href="https://www.boost.org/doc/libs/latest/libs/python/doc/html/tutorial/tutorial/functions.html#tutorial.functions.call_policies"
+          target="_blank">tutorial</a>.
+        </p>
+    </div>
+
+    <div id="class-methods-section" class="article-text-div">
+        <h4 class="heading-spaced">Adding class methods</h4>
+
+        <p>
+          Below the properties section we see all the method definitions we want to expose:
+        </p>
+
+<pre><code class="language-cpp">BOOST_PYTHON_MODULE(py_data_modeling)
+{
+// ...
+.def("__getitem__", &Py_DataModeling::tensorGetItem)
+.def("__setitem__", &Py_DataModeling::tensorSetItem)
+.def("__add__", WRAP_TENSOR_METHOD_1(operator+))
+.def("__mul__", WRAP_TENSOR_METHOD_1(operator*))
+.def("__mul__", WRAP_SCALAR(operator*, float))
+// ...
+}</code></pre>
+
+        <p>
+          These are the methods we give our Tensor object. First we give it the names. All the names we give it here are reserved 
+          Python keywords. For instance, defining <code>__add__</code> for our class enables us to write simply <code>t + 5</code>
+          or <code>t1 + t2</code>. Similarly, <code>__getitem__</code> gives us <code>t[5] = 3.14</code>. However, there is a mismatch
+          in the return values. These method do return a new tensor object as defined in the backend, but Python manages 
+          <code>shared_ptr&lt;Tensor&gt;</code> objects. To bridge the gap we give it wrapper functions that convert the return value 
+          explicitly into the desired type. This would look something like this:
+        </p>
+
+<pre><code class="language-cpp">&#35;define WRAP_TENSOR_METHOD_1(method) \
++[](const Tensor& self, const Tensor& other) -&gt; std::shared_ptr&lt;Tensor&gt; { \
+  return std::make_shared&lt;Tensor&gt;(self.method(other)); \
+}
+
+&#35;define WRAP_SCALAR(method, T) \
++[](const Tensor& self, T val) -&gt; std::shared_ptr&lt;Tensor&gt; { \
+  return std::make_shared&lt;Tensor&gt;(self.method(val)); \
+}</code></pre>
+
+        <p>
+          In other words, we define lambdas. The first argument is always a reference to the object we call the method on,
+          hence the input arguments. Then comes a list with arguments. The wrapper simply calls the operation we requested 
+          by the signature, and returns the result explicitly wrapped in a shared pointer. A quirk of Boost.Python here 
+          is that when calling a method, it sees the Tensor, which it then unwraps into its representation, hence the
+          expected argument is a normal Tensor reference. However, when returning the value, it takes the representation,
+          and then wraps it into its own management structs. Thus the values look a bit odd and asymmetrical.
+        </p>
+    </div>
+
+    <div id="commutative-operators-section" class="article-text-div">
+        <h4 class="heading-spaced">Adding commutative operators</h4>
+
+        <p>
+          Given Python and C++ treat operators differently, we need to pay some special attention
+          to those. In Python the call is simple: We define a reverse operator, usually specified via prefix-r. For instance, the reverse
+          operator for <code>__mul__</code> is <code>__rmul__</code>. C++ is not so nice however. Say for instance we overload the
+          multiplication operator in C++: <code>Tensor operator*(ftype scalar) const;</code>. Now, in C++ we can do for instance
+          <code>auto t = Tensor(/* args */) * 0.5f;</code>. However, flipping that around into
+          <code>auto t = 0.5f * Tensor(/* args */); // ERROR!</code> is gonna result in a compiler error. The canonical way to deal with it
+          is via a free floating friend class. 
+        </p>
+
+<pre><code class="language-cpp">// src/data_modeling/tensor.h
+
+class Tensor final {
+// ...
+public: 
+  // ...
+  friend Tensor operator*(ftype scalar, const Tensor& tensor);
+  // ...
+};
+
+// src/data_modeling/tensor.cpp
+Tensor operator*(ftype scalar, const Tensor& tensor) {
+  return tensor * scalar;
+}</code></pre>
+
+        <p>
+          Obviously this function then calls the operator we defined earlier, fixing our issue. Exposing this to our Python interface is then 
+          relatively straight forward. 
+        </p>
+
+<pre><code class="language-cpp">&#35;define WRAP_SCALAR_REVERSE(op, T) \
++[](const Tensor& self, T val) -&gt; std::shared_ptr&lt;Tensor&gt; { \
+  return std::make_shared&lt;Tensor&gt;(val op self); \
+}
+
+// ...
+// Add to tensor class:
+.def("__rmul__", WRAP_SCALAR_REVERSE(*, float))
+// more operators...
+; // we wrap up our tensor class with this</code></pre>
+
+    </div>
+
+      <div id="bp-tensor-class-section" class="article-text-div">
+        <h4 class="heading-spaced">Boost.Python and Tensor class interaction</h4>
+
+        <p>
+          We wrap up our tensor class in the end with a semicolon ";", as per usual
+          in C++. With that we are done with the binding around the Tensor class so far. Before we add 
+          a few convenience functions we take a brief look at how things integrate now. The figure 
+          below shows schematically how Boost.Python integrates our whole Tensor class into Python
+          by wrapping a translation layer around it. 
+        </p>
+
+        <figure class="fig-light">
+        <img
+        id="pytorch-boost-python-schematic"
+        class="blog-image"
+        src="./img_1/boost-python-schematic.png"
+        alt="Schematic frontend-backend interaction">
+        <figcaption>
+          Schematic of how Boost.Python manages the interaction between the front- and the backend, 
+          and Python-C++ translation in general.<br>Free functions omitted for simplicity.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-boost-python-schematic-dark"
+        class="blog-image"
+        src="./img_1/boost-python-schematic-dark.png"
+        alt="Schematic frontend-backend interaction">
+        <figcaption>
+          Schematic of how Boost.Python manages the interaction between the front- and the backend, 
+          and Python-C++ translation in general.<br>Free functions omitted for simplicity.
+        </figcaption>
+        </figure>
+
+        <p>
+          One thing we did not mention so far, and what gets hinted at in the figure, is what happens
+          with Python native objects, say a list-type in Python. Luckily we do not need to think about 
+          that yet, since Boost.Python does this automatically in the most common cases. For instance, a 
+          floating point in Python will just get translated into a C++ float or double type. A list type 
+          acts semantically similar to the std::vector type in C++, hence this also gets translated automatically. 
+        </p>
+
+        <p>
+          In other cases we have to do it manually. For instance, we gave it a data type tensorDim_t, that 
+          we take as a template argument for Tensor dimension initialization. During compilation Boost.Python 
+          will complain that it does not know how to translate in between the two, demanding that we have to 
+          instruct it manually how to convert the two. This unfortunately turns out to be rather tedious work, 
+          and I'd rather not clutter this post with cryptic lines of Boost.Python internal ABI calls. Instead I 
+          will encourage the interested reader to take a look at file <i>src/python/py_utility/custom_converters.h</i> 
+          of the source code, and I refer to <a href="https://misspent.wordpress.com/2009/09/27/how-to-write-boost-python-converters/" 
+          target="_blank">this</a> blogpost about it. For the rest it suffices to know that we have to implement a 
+          custom class with the following definitions:
+        </p>
+
+<pre><code class="language-cpp">// src/python/py_utility/custom_converters.h
+
+namespace custom_converters {
+  /**
+   * @brief We use this class to convert Python lists of int into vectors of
+   * internal types, such as tensorDim_t.
+   */
+  template&lt;typename T&gt;
+  requires ( std::is_integral_v&lt;T&gt; || 
+             std::is_floating_point_v&lt;T&gt;)
+  struct PyListToVectorConverter {
+    using rvalueFromPythonData = boost::python::converter::rvalue_from_python_stage1_data;
+
+    PyListToVectorConverter();
+
+    static void* convertible(PyObject* obj_ptr);
+    static void construct(PyObject* obj_ptr,rvalueFromPythonData* data);
+  };
+}</code></pre>
+
+        <p>
+          I made it a templated just class just in case we need it for some other type later on as well. 
+          The template-guards are because in the conversion we have to tell it exactly how to convert the 
+          arguments as in <code>if constexpr(std::is_integral_v&lt;T&gt;){auto val = extract&lt;int&gt;(py_list[i]); /*.../*}</code>, 
+          and for safety reasons I put them up, should things change in the future. 
+          We then have to register this new class type with Boost.Python via 
+          <code>custom_converters::PyListToVectorConverter&lt;tensorDim_t&gt;();</code> in the same scope and before we declare 
+          the Boost.Python tensor class. I.e. the first time before we hand Boost.Python a function with a signature asking 
+          for the data type we want to convert to and from.
+        </p>
+    </div>
+
+    <div id="free-functions-section" class="article-text-div">
+        <h4 class="heading-spaced">Free functions and resolving operator overloading</h4>
+
+        <p>
+          Having wrapped up our Tensor class frontend binding, we also want to give our 
+          Python module some free functions. More specifically, we introduce some 
+          tensor-creation functions: 
+        </p>  
+        
+<pre><code class="language-cpp"> // src/data_modeling/tensor_creation.h
+
+// creates a tensor with gaussian initialized values, centered around zero with stddev=1
+std::shared_ptr&lt;Tensor&gt; Gaussian(std::vector&lt;tensorDim_t&gt; dims, Device d, const bool requiresGrad=false) {
+  auto res = std::make_shared&lt;Tensor&gt;(std::move(dims), d, requiresGrad);
+  res-&gt;reset(utility::InitClass::Gaussian);
+  return res;
+}
+    
+std::shared_ptr&lt;Tensor&gt; Gaussian(std::vector&lt;tensorDim_t&gt; dims, const bool requiresGrad=false) {
+  return Gaussian(std::move(dims), Tensor::getDefaultDevice(), requiresGrad);
+}
+
+// also functions for creating zero- and ones-initialized tensors</code></pre>
+          
+        <p>One problem that arises in Boost.Python is that when we give it function pointers as above 
+          it cannot tell what overload we need. Therefore Boost.Python needs an explicit function pointer to an unambiguous function name.
+          We achieve this by writing explicit wrapper-methods, one for each overload that we want to have. Those would look like this:
+        </p>
+
+<pre><code class="language-cpp">// lambda wrappers to resolve default arguments
+auto GaussianWrapper0(std::vector&lt;tensorDim_t&gt; dims) { 
+  return TensorFunctions::Gaussian(std::move(dims)); 
+}
+
+auto GaussianWrapper1(std::vector&lt;tensorDim_t&gt; dims, Device d) { 
+  return TensorFunctions::Gaussian(std::move(dims), d); 
+}
+
+// explicit function pointers resolving overloads
+std::shared_ptr&lt;Tensor&gt;    (*Gaussian0)(std::vector&lt;tensorDim_t&gt;)                     = &amp;GaussianWrapper0;
+std::shared_ptr&lt;Tensor&gt;    (*Gaussian1)(std::vector&lt;tensorDim_t&gt;, Device)             = &amp;GaussianWrapper1;
+std::shared_ptr&lt;Tensor&gt;    (*Gaussian2)(std::vector&lt;tensorDim_t&gt;, const bool)         = &(TensorFunctions::Gaussian);
+std::shared_ptr&lt;Tensor&gt;    (*Gaussian3)(std::vector&lt;tensorDim_t&gt;, Device, const bool) = &(TensorFunctions::Gaussian);</code></pre>
+
+        <p>
+          Here we did two things: Firstly, we have default arguments we introduced in our two overloads, in both cases the 
+          <code>const bool requiresGrad=false</code>. We need to resolve this via lambda wrappers (see also the
+          <a href="https://beta.boost.org/doc/libs/develop/libs/python/doc/html/tutorial/tutorial/functions.html" 
+          target="_blank">doc-tutorials</a>). Secondly, we gave it explicit function pointers to untangle the overloads, 
+          and specify which ones we actually do want to expose. Finally, we expose our free floating functions via 
+        </p>
+
+<pre><code class="language-cpp">def("Gaussian", Py_DataModeling::Gaussian0);
+def("Gaussian", Py_DataModeling::Gaussian1);
+def("Gaussian", Py_DataModeling::Gaussian2);
+def("Gaussian", Py_DataModeling::Gaussian3);</code></pre>
+
+        <details class="pytorch-optional" id="bp-under-hood-section">
+        <summary class="pytorch-optional-summary">
+          <h4 id="bp-under-hood">Optional: Taking a brief look into Boost.Python</h4>
+        </summary>
+
+        <div class="pytorch-optional-collapse-bar">
+          <button type="button" class="pytorch-optional-collapse-btn"
+            onclick="var s=document.getElementById('bp-under-hood-section'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+            &#9650; Collapse
+          </button>
+        </div>
+
+        <p>
+          In the previous section we did a lot of magic with Boost.Python. For those also itching with curiosity I want to
+          give a rough explanation of how this all works under the hood. I.e. in this quite brief and optional section we take a 
+          look into Boost.Python, and how it does all this for us with seeming ease. To do so we have to revisit CPython. For 
+          those that have not read my previous post on CPython or have never had contact with it I refer to my article 
+          <a href="../calling_python_from_cpp/calling_python_from_cpp.html" target="_blank">here</a>. In the following we will need
+          this and add a little extra to everything I say there.
+        </p>
+
+        <p>
+          <b>Writing custom data types in CPython</b>: Because our Tensor class is a new data type we introduce we first need to 
+          understand how CPython data types work. The <a href="https://github.com/python/cpython/blob/main/Include/pytypedefs.h"
+          target="_blank">source code</a> of CPython gives us a few typedefs. We find <code>typedef struct _typeobject PyTypeObject;</code>
+          a suitable starter. <code>_typeobject</code> itself is defined in 
+          <a href="https://github.com/python/cpython/blob/main/Include/cpython/object.h" target="_blank">object.h</a>, where we find
+          several pointers telling us more. We have attributes such as <code>PyObject_VAR_HEAD</code>, <code>Py_ssize_t tp_basicsize, tp_itemsize;</code>,
+          <code>destructor tp_dealloc;</code>, and the following block:
+        </p>
+
+<pre><code class="language-cpp">struct _typeobject {
+    // ...
+    /* Attribute descriptor and subclassing stuff */
+    PyMethodDef *tp_methods;
+    PyMemberDef *tp_members;
+    PyGetSetDef *tp_getset;
+    // Strong reference on a heap type, borrowed reference on a static type
+    PyTypeObject *tp_base;
+    PyObject *tp_dict;
+    // ...
+};</code></pre>
+
+        <p>
+          It becomes clear that the struct itself is a wrapper around a datatype, with members for initialization, allocation, destructor like 
+          functions, members, information about inheritance, and many more. <code>PyMethodDef</code> is rather simple in comparison:
+        </p>
+
+<pre><code class="language-cpp">struct PyMethodDef {
+    const char  *ml_name;
+    PyCFunction  ml_meth;
+    int ml_flags;
+    const char  *ml_doc;
+};</code></pre>
+
+        <p>
+          It has a name, a pointer to the actual function, some flags and a docstring. We can see where this is headed. In the next section 
+          we will come to see that we take our tensor class with the Python frontend, and we compile it into a shared library (.so on Linux).
+          Therefore, all Boost.Python has to do is to take the definitions we gave it, translate it into manual CPython code, and have the
+          thus written files compile into the library. The library will then be loaded by the Python interpreter, and following the ABI above 
+          takes care of the rest for us. For more information on how Python manages objects I refer to e.g. 
+          <a href="https://deepwiki.com/python/cpython/4.1-pyobject-and-type-system" target="_blank">DeepWiki</a>.
+        </p>
+
+        </details>
+    </div>
+
+    <div id="build-project-section" class="article-text-div">
+        <h2 id="build-project" class="heading-spaced">Building and importing the project</h2>
+
+        <p>
+          Since we are writing C++, CMake is the preferred choice of a build system. We have to make sure we find Boost, and we have to find 
+          and link against the Python libs. More interesting for us is the question of how to get our code into the Python interpreter in the end.
+          Since we are not compiling a standalone binary/executable file, we have to make it a shared library. At first we acknowledge that we have 
+          two main components, the backend and the frontend. I named the backend library <code>DataModeling</code> (later renamed to <code>_core</code>), 
+          and we link it statically into the whole Python library. Subsequently, link it against the Python frontend, along with the libraries we 
+          used. The whole thing looks like the following:
+        </p>
+
+<pre><code>&#35; src/data_modeling/CMakeLists.txt
+
+add_library(DataModeling STATIC
+    dim_type.cpp
+    tensor.cpp
+    tensor_functions.cpp
+)
+
+&#35; src/python/CMakeLists.txt
+include_directories(
+        "${CMAKE_CURRENT_SOURCE_DIR}/python_utility"
+        )
+
+&#35; remove the lib... prefix 
+set(CMAKE_SHARED_MODULE_PREFIX "")
+
+add_library(py_data_modeling MODULE
+            data_modeling/py_data_modeling.cpp
+            )
+set_target_properties(py_data_modeling PROPERTIES PREFIX "") # don't add "lib" in front
+
+&#35; src/CMakeLists.txt
+target_link_libraries(py_data_modeling ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} DataModeling)
+target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})</code></pre>
+
+        <p>
+          I plead guilty for the redundant second time I removed the prefix here. Since we just added a shared library via 
+          <code>MODULE</code> CMake is so kind to us and automatically adds a lib-prefix to the file. However, this clashes 
+          with our naming of the module <code>BOOST_PYTHON_MODULE(py_data_modeling){...}</code>. Apart from maybe looking mildly 
+          awkward in our final Python module (depending on your personal taste that is), Boost.Python requires that 
+          the library's filename and the naming we give it internally must be identical. Else we will get problems when loading the 
+          library (and I challenge you to test it if you will so). We also have to compile our library using position independent code,
+          which we do by <code>set(CMAKE_POSITION_INDEPENDENT_CODE ON)</code>.
+        </p>
+
+        <details class="pytorch-optional" id="module-pic-section">
+        <summary class="pytorch-optional-summary">
+          <h4>Optional: The why behind MODULE and position independent code</h4>
+        </summary>
+
+        <div class="pytorch-optional-collapse-bar">
+          <button type="button" class="pytorch-optional-collapse-btn"
+            onclick="var s=document.getElementById('module-pic-section'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+            &#9650; Collapse
+          </button>
+        </div>
+
+        <p>
+          If you wonder why we choose to compile our Python library as a <code>MODULE</code>, this will be for you.
+          Essentially, CMake gives us four options to consider: <code>STATIC</code>, <code>SHARED</code>, <code>MODULE</code>, and <code>INTERFACE</code>. 
+          <code>STATIC</code> is the bread and butter for most C++ devs. It compiles a static library, and everytime we link a binary against it the 
+          binary gets a full copy of it. It is the fastest during execution of binary, since no intermediate address translation layer has to be called, but 
+          it makes the binary larger and might lead to larger compile times, depending on your use case. <code>SHARED</code> and 
+          <code>MODULE</code> both introduce a shared library object. The difference between them is how they get loaded at run-time. 
+          When we compile with SHARED and execute the binary, then the binary will look for MYLIB_NAME.so before main is executed, and load
+          it before <code>main()</code> is called. The advantage here is that two binaries can use the same shared library, saving memory 
+          and loading times. <code>MODULE</code> is quite similar, but a library compiled with this flag cannot be linked against any 
+          binary. Instead it has to be loaded dynamically via a syscall. Lastly, <code>INTERFACE</code> is a little cryptic. It
+          "does not compile sources and does not produce a library artifact on disk" (<a href="https://cmake.org/cmake/help/latest/guide/tutorial/In-Depth%20CMake%20Library%20Concepts.html#background"
+          target="_blank">CMake tutorials</a>). What sounds odd at first glance makes a little bit more sense knowing that its 
+          main purpose is for header-only libraries.
+        </p>
+
+        <p>
+          Going full circle now why <code>MODULE</code>, I hope this has gotten somewhat clear now. When running Python, our main
+          binary we run is the Python interpreter. Knowing that a Python library only ever gets included via an <code>import my_lib</code>
+          leaves <code>MODULE</code> as pretty much the only candidate now. It is important to note however that this alone is not enough. 
+          Since we do not link statically we also have to tell the compiler to generate position independent code for us. I did this 
+          globally, but the better approach would be a localized version telling it explicitly which parts of the code should be <a href="https://en.wikipedia.org/wiki/Position-independent_code"
+          target="_blank">position independent code</a> compiled. Anyway, I ain't perfect, and it's now on my TODO-list. We will revisit 
+          this flag later in the optimization posts. But for now know that we have to 
+          do this because we are using a shared library. That means that the objects of the shared library cannot sit at fixed positions 
+          before linking against the binary, since that would mean that addresses there could clash. Position independent code does not 
+          give each class, function, and global object a fixed global address, but instead addresses relative to the base address where
+          they are loaded, meaning the linker can map this all out via building one extra level of indirection (the PLT-Procedure Linkage 
+          Table). In other words, this is a classical memory vs. run-time performance trade-off.
+        </p>
+
+      </details>
+
+        <p>
+          With that now all in place we can compile via our casual suspects, the classic CMake commands. We end up with a <i>py_data_modeling.so</i>
+          file. Firing up a Python interpreter in the directory where the .so resides we can now do <code>from py_data_modeling import Tensor</code>
+          and use our Tensor as we intended.
+        </p>
+    </div>
+
+    <div id="summary-section" class="article-text-div">
+        <h2 id="summary" class="heading-spaced">Summary</h2>
+
+        <p>
+          This concludes the first of this series of blogposts. We first designed a Tensor class in C++ and implemented basic data management, 
+          some basic operations, and designed a Python frontend through the use of Boost.Python. Additionally we took the chance to find the right 
+          way to build the library and ended up with a standalone library we can now import and use in Python.   
+        </p>
+          
+        <p>
+          In the next post we will be getting to the real meat of deep learning and implement a backpropagation engine with dynamic computational 
+          graph allocation. This way we can use our Tensor class to define neural networks and propagate gradients through the network. We will also 
+          implement some additional modules enabling basic deep learning, such as activation functions, optimizers, and loss functions. Bringing that 
+          all into Python we will be able to write a full MNIST example in Python, using our own designed training backend.
+        </p>
+
+        <p>
+          If you want to find the source of this example you can download it from 
+          <a href="https://github.com/RobBa/dl_lib/releases/tag/ComputationalGraph" target="_blank">GitHub</a>. I went a little further here, 
+          having already done the computational graph, but it is a version covering some bugfixes, as opposed to earlier commits. Anyway, a basic 
+          Python example can be found in the unit tests of the downloaded code. Feedback is 
+          always welcome, so feel free to reach out via LinkedIn or E-mail. Cheers.
+        </p>
+    </div>
+

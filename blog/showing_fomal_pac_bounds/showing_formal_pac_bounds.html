@@ -5,16 +5,21 @@ section: PAC-bounds
 mathjax: true
 ---
 
-    <br>
+    <h1 class="heading-spaced">Proving formal PAC-bounds: An example step-by-step</h1>
+    <p class="article-date">Published: April 8, 2026</p>
 
-      <h1>Proving formal PAC-bounds: An example step-by-step</h1>
-      <p class="article-date">Published: April 8, 2026</p>
+    <br>
+    
+    <blockquote class="article-quote">
+      "Sometimes science is more art than science."
+      <cite>&mdash; Rick Sanchez (Rick & Morty)</cite>
+    </blockquote>
 
     <br>
 
     <div class="article-content-div">
-      <h2>Content</h2>
-      <ul>
+      <h2 class="heading-spaced">Content</h2>
+      <ol>
         <li>
           <a href="#introduction-proving-pac-bounds">Introduction</a>
         </li>
@@ -36,14 +41,11 @@ mathjax: true
         <li>
           <a href="#pac-bounds-connect">Wrapping up</a>
         </li>
-      </ul>
+      </ol>
     </div>
 
-    <br>
-
     <div id="introduction-proving-pac-bounds" class="article-text-div">
-
-      <h2>Introduction</h2>
+      <h2 class="heading-spaced">Introduction</h2>
 
       <p>
         In our publication <a href="https://proceedings.mlr.press/v217/baumgartner23a.html" target="_blank">
@@ -80,7 +82,7 @@ mathjax: true
       <figure>
         <img class="dark-invert"
         id="pac-bounds-pdfa-example"
-        src="./showing_fomal_pac_bounds/hdfs_model.png"
+        src="./img/hdfs_model.png"
         alt="Example PDFA">
         <figcaption>
           Example of a model we once learned. Traversing the graph yields probabilities of related events
@@ -132,7 +134,7 @@ mathjax: true
       <img
       id="pac-bounds-graph"
       class="blog-image"
-      src="./showing_fomal_pac_bounds/pac-bounds-graph.png"
+      src="./img/pac-bounds-graph.png"
       alt="Concept of how we will show the bounds">
       <figcaption>Steps for proof of PAC-bounds, from bottom to top.</figcaption>
       </figure>
@@ -140,7 +142,7 @@ mathjax: true
       <img
       id="pac-bounds-graph-dark"
       class="blog-image"
-      src="./showing_fomal_pac_bounds/pac-bounds-graph-dark.png"
+      src="./img/pac-bounds-graph-dark.png"
       alt="Concept of how we will show the bounds">
       <figcaption>Steps for proof of PAC-bounds, from bottom to top.</figcaption>
       </figure>
@@ -210,7 +212,7 @@ mathjax: true
         The proof is similar to the one of Theorem 1, so we can skip the explaination here. Last but not least we need to combine the two bounds.
         The two cases can be generously bound using the union bound, a useful tool in general. From
 
-        $$P(A \cup B)= P(A) + B(B) - P(A \cap B) \leq P(A) + P(B)$$
+        $$P(A \cup B)= P(A) + P(B) - P(A \cap B) \leq P(A) + P(B)$$
 
         we obtain the union bound as
 
@@ -223,7 +225,7 @@ mathjax: true
       <img
       id="pac-bounds-cms-to-test"
       class="blog-image"
-      src="./showing_fomal_pac_bounds/cms-to-statistical-test.png"
+      src="./img/cms-to-statistical-test.png"
       alt="CMS to statistical test">
       <figcaption>Comparing two states. Each state has one CMS, through which we can retrieve a sampled distribution
         over input words. The two distributions are then compared through a statistical test. Mistakes can happen in the
@@ -234,7 +236,7 @@ mathjax: true
       <img
       id="pac-bounds-cms-to-test-dark"
       class="blog-image"
-      src="./showing_fomal_pac_bounds/cms-to-statistical-test-dark.png"
+      src="./img/cms-to-statistical-test-dark.png"
       alt="CMS to statistical test">
       <figcaption>Comparing two states. Each state has one CMS, through which we can retrieve a sampled distribution
         over input words. The two distributions are then compared through a statistical test. Mistakes can happen in the
@@ -244,10 +246,8 @@ mathjax: true
 
     </div>
 
-    <br>
-
     <div id="pac-bounds-test" class="article-text-div">
-      <h2>Bounds on statistical test</h2>
+      <h2 class="heading-spaced">Bounds on statistical test</h2>
 
       <p>
         Having bound the error on the CMS data structure, knowing what can happen when we approximate the sampled distributions, rather than having the actual one,
@@ -426,7 +426,7 @@ mathjax: true
       <img
       id="pac-bounds-graph-traversal"
       class="blog-image"
-      src="./showing_fomal_pac_bounds/traverse-graph.png"
+      src="./img/traverse-graph.png"
       alt="Tree with example trace">
       <figcaption>Mini example of a tree before creating the graph from it with an example trace of states to be parsed. We need to be sure that each of the nodes has seen enough
         data samples so that its sampled distributions and predicted probabilities can be error bound for our purposes.
@@ -436,7 +436,7 @@ mathjax: true
       <img
       id="pac-bounds-graph-traversal-dark"
       class="blog-image"
-      src="./showing_fomal_pac_bounds/traverse-graph-dark.png"
+      src="./img/traverse-graph-dark.png"
       alt="Tree with example trace">
       <figcaption>Mini example of a tree before creating the graph from it with an example trace of states to be parsed. We need to be sure that each of the nodes has seen enough
         data samples so that its sampled distributions and predicted probabilities can be error bound for our purposes.
@@ -484,10 +484,8 @@ mathjax: true
         The first one is an example of a randomized algorithm, i.e. it is non-deterministic. The algorithm is not the optimal algorithm for the problem it solves, but it serves as a good example
         how random algorithms are still capable to find elegant solutions for difficult problems. The second algorithm we briefly touch on solves the infamous Knapsack problem, an instance of an 
         <a href="https://en.wikipedia.org/wiki/NP-hardness" target="_blank">NP-hard</a> problem.
-        
-      <br>
-      
-      <h4>Karger's algorithm for the min-cut problem</h4>
+
+      <h4 class="heading-spaced">Karger's algorithm for the min-cut problem</h4>
 
       <p>Karger's algorithm for the min-cut problem on graphs is a classical example in a good curriculum to show that simple algorithms can elegantly achieve desired results. The min-cut problem 
         essentially states as the following. Given a graph ($V$, $E$), find two partitions $G$, $H$, s.t. $G \cup H = V$ and that the set of edges crossing the two sets are minimal.
@@ -497,7 +495,7 @@ mathjax: true
       <img
       id="pac-bounds-min-cut"
       class="blog-image"
-      src="./showing_fomal_pac_bounds/min-cut.png"
+      src="./img/min-cut.png"
       alt="Example graph with a minimum-cut">
       <figcaption>
         Example mini-graph with a minimum-cut solution. The min-cut separates the graph into two virtual components, connected through a minimum number of edges. Applications are e.g. finding vulnerabilities
@@ -508,7 +506,7 @@ mathjax: true
       <img
       id="pac-bounds-min-cut-dark"
       class="blog-image"
-      src="./showing_fomal_pac_bounds/min-cut-dark.png"
+      src="./img/min-cut-dark.png"
       alt="Example graph with a minimum-cut">
       <figcaption>
         Example mini-graph with a minimum-cut solution. The min-cut separates the graph into two virtual components, connected through a minimum number of edges. Applications are e.g. finding vulnerabilities
@@ -545,9 +543,7 @@ mathjax: true
         approximate solutions or entirely different ones to solve these problems. The second example below may prove to be an even better example to illustrate trade-offs we have to make in algorithms sometimes.
       </p>
 
-      <br>
-
-      <h4>Fully polynomial time approximation scheme for the Knapsack problem</h4>
+      <h4 class="heading-spaced">Fully polynomial time approximation scheme for the Knapsack problem</h4>
 
       <p>
         The fully polynomial time approximation scheme (FPTAS) for the <a href="https://en.wikipedia.org/wiki/Knapsack_problem" target="_blank">Knapsack problem</a> is an algorithm to approximate the optimal solution. The exact algorithm yields 

@@ -1,0 +1,568 @@
+---
+layout: default
+title: "PyTorch demystified 3: Implementing the CUDA backend"
+section: Pytorch demystified - 3
+highlight: true
+mathjax: false
+---
+
+    <h1 class="heading-spaced">PyTorch demystified 3 -<br>Implementing the CUDA backend</h1>
+    <p class="article-date">Published: -</p>
+
+    <br>
+
+    <blockquote class="article-quote">
+      "Nobody wants just to go on. One wants to go on in an elegant way."
+      <cite>&mdash; Alan Watts</cite>
+    </blockquote>
+
+    <br>
+
+    <div class="article-content-div">
+      <h2 class="heading-spaced">Content</h2>
+      <ul>
+        <li>
+          <a href="#introduction">Introduction</a>
+        </li>
+        <li>
+          <a href="#cuda-backend-basics">Building a basic CUDA backend</a>
+          <ul>
+            <li>
+              <a href="#cuda-structure">Setting up a basic structure</a>
+            </li>
+            <li>
+              <a href="#cuda-adding-kernels">CUDA memory management and custom kernels</a>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+
+    <div id="introduction" class="article-text-div">
+      <h2 class="heading-spaced">Introduction</h2>
+
+      <p>
+        Now that we have built our basic infrastructure, and we have a full pipeline, it is time for our long awaited
+        part where we get to speed things up. This part will consist of two subparts. In part one, this post, we implement 
+        a CUDA backend and optimize it. We will use Nsight and NCU, two tools provided by NVIDIA, to profile our CUDA
+        implementation, make deductions about bottlenecks, and do fixes.
+      </p>
+
+      <div class="pytorch-step-row pytorch-step-row-compact">
+        <div class="pytorch-step-text">
+          <p>
+            The structure of this post is as follows: We first have a brief introduction into the main architecture and how
+            we incorporate the CUDA backend. Because most of the CUDA implementation is straight forward I will outline how 
+            to do most, and we will exemplify with a few kernels that are a little more interesting. We will end up with a
+            version of the backend that has a full CUDA backend and can be run end-to-end on the same MNIST instance we 
+            wrapped up in the <a href="pytorch_demystified_2b.html" target="_blank">previous post</a>. For convenience I 
+            have made this a special release on my <a href="https://github.com/RobBa/dl_lib/releases/tag/Naive_CUDA" 
+            target="_blank">GitHub</a>.
+          </p>
+        </div>
+        <div class="pytorch-step-figs">
+          <figure class="fig-light">
+          <img
+          id="pytorch-step-3"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_3.png"
+          alt="Diagram of part 3: CUDA backend and optimization">
+          </figure>
+          <figure class="fig-dark">
+          <img
+          id="pytorch-step-3-dark"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_3_dark.png"
+          alt="Diagram of part 3: CUDA backend and optimization">
+          </figure>
+        </div>
+      </div>
+
+      <p>
+        In part two we will optimize those kernels. Each optimization step is clearly marked by its headline, and we will
+        see profiling outputs both before and after the fix, showing how much each step actually improved on our pipeline.
+        Additionally for those who want to follow along or maybe do even better fixes I have left every optimization step 
+        on a branch of the repository. You can find it <a href="https://github.com/RobBa/dl_lib/tree/dev/cuda_optimization" 
+        target="_blank">here</a>. Every finished optimization is clearly marked in its commit message, starting with an 
+        "Opt. [number]: 'Name of the fix'". In the end we will have improved our code execution on our benchmark from roughly 
+        997.691s, and after an initial fix 2.399s, down to 0.206s, a speedup with a factor of 4800x and 11.6x respectively. 
+        So let's get started building something we can optimize.
+      </p>
+    </div>
+
+    <div id="cuda-backend-basics" class="article-text-div">
+      <h2 class="heading-spaced">Building a basic CUDA backend</h2>
+
+    <p>
+      We build our CUDA backend in two steps. At first we have to set up the basic infrastructure needed to include everything. 
+      Following that we implement the missing kernels step by step.
+    </p>
+    </div>
+
+    <div id="cuda-structure" class="article-text-div">
+      <h3 class="heading-spaced">Setting up a basic structure</h3>
+
+      <p>
+        At first we do have to include CUDA code against our project. We have to tell CMake to find CUDA and where its libraries
+        are. Additionally, because not everyone has a CUDA capable GPU or simply may not want to use it we give it a flag that is
+        enabled by default and switches off automatically if CUDA could not be found on the machine. We do so by
+      </p>
+
+<pre><code>&#35; CMakeLists.txt
+
+if (CUDA)  
+  include(CheckLanguage)
+  check_language(CUDA)
+
+  if(CMAKE_CUDA_COMPILER)
+    add_definitions(-D__CUDA)
+    enable_language(CUDA)
+    
+    set(CMAKE_CUDA_STANDARD 20)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+  else()
+    message(WARNING "Could not find CUDA on system. Compiling without CUDA enabled")
+  endif()
+endif()</code></pre>
+
+      <p>
+        Note that we introduced a definition here as well through <code>add_definitions(-D__CUDA)</code>. This will help 
+        us identify whether CUDA has been compile time enabled, and we will use it for compile time dependent branches in code.
+        We have to make the CUDA headers accessible to the backend, and link CUDA against it. We are a little lazy here, so we 
+        go a little unorthodox in CMake and simply look for all .cpp files and all .cu files and append those if desired. We do 
+        get for the backend
+      </p>
+
+<pre><code>
+
+file(GLOB_RECURSE CORE_SOURCES
+    computational_graph/*.cpp
+    data_modeling/*.cpp
+    module/*.cpp
+    system/*.cpp
+    training/*.cpp
+    utility/*.cpp
+)
+
+if(CMAKE_CUDA_COMPILER)
+    file(GLOB_RECURSE CUDA_SOURCES
+        computational_graph/*.cu
+        data_modeling/*.cu
+        module/*.cu
+        system/*.cu
+        training/*.cu
+        utility/*.cu
+    )
+    list(APPEND CORE_SOURCES ${CUDA_SOURCES})
+endif()
+
+add_library(BackendCore SHARED ${CORE_SOURCES})
+
+target_include_directories(BackendCore PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+set_target_properties(BackendCore PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${PYTHON_MODULE_DIR}" # make sure Python-modules see backend
+)
+
+if(CMAKE_CUDA_COMPILER)
+    set_target_properties(BackendCore PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+        CMAKE_CUDA_ARCHITECTURES native &#35; we can target alternative architectures here
+    )
+
+    find_package(CUDAToolkit REQUIRED)
+    target_include_directories(BackendCore PRIVATE 
+        ${CUDAToolkit_INCLUDE_DIRS}
+    )
+    target_link_libraries(BackendCore 
+        CUDA::cudart
+    )
+endif()</code></pre>
+
+      <p>
+        With that we now should be able to readily include our first CUDA files into our C++ 
+        backend. Remember the definition we introduced in CMake? We will now use it and include 
+        our first kernel. The casual scalar multiplication will serve as a base example illustrating 
+        the workflow. Our Tensor class will get the following enhancements:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
+
+#ifdef __CUDA
+#include "utility/cuda/cuda_common.cuh"
+#include "data_modeling/cuda/tensor_ops.cuh"
+#endif
+
+// ... 
+
+Tensor Tensor::operator*(const ftype scalar) const {
+  Tensor res(dims, values-&gt;getDevice(), requiresGrad);
+  switch(values-&gt;getDevice()){
+    case Device::CPU:
+      for (tensorSize_t i = 0; i &lt; values-&gt;getSize(); ++i) {
+        res.values-&gt;data()[i] = values-&gt;data()[i] * scalar;
+      }
+      break;
+    case Device::CUDA:
+      #ifdef __CUDA
+        cuda_impl::scalarmul(res, *this, scalar);
+      #else
+        __throw_runtime_error("Not compiled with CUDA");
+      #endif
+      break;
+  }
+
+  return res;
+}
+
+// ...</code></pre>
+
+    <p>
+      What we do here is check the device of the tensor we call the operation on, and either allocate the 
+      result on the GPU or in host RAM. A switch-case is either gonna call the CPU version or the CUDA version.
+      Additionally, we guard against errors with a conditional compilation, giving us meaningful output when 
+      CUDA has been requested, but the code has not been compiled against. We will use this structure, i.e. the 
+      switch-case with the error output in virtually every operation where we intend to branch off into CUDA code.
+    </p>
+
+    <p>
+      We also have to store the CUDA kernels somewhere. In the example we did a conditional include that only 
+      uses the CUDA headers when the compile time flag has been enabled. For ease of architecture we write kernels 
+      exactly where they belong. That is, respective CUDA kernels are in a directory named cuda in the same directory
+      where the CPU version resides in. CUDA kernels that can be shared by multiple modules of the backend are in 
+      a folder with path src/backend/shared/cuda. Therefore the directory structure looks like the following now:
+    </p>
+
+<pre>.
+├── src
+│   ├── CMakeLists.txt
+│   ├── backend
+│   │   ├── computational_graph
+│   │   │   ├── activation_functions
+│   │   │   │   └── cuda
+│   │   │   ├── loss_functions
+│   │   │   │   └── cuda
+│   │   │   ├── tensor_ops
+│   │   │   │   └── cuda
+│   │   ├── data_modeling
+│   │   │   └── cuda
+│   │   ├── module
+│   │   │   ├── activation_functions
+│   │   │   │   └── cuda
+│   │   │   ├── layers
+│   │   │   │   └── cuda
+│   │   ├── shared
+│   │   │   └── cuda
+│   │   ├── system
+│   │   ├── training
+│   │   │   ├── loss_functions
+│   │   │   │   └── cuda
+│   │   └── utility
+│   │       └── cuda
+...</pre>
+
+      <p>
+        Note that I only show directories in the tree above. An exception to the rule is the cuda folder in
+        utility, but I'd wager this also contains what you'd expect it to contain. Mainly some wrappers
+        for better error messaging and some generic functions checking device capability. With that we can now
+        bring CUDA alive in our backend.
+      </p>
+
+    </div>
+
+    <div id="cuda-adding-kernels" class="article-text-div">
+      <h3 class="heading-spaced">CUDA memory management and custom kernels</h3>
+
+      <p>
+        As previously mentioned, we don't really have to work out every kernel for this blogpost. For us now 
+        it is mostly important to look at the main points, and point out some kernels that are of more interest
+        to us. The previous section introduced the basic pattern we will apply through our CUDA implementations.
+        But it did not show yet how we get CUDA tensors in the first place. Given our preliminary thoughts in part 1
+        of this series, this is rather a plug-and-play operation. There, we came up with a tensorValues_t struct,
+        whose purpose was to manage the underlying data of the tensors. We gave it a resize operation that every
+        tensor constructor called, and malloc'ed memory in there. All we have to do now is to give it the device and 
+        call cudaMalloc instead, as in 
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
+
+void Tensor::tensorValues_t::resize(const tensorSize_t size) {
+  this-&gt;size = size;
+  switch (device) {
+    case Device::CPU:
+      values = static_cast&lt;ftype*&gt;(std::malloc(this-&gt;size * sizeof(ftype)));
+      break;
+    case Device::CUDA:
+      #ifdef __CUDA
+        cudaErrchk(cudaMalloc((void**) &values, this-&gt;size * sizeof(ftype)));
+      #else
+        std::__throw_invalid_argument("Not compiled with CUDA.");
+      #endif
+      break;
+  }
+}</code></pre>
+
+      <p>
+        After this we also have to make sure that we update the constructor of tensorValues_t accordingly, as well as
+        all the copy operations and set-device operations. The latter has two ways: If we are on the GPU and we move to 
+        the CPU we have to malloc, copy from the device to the host, and free memory on the GPU. If we start out on the 
+        CPU and move to the GPU we have to go the other way. No surprises there essentially. Lastly we update our getters 
+        and setters of the tensorValues_t to fetch elements from either the CPU or the GPU. And that already concludes our
+        memory management.
+      </p>
+      
+      <p>
+        Because we designed our frontend with this in mind, we do not have to update the Python binding and can
+        simply instantiate a tensor now, telling it that it is a GPU resident as in <code>t = Tensor.ones([2, 2], Device.CUDA)</code>,
+        and we will have a tensor that lives on the GPU.
+      </p>
+
+      <p>
+        Adding a few kernels is just what you think it is. In the previous section we took a look at how CUDA kernels are called 
+        through a switch-case statement, here is the CUDA implementation of the kernel we showed there:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cuh
+
+#ifndef __CUDA
+static_assert(false, "File should not be included without CUDA enabled"); // for safety reasons
+#endif // __CUDA
+
+// includes here...
+
+class Tensor;
+
+namespace cuda_impl {
+  void scalarmul(Tensor& res, const Tensor& src, ftype scalar);
+}
+
+// src/backend/data_modeling/cuda/tensor_ops.cu
+
+namespace {
+  __global__ void scalarmulKernel(ftype* const res, const ftype* const left, ftype scalar, tensorSize_t size) {
+    int gid = blockDim.x * blockIdx.x + threadIdx.x;
+    if(gid &gt;= size)
+      return;
+    
+    res[gid] = left[gid] * scalar;
+  }
+}
+
+namespace cuda_impl {
+  void scalarmul(Tensor& res, const Tensor& src, ftype scalar) {
+    constexpr int threadsPerBlock = 256;
+    const int blocksPerGrid = (src.getSize() + threadsPerBlock - 1) / threadsPerBlock;
+
+    scalarmulKernel&lt;&lt;&lt;blocksPerGrid, threadsPerBlock&gt;&gt;&gt;(res.getData(), src.getData(), scalar, src.getSize());
+    cudaErrchk(cudaDeviceSynchronize());
+  }
+}</code></pre>
+
+      <p>
+        We have this modular design for clean code reasons, but also just because CUDA demands it. Essentially, 
+        when implementing CUDA kernels we have to use .cu file endings, to signal NVCC that it's time for it to shine.
+        We could now either rename all our .cpp files to .cu, which would force every user to have a CUDA toolchain on
+        their machine, or we do what I did here: Have separate .cu files with conditional compilation, and we cleanly
+        separate CUDA code from pure C++ code. I note here that cudaMalloc and other utility functions given by CUDA 
+        are pure C++ code included through <code>#include "cuda_runtime.h"</code> and can reside in .cpp files.
+      </p>
+
+      <figure class="fig-light">
+        <img
+        id="pytorch-cpp-cuda-separation"
+        class="blog-image"
+        src="./img_3/cpp-cuda-separation.png"
+        alt="Illustration of compiler separation">
+        <figcaption>
+          Illustration of how the conditional include header separates CUDA code from C++ code, enabling 
+          separation between the C++ and the CUDA toolchains.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-cpp-cuda-separation-dark"
+        class="blog-image"
+        src="./img_3/cpp-cuda-separation-dark.png"
+        alt="Illustration of compiler separation">
+        <figcaption>
+          Illustration of how the conditional include header separates CUDA code from C++ code, enabling 
+          separation between the C++ and the CUDA toolchains.
+        </figcaption>
+      </figure>
+
+      <p>
+        I also note here that the custom kernel we just implemented above is what CUDA engineers like to call
+        "embarrassingly parallel". In other words, pretty trivial to implement functionally. Most of the kernels
+        introduced in this new version follow this pattern, making for a quick win. A few exceptions however stand
+        out, and I will present them as an optional section below. However, one thing I want to note is that the kernels have
+        not been written all too terrible to start with. For instance, I used hardware intrinsics when possible.
+        For instance, inside the sigmoid kernel we compute a single element using this kernel:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/shared/cuda/common_kernels.cuh
+
+namespace cuda_impl {
+  template&lt;typename T&gt;
+  __device__ __forceinline__ ftype cudaSigmoid(const ftype x) {
+    if constexpr (std::is_same_v&lt;T, float&gt;) {
+      ftype z = expf(-fabsf(x));
+      ftype s = 1.0f / (1.0f + z);
+      return (x &gt;= 0.f) ? s : z * s; // x &lt; 0 =&gt; e^x/(e^x+1) 
+    } 
+    else if constexpr (std::is_same_v&lt;T, double&gt;) {
+      ftype z = exp(-abs(x));
+      ftype s = 1.0 / (1.0 + z);
+      return (x &gt;= 0.0) ? s : z * s; // x &lt; 0 =&gt; e^x/(e^x+1) 
+    }
+    else {
+      static_assert(always_false&lt;T&gt;, "Unexpected value for ftype encountered");
+    }
+  }
+}
+</code></pre>
+
+      <p>
+        The kernel lives in shared because it is used both in the forward pass and in the backward pass.
+        A forced inline ensures that we do not call kernels from within a kernel, and a templated overload
+        distinguishes whether to use single-precision-specific instructions (expf, fabsf) or generic instructions
+        (exp, abs). The generic instructions take both single- and double-precision values, but we can play 
+        with other functions exposed through the <a
+        href="https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/mathematical-functions.html#non-standard-cuda-mathematical-functions"
+        target="_blank">CUDA API</a>. While I did not verify this myself at this point, we can later revisit this
+        and play with these functions to squeeze out performance. In theory we would expect the expf to be faster
+        though, since it is <a href="https://docs.nvidia.com/cuda/cuda-math-api/cuda_math_api/group__CUDA__MATH__SINGLE.html"
+        target="_blank">explicitly designed</a> for single-precision floating-point numbers. In general for floating
+        points there is a trade-off between accuracy and speed. The larger our representation, the better our results,
+        but the slower the computation itself. NVIDIA provides intrinsics for this that reduce the number of operations
+        even further, at the cost of precision.
+      </p>
+
+      <details class="pytorch-optional" id="optional-floating-points">
+      <summary class="pytorch-optional-summary">
+        <h4>Optional: A brief history of floating points</h4>
+      </summary>
+
+      <div class="pytorch-optional-collapse-bar">
+        <button type="button" class="pytorch-optional-collapse-btn"
+          onclick="var s=document.getElementById('optional-floating-points'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
+
+      <p>
+        This optional is a brief historical breakdown of floating point numbers and how they evolved over time. A short
+        disclaimer: This is obviously for the younger generation of engineers, including spoiled millennials like me, and
+        I have not personally lived through all those events I describe in the following. It is based on my personal
+        research through the wild west the internet has become, and could be wrong. I am confident the information is
+        correct, but if you find something wrong, please let me know.
+      </p>
+
+      <p>
+        Essentially, when representing numbers we distinguish, roughly, two kinds of number representations: integer
+        values and floating point numbers (FPs). Normally we learn the integer representation first, since that is the
+        easier one - binary representation, conversion between decimal, octal, hexadecimal, and binary format, addition
+        and subtraction in the respective number systems, and signed representation, nowadays the 2's complement (enabling
+        us to push both addition and subtraction through an adder, hence saving silicon). Pretty straight forward once you
+        get the idea.
+      </p>
+
+      <p>
+        FPs on the other hand are not that easy. I myself have never had an introduction into actual circuitry doing
+        basic arithmetic on FPs, and the reason is that even basic operations get much more complicated than on integer
+        values. On top of that, floating points come with a much larger set of operations we want to perform on them.
+        Integers are normally constrained to addition and multiplication plus their inverse, unless you want to do something
+        more fancy. Floating points, on the other hand, add trigonometric functions (sine, cosine, tangent), root operations
+        such as the square root, exponentials, logarithms, and any other hip operation you can come up with. This makes it
+        inherently harder to find a single representation that works well across all these operations, and for all intended
+        purposes.
+      </p>
+
+      <p>
+        The result was that in the beginning of computing (relative to our modern standpoint that is) vendors had different
+        ways to represent floats, mostly disagreeing on how many bits to use for representation and how to distribute them
+        (see figure below). Intel CPUs did it differently than IBM, which did it differently than Seymour Cray, etc., leading
+        to problems such as incompatibilities between hardware of different vendors, different user-facing results on each
+        system, and each representation having its own set of quirks. To tackle the challenge Intel brought in Canadian
+        mathematician <a href="https://en.wikipedia.org/wiki/William_Kahan" target="_blank">William Kahan</a>, and secretly
+        they began working on an 'ultimate FP representation'.
+      </p>
+
+      <p>
+        At the same time, the IEEE called for a unified standard, and Intel allowed Kahan to submit his work, which led to what
+        is now called the <a href="https://ieeexplore.ieee.org/document/8766229/" target="_blank">IEEE-754 standard</a>. It is a
+        standard that generally puts up the scaffolding for how FPs are computed nowadays, which is why if you work on code that
+        is a little closer to hardware, you've probably seen the name many times already. It starts out with how to represent
+        numbers - see the figure below. In addition, it also provides rules for how to round, how to control rounding errors,
+        and exception handling. The two special FP types you have probably seen already, NaN and Infinity, have their root in
+        this standard. The standard also defines a positive and negative zero FP representation, indicating whether we
+        approached zero from the positive or the negative side.
+      </p>
+
+      <figure class="fig-light">
+        <img
+        id="pytorch-ieee-reps"
+        class="blog-image"
+        src="./img_3/ieee-reps.png"
+        alt="IEEE-754 standard">
+        <figcaption>
+          Floating point representations and distribution of bits according to IEEE-754. The 128-bit representation 
+          got added later.        
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-ieee-reps-dark"
+        class="blog-image"
+        src="./img_3/ieee-reps-dark.png"
+        alt="IEEE-754 standard">
+        <figcaption>
+          Floating point representations and distribution of bits according to IEEE-754. The 128-bit representation 
+          got added later.
+        </figcaption>
+      </figure>
+
+      <p>
+        Intel on its side developed the Intel 8087 math co-processor in 1980, 5 years before IEEE-754 officially launched. The
+        centerpiece of it was the x87 architecture, which uses a stack-based register file. Kahan determined that an 80-bit
+        representation of floating-point numbers is enough to remove numerical errors that arise from chaining floating point
+        operations, which is why x86-64 processors still support 80-bit wide FP operations today. However, while mathematically
+        sound, 80-bit sits awkwardly in a computer, since it is not a natural power of two. Computers, however, tend to fetch
+        from addresses aligned to a power of two, resulting in alignment problems outside of the floating point unit. Modern
+        computers that need genuine higher precision than 80 bits bank on the fact that hardware got a whole lot more efficient
+        than it used to be back in the day, and moved directly up to 128-bit. Practically it also turned out that for most of us
+        32-bit and in some cases 64-bit are more than sufficient, making the 80-bit format obsolete today. Intel used later
+        capability upgrades of its processors, starting with SSE and cemented by SSE2, to softly phase out the x87 FP unit,
+        which it still carries only for backward compatibility reasons.
+      </p>
+
+      <p>
+        However, the story of floating point numbers does not end here. For decades this has worked just fine. Whoever follows recent
+        developments, however, will have noticed that we all of a sudden encountered a new wave of floating point representations.
+        For instance, the C++ standard just got enhanced with a few new
+        <a href="https://en.cppreference.com/w/cpp/types/floating-point" target="_blank">FP types</a>.
+        Most are not a surprise, but looking closer we find an std::bfloat16_t type. CUDA supports a range of
+        <a href="https://docs.nvidia.com/cuda/cuda-math-api/index.html" target="_blank">smaller types</a>, mainly FP4, FP6, and FP8, along with
+        the brainfloat type that C++ also has. But how come?
+      </p>
+
+      <p>
+        The answer lies in the rise of modern LLMs. Researchers found that for large models shorter representations are enough to still yield
+        good results, leading to the notion of <a href="https://huggingface.co/docs/optimum/concept_guides/quantization"
+        target="_blank">quantization</a>. Here, smaller data types have been used to perform the floating point operations in LLMs, reaching good
+        results with higher compute throughput and cutting the memory footprint. Google's brainfloat (BFloat) takes this idea a step further.
+        Given that precision (the mantissa) matters less, but the exponent range needed in LLMs can be wide, this data type shifts the bit
+        budget accordingly. For instance, the IEEE-754 half-precision (FP16) format assigns 10 bits to the mantissa and 5 bits to the exponent
+        (plus 1 sign bit). BFloat16 keeps the sign bit but instead spends 8 bits on the exponent and 7 on the mantissa, reducing the mantissa
+        by three bits and increasing the exponent by the same number. These are, however, very recent developments and can change in the
+        future, so it's worth keeping an eye out.
+      </p>
+
+      </details>
+
+      <p>
+
+      </p>
+
+    </div>

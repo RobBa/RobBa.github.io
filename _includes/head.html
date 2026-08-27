@@ -33,6 +33,15 @@
     {% if page.url contains '/research/' %}
     <link rel="stylesheet" href="{{ '/research/research.css' | relative_url }}">
     {% endif %}
+    {% if page.url contains '/pytorch_demystified/' %}
+    <link rel="stylesheet" href="{{ '/blog/pytorch_demystified/pytorch_demystified.css' | relative_url }}">
+    {% endif %}
+    {% if page.url contains '/calling_python_from_cpp/' %}
+    <link rel="stylesheet" href="{{ '/blog/calling_python_from_cpp/calling_python_from_cpp.css' | relative_url }}">
+    {% endif %}
+    {% if page.url contains '/showing_fomal_pac_bounds/' %}
+    <link rel="stylesheet" href="{{ '/blog/showing_fomal_pac_bounds/showing_formal_pac_bounds.css' | relative_url }}">
+    {% endif %}
 
     <!-- scrolling + dark mode -->
     <script defer src="{{ '/code/scrolling.js' | relative_url }}"></script>

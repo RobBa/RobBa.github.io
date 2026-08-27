@@ -1,0 +1,53 @@
+/* -------------- Proving formal PAC-bounds ---------------- */
+
+#pac-bounds-graph,
+#pac-bounds-graph-dark {
+    width: 45%;
+    max-width: 400px;
+}
+
+#pac-bounds-cms-to-test,
+#pac-bounds-cms-to-test-dark {
+    width: 60%;
+    max-width: 500px;
+}
+
+#pac-bounds-graph-traversal,
+#pac-bounds-graph-traversal-dark {
+    width: 53%;
+    max-width: 700px;
+}
+
+#pac-bounds-min-cut,
+#pac-bounds-min-cut-dark {
+    width: 70%;
+    max-width: 600px;
+}
+
+#pac-bounds-pdfa-example {
+    width: 100%;
+    max-width: 800px;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    #pac-bounds-graph,
+    #pac-bounds-graph-dark {
+        width: 75%;
+    }
+
+    #pac-bounds-cms-to-test,
+    #pac-bounds-cms-to-test-dark {
+        width: 80%;
+        max-width: 500px;
+    }
+
+    #pac-bounds-min-cut,
+    #pac-bounds-min-cut-dark {
+        width: 75%;
+        max-width: 600px;
+    }
+
+    #pac-bounds-pdfa-example {
+        width: 100%;
+    }
+}

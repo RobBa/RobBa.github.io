@@ -1,0 +1,256 @@
+/* -------------- Pytorch demystified series ---------------- */
+
+.pytorch-step-row {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    margin-bottom: 20px;
+}
+
+.pytorch-step-row-reverse {
+    flex-direction: row-reverse;
+}
+
+.pytorch-step-text {
+    flex: 1 1 45%;
+    min-width: 0;
+}
+
+.pytorch-step-figs {
+    flex: 1 1 55%;
+    min-width: 0;
+}
+
+.pytorch-step-img {
+    width: 95%;
+}
+
+/*
+ * Scoped to post 2's single figure row only (via pytorch-step-row-compact):
+ * tighter gap between text and figure, with the figure claiming the space
+ * that frees up, and the row itself flush against the surrounding text
+ * (plain divs otherwise inherit a global 2% side margin).
+ */
+.pytorch-step-row.pytorch-step-row-compact {
+    gap: 15px;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.pytorch-step-row-compact .pytorch-step-text {
+    flex: 1 1 40%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.pytorch-step-row-compact .pytorch-step-figs {
+    flex: 1 1 60%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+#pytorch-trends-in-ml,
+#pytorch-trends-in-ml-dark {
+    width: 75%;
+}
+
+#pytorch-class-diagram,
+#pytorch-class-diagram-dark {
+    width: 64%;
+}
+
+#pytorch-boost-python-schematic,
+#pytorch-boost-python-schematic-dark {
+    width: 70%;
+}
+
+.pytorch-step-heading {
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.pytorch-step-heading-mobile {
+    display: none;
+}
+
+.pytorch-optional {
+    margin: 30px 0;
+    border: 1px solid var(--color-article-date);
+    border-radius: 6px;
+    padding: 0 20px 20px 20px;
+}
+
+.pytorch-optional-summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 15px 0;
+}
+
+.pytorch-optional-summary::-webkit-details-marker {
+    display: none;
+}
+
+.pytorch-optional-summary h4 {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.pytorch-optional-summary h4::before {
+    content: "\25B8";
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.pytorch-optional[open] .pytorch-optional-summary h4::before {
+    transform: rotate(90deg);
+}
+
+.pytorch-optional-collapse-bar {
+    position: sticky;
+    top: 40px;
+    z-index: 500;
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+    margin: 0 0 10px 0;
+    background: var(--color-bg);
+}
+
+.pytorch-optional-collapse-btn {
+    background-color: var(--color-chrome-bg);
+    color: var(--color-chrome-text);
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.pytorch-optional-collapse-btn:hover {
+    opacity: 0.85;
+}
+
+h4.heading-spaced {
+    margin-top: 20px;
+}
+
+.pytorch-graph-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 30px;
+    margin-bottom: 20px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.pytorch-graph-example {
+    max-width: 75%;
+}
+
+.pytorch-graph-pass {
+    max-width: 100%;
+}
+
+.pytorch-graph-fig {
+    flex: 1 1 50%;
+    min-width: 0;
+}
+
+#pytorch-reference-illustration, 
+#pytorch-reference-illustration-dark {
+    width: 82%;
+}
+
+#pytorch-backward-order-illustration,
+#pytorch-backward-order-illustration-dark {
+    width: 85%;
+}
+
+#pytorch-train-loop-illustrated,
+#pytorch-train-loop-illustrated-dark {
+    width: 75%;
+}
+
+#pytorch-library-diagram,
+#pytorch-library-diagram-dark {
+    width: 90%;
+}
+
+#pytorch-cpp-cuda-separation,
+#pytorch-cpp-cuda-separation-dark {
+    width: 85%;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    .pytorch-step-row,
+    .pytorch-step-row-reverse {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .pytorch-step-row.pytorch-step-row-compact {
+        gap: 10px;
+    }
+
+    .pytorch-graph-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .pytorch-graph-example {
+        max-width: 80%;
+    }
+
+    .pytorch-graph-pass {
+        max-width: 90%;
+    }
+
+    .pytorch-step-img {
+        width: 80%;
+    }
+
+    .pytorch-step-heading {
+        display: none;
+    }
+
+    .pytorch-step-heading-mobile {
+        display: inline;
+    }
+
+    .pytorch-optional-collapse-bar {
+        top: 55px;
+    }
+
+    #pytorch-boost-python-schematic,
+    #pytorch-boost-python-schematic-dark {
+        width: 85%;
+    }
+
+    #pytorch-reference-illustration,
+    #pytorch-reference-illustration-dark {
+        width: 90%;
+    }
+
+    #pytorch-backward-order-illustration,
+    #pytorch-backward-order-illustration-dark {
+        width: 95%;
+    }
+
+    #pytorch-train-loop-illustrated,
+    #pytorch-train-loop-illustrated-dark {
+        width: 80%;
+    }
+
+    #pytorch-library-diagram,
+    #pytorch-library-diagram-dark {
+        width: 95%;
+    }
+
+    #pytorch-cpp-cuda-separation,
+    #pytorch-cpp-cuda-separation-dark {
+        width: 85%;
+    }
+}
