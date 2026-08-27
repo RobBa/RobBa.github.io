@@ -44,7 +44,7 @@ mathjax: false
       <p>
         Now that we have built our basic infrastructure, and we have a full pipeline, it is time for our long awaited
         part where we get to speed things up. This part will consist of two subparts. In part one, this post, we implement 
-        a CUDA backend and optimize it. We will use NSight and NCU, two tools provided by NVIDIA, to profile our CUDA 
+        a CUDA backend and optimize it. We will use Nsight and NCU, two tools provided by NVIDIA, to profile our CUDA
         implementation, make deductions about bottlenecks, and do fixes.
       </p>
 
@@ -104,8 +104,8 @@ mathjax: false
 
       <p>
         At first we do have to include CUDA code against our project. We have to tell CMake to find CUDA and where its libraries
-        are. Additionally, because not everyone has a CUDA capable GPU or simply may not want to use it we give it flag that is 
-        enabled by default and switches off automatically if CUDA could not be found on the machine. We do so by 
+        are. Additionally, because not everyone has a CUDA capable GPU or simply may not want to use it we give it a flag that is
+        enabled by default and switches off automatically if CUDA could not be found on the machine. We do so by
       </p>
 
 <pre><code>&#35; CMakeLists.txt
@@ -264,8 +264,8 @@ Tensor Tensor::operator*(const ftype scalar) const {
 ...</pre>
 
       <p>
-        Note that I only show directories in the tree above. An exception to the rule is the cuda folder in 
-        utility, but I'd wager this also contains what you would expect it contains. Mainly some wrappers
+        Note that I only show directories in the tree above. An exception to the rule is the cuda folder in
+        utility, but I'd wager this also contains what you'd expect it to contain. Mainly some wrappers
         for better error messaging and some generic functions checking device capability. With that we can now
         bring CUDA alive in our backend.
       </p>
@@ -280,7 +280,7 @@ Tensor Tensor::operator*(const ftype scalar) const {
         it is mostly important to look at the main points, and point out some kernels that are of more interest
         to us. The previous section introduced the basic pattern we will apply through our CUDA implementations.
         But it did not show yet how we get CUDA tensors in the first place. Given our preliminary thoughts in part 1
-        of this series this is rather a plug-and-play operation. There, we came up with a tensorValues_t struct,
+        of this series, this is rather a plug-and-play operation. There, we came up with a tensorValues_t struct,
         whose purpose was to manage the underlying data of the tensors. We gave it a resize operation that every
         tensor constructor called, and malloc'ed memory in there. All we have to do now is to give it the device and 
         call cudaMalloc instead, as in 
@@ -314,9 +314,9 @@ void Tensor::tensorValues_t::resize(const tensorSize_t size) {
       </p>
       
       <p>
-        Because we designed our frontend forward we do not have to update the Python binding and can 
-        simply instantiate a tensor now, telling it that it is a GPU resident as in <code>t = Tensor.ones([2, 2], Device.CUDA)</code>, 
-        and we will have a tensor that lives on the GPU. 
+        Because we designed our frontend with this in mind, we do not have to update the Python binding and can
+        simply instantiate a tensor now, telling it that it is a GPU resident as in <code>t = Tensor.ones([2, 2], Device.CUDA)</code>,
+        and we will have a tensor that lives on the GPU.
       </p>
 
       <p>
@@ -396,7 +396,7 @@ namespace cuda_impl {
         I also note here that the custom kernel we just implemented above is what CUDA engineers like to call
         "embarrassingly parallel". In other words, pretty trivial to implement functionally. Most of the kernels
         introduced in this new version follow this pattern, making for a quick win. A few exceptions however stand
-        out, and I will present them optionally below. However, one thing I want to note is that the kernels have 
+        out, and I will present them as an optional section below. However, one thing I want to note is that the kernels have
         not been written all too terrible to start with. For instance, I used hardware intrinsics when possible.
         For instance, inside the sigmoid kernel we compute a single element using this kernel:
       </p>
@@ -404,7 +404,7 @@ namespace cuda_impl {
 <pre><code class="language-cpp">// src/backend/shared/cuda/common_kernels.cuh
 
 namespace cuda_impl {
-   template&lt;typename T&gt;
+  template&lt;typename T&gt;
   __device__ __forceinline__ ftype cudaSigmoid(const ftype x) {
     if constexpr (std::is_same_v&lt;T, float&gt;) {
       ftype z = expf(-fabsf(x));
@@ -428,14 +428,14 @@ namespace cuda_impl {
         A forced inline ensures that we do not call kernels from within a kernel, and a templated overload
         distinguishes whether to use single-precision-specific instructions (expf, fabsf) or generic instructions
         (exp, abs). The generic instructions take both single- and double-precision values, but we can play 
-        with other functions exposed through the <a 
-        href="https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/mathematical-functions.html#non-standard-cuda-mathematical-functions" 
-        target="_blank">CUDA API</a>. While I did not verify this myself at this point we can later resume here
+        with other functions exposed through the <a
+        href="https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/mathematical-functions.html#non-standard-cuda-mathematical-functions"
+        target="_blank">CUDA API</a>. While I did not verify this myself at this point, we can later revisit this
         and play with these functions to squeeze out performance. In theory we would expect the expf to be faster
         though, since it is <a href="https://docs.nvidia.com/cuda/cuda-math-api/cuda_math_api/group__CUDA__MATH__SINGLE.html"
         target="_blank">explicitly designed</a> for single-precision floating-point numbers. In general for floating
-        points there is a trade-off between accuracy and speed. The larger our representation the better our results, 
-        but the slower the computation itself. NVIDIA provides intrinsics for this that reduce the number of operations 
+        points there is a trade-off between accuracy and speed. The larger our representation, the better our results,
+        but the slower the computation itself. NVIDIA provides intrinsics for this that reduce the number of operations
         even further, at the cost of precision.
       </p>
 
@@ -452,51 +452,52 @@ namespace cuda_impl {
       </div>
 
       <p>
-        This optional is a brief historical breakdown of floating point numbers and how they evolved over time. A short 
-        disclaimer: This is obviously for the younger generation of engineers, including spoiled millenials like me, and 
-        I have not personally lived through all those events I describe in the following. It is based on my personal 
-        research through the wild west the internet has become, and could be wrong. I am confident the information is 
-        correct, but if you find something wrong please let me know.
+        This optional is a brief historical breakdown of floating point numbers and how they evolved over time. A short
+        disclaimer: This is obviously for the younger generation of engineers, including spoiled millennials like me, and
+        I have not personally lived through all those events I describe in the following. It is based on my personal
+        research through the wild west the internet has become, and could be wrong. I am confident the information is
+        correct, but if you find something wrong, please let me know.
       </p>
 
       <p>
-        Essentially, when representing numbers we distinguish two kinds of operands roughly: Integer values and floating 
-        point numbers (FPs). Normally we learn the integer representation first, since that is the easier one - binary 
-        representation, conversion between decimal, octal, hexadecimal, and binary format, addition and subtraction in 
-        the respective number systems, and signed representation, nowadays the 2's complement (enabling us to push both 
-        addition and subtraction through an adder, hence saving silicon). Pretty straight forward once you get the idea. 
+        Essentially, when representing numbers we distinguish, roughly, two kinds of number representations: integer
+        values and floating point numbers (FPs). Normally we learn the integer representation first, since that is the
+        easier one - binary representation, conversion between decimal, octal, hexadecimal, and binary format, addition
+        and subtraction in the respective number systems, and signed representation, nowadays the 2's complement (enabling
+        us to push both addition and subtraction through an adder, hence saving silicon). Pretty straight forward once you
+        get the idea.
       </p>
 
       <p>
-        FPs on the other hand are not that easy. I for myself have never had an introduction into actual circuitry doing
-        basic arithmetics on FPs, and the reason is that even basic operations get much more complicated than on integer
-        values. On top of that, floating points come with a much larger set of operations we want to perform on those. 
-        Integers are normally constraint to addition and multiplication plus their inverse, unless you want to do something
-        more fancy. Floating points on that trigonometrics (sine, cosine, tangent), taking roots such as the square root, 
-        exponentials, logarithms, and any other hip operation you can come up with. This makes it inherently harder to find
-        an optimal representation for those that works well with all operations we are aiming for, and for all intended 
+        FPs on the other hand are not that easy. I myself have never had an introduction into actual circuitry doing
+        basic arithmetic on FPs, and the reason is that even basic operations get much more complicated than on integer
+        values. On top of that, floating points come with a much larger set of operations we want to perform on them.
+        Integers are normally constrained to addition and multiplication plus their inverse, unless you want to do something
+        more fancy. Floating points, on the other hand, add trigonometric functions (sine, cosine, tangent), root operations
+        such as the square root, exponentials, logarithms, and any other hip operation you can come up with. This makes it
+        inherently harder to find a single representation that works well across all these operations, and for all intended
         purposes.
       </p>
 
       <p>
-        The result was that in the beginning of computing (relative from our modern standpoint that is) vendors had different 
-        ways to represent floats, mostly disagreeing how many bits for representation and how to distribute them (see figure below). 
-        Intel CPUs did different than IBM did different than Seymour Cray etc., leading to problems
-        such as incompatibilities in between hardware of different vendors, different user facing results on each system, 
-        while each representation had its own set of problems. To tackle the challenge Intel took in Canadian mathematician 
-        <a href="https://en.wikipedia.org/wiki/William_Kahan" target="_blank">William Kahan</a>, and secretly they began 
-        working on an 'ultimate FP representation'.
+        The result was that in the beginning of computing (relative to our modern standpoint that is) vendors had different
+        ways to represent floats, mostly disagreeing on how many bits to use for representation and how to distribute them
+        (see figure below). Intel CPUs did it differently than IBM, which did it differently than Seymour Cray, etc., leading
+        to problems such as incompatibilities between hardware of different vendors, different user-facing results on each
+        system, and each representation having its own set of quirks. To tackle the challenge Intel brought in Canadian
+        mathematician <a href="https://en.wikipedia.org/wiki/William_Kahan" target="_blank">William Kahan</a>, and secretly
+        they began working on an 'ultimate FP representation'.
       </p>
 
       <p>
-        The same time the IEEE called for a unified standard, and Intel allowed Kahan to submit his work, which led to what is 
-        now called the <a href="https://ieeexplore.ieee.org/document/8766229/" target="_blank">IEEE-754 standard</a>. It is a 
-        standard that generally put up the scaffolding for how FPs are computed nowadays, which is why if you work on code that 
-        is a little closer to hardware you've probably seen the name many times already. It starts out with how to represent numbers,
-        see the figure below. In addition, it also provides rules for how to round, how to control rounding errors, and exception 
-        handling. The two special FP types you have probably seen already, NaN and Infty, have their root in this standard. The 
-        standard also defines a positive and negative zero FP representation, indicating whether we approached zero from the positive
-        or the negative side.   
+        At the same time, the IEEE called for a unified standard, and Intel allowed Kahan to submit his work, which led to what
+        is now called the <a href="https://ieeexplore.ieee.org/document/8766229/" target="_blank">IEEE-754 standard</a>. It is a
+        standard that generally puts up the scaffolding for how FPs are computed nowadays, which is why if you work on code that
+        is a little closer to hardware, you've probably seen the name many times already. It starts out with how to represent
+        numbers - see the figure below. In addition, it also provides rules for how to round, how to control rounding errors,
+        and exception handling. The two special FP types you have probably seen already, NaN and Infinity, have their root in
+        this standard. The standard also defines a positive and negative zero FP representation, indicating whether we
+        approached zero from the positive or the negative side.
       </p>
 
       <figure class="fig-light">
@@ -523,36 +524,39 @@ namespace cuda_impl {
       </figure>
 
       <p>
-        Intel on its side developed the Intel 8087 math co-processor in 1980, 5 years before IEEE-754 officially launched. The 
-        centerpiece of it was the x87 architecture, which uses a stack based register. Kahan determined that an 80-bit representation
-        of floating is enough to remove numerical errors that arise from chaining floating point operations, which is why x86-64 
-        processors still support 80-bit wide FP operations today. However, while mathematically sound, 80-bit sits awkward in a computer,
-        since it is not a natural power of two. Computers however tend to fetch from addresses starting with a power of two, resulting in 
-        alignment problems outside of the floating point unit. Modern computers that need genuine higher precision than 80-bits bank on 
-        the fact that computers got a whole lot more efficient than they used to be back in the day, and moved directly up to 128-bit.
-        Practically it also turned out that for most of us 32-bit and in some cases 64-bit are more than sufficient, making the 80-bit 
-        standard obsolete today. Intel used later capability upgrades of its processors, starting with MMX, to softly phase out the 
-        x87 FP unit, and carries it only for backward compatibility reasons. 
+        Intel on its side developed the Intel 8087 math co-processor in 1980, 5 years before IEEE-754 officially launched. The
+        centerpiece of it was the x87 architecture, which uses a stack-based register file. Kahan determined that an 80-bit
+        representation of floating-point numbers is enough to remove numerical errors that arise from chaining floating point
+        operations, which is why x86-64 processors still support 80-bit wide FP operations today. However, while mathematically
+        sound, 80-bit sits awkwardly in a computer, since it is not a natural power of two. Computers, however, tend to fetch
+        from addresses aligned to a power of two, resulting in alignment problems outside of the floating point unit. Modern
+        computers that need genuine higher precision than 80 bits bank on the fact that hardware got a whole lot more efficient
+        than it used to be back in the day, and moved directly up to 128-bit. Practically it also turned out that for most of us
+        32-bit and in some cases 64-bit are more than sufficient, making the 80-bit format obsolete today. Intel used later
+        capability upgrades of its processors, starting with SSE and cemented by SSE2, to softly phase out the x87 FP unit,
+        which it still carries only for backward compatibility reasons.
       </p>
 
       <p>
-        However, the story of floating point numbers does not end here. For decades this has worked just fine. Whoever follows recent 
-        movements however noticed that we all of a sudden encountered a new wave of floating point representations. For instance, the 
-        C++ standard just got enhanced with a few new <a href="https://en.cppreference.com/w/cpp/types/floating-point" target="_blank">FP types</a>.
+        However, the story of floating point numbers does not end here. For decades this has worked just fine. Whoever follows recent
+        developments, however, will have noticed that we all of a sudden encountered a new wave of floating point representations.
+        For instance, the C++ standard just got enhanced with a few new
+        <a href="https://en.cppreference.com/w/cpp/types/floating-point" target="_blank">FP types</a>.
         Most are not a surprise, but looking closer we find an std::bfloat16_t type. CUDA supports a range of
         <a href="https://docs.nvidia.com/cuda/cuda-math-api/index.html" target="_blank">smaller types</a>, mainly FP4, FP6, and FP8, along with
-        the brainfloat C++ also has. But how come?   
+        the brainfloat type that C++ also has. But how come?
       </p>
 
       <p>
         The answer lies in the rise of modern LLMs. Researchers found that for large models shorter representations are enough to still yield
-        good results, leading to the notion of <a href="https://huggingface.co/docs/optimum/concept_guides/quantization" 
-        target="_blank">quantization</a>. Here smaller data types have been used to perform the floating point operations in LLMs, reaching good 
-        results with higher compute throughput and cutting the memory footprint. Google's brainfloat (BFloat) adapts the floating points a little more from 
-        that. Given that the absolute number (mantissa) does not matter that much, but the exponents in LLMs can cover a wide range, this data 
-        type moves the bits a little. For instance, the IEEE-754 standard assigns 10 bits to the mantissa and 5 bits to the exponent. The BFloat-16 
-        data type removes the sign bit and gives each 8, reducing the mantissa by two bits and increasing the exponent by three. These are however very 
-        recent events and can change in the future, so it's worth it keeping an eye out.
+        good results, leading to the notion of <a href="https://huggingface.co/docs/optimum/concept_guides/quantization"
+        target="_blank">quantization</a>. Here, smaller data types have been used to perform the floating point operations in LLMs, reaching good
+        results with higher compute throughput and cutting the memory footprint. Google's brainfloat (BFloat) takes this idea a step further.
+        Given that precision (the mantissa) matters less, but the exponent range needed in LLMs can be wide, this data type shifts the bit
+        budget accordingly. For instance, the IEEE-754 half-precision (FP16) format assigns 10 bits to the mantissa and 5 bits to the exponent
+        (plus 1 sign bit). BFloat16 keeps the sign bit but instead spends 8 bits on the exponent and 7 on the mantissa, reducing the mantissa
+        by three bits and increasing the exponent by the same number. These are, however, very recent developments and can change in the
+        future, so it's worth keeping an eye out.
       </p>
 
       </details>
