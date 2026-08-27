@@ -39,6 +39,12 @@ mathjax: true
             </li>
           </ul>
         </li>
+        <li>
+          <a href="#cuda-backend-optimization">Optimizing the CUDA backend</a>
+          <ul>
+            <li><a href="#">TODO</a></li>
+          </ul>
+        </li>
       </ul>
     </div>
 
@@ -703,7 +709,6 @@ namespace {
     // C[i, j] = sum_{k=0}^{leftCols} A[i, k] * B[k, j]
     ftype cij = 0;
     for(int k = 0; k < leftCols; k++) {
-      //smem[tid] += left[leftBase + k] * right[k * rightCols + resCol];
       cij += left[leftBase + k] * right[k * rightCols + resCol];
     }
 
@@ -1203,4 +1208,4 @@ namespace cuda_impl {
       </p>
     </div>
 
-    <!-- TODO: mention the memory error in one of the kernels and give an optional fix -->
+    TODO: mention the memory error in one of the kernels and give an optional fix
