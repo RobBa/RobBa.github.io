@@ -1,0 +1,59 @@
+/* -------------- Pytorch demystified 1: Tensor interface and Python bindings ---------------- */
+
+.pytorch-step-row-reverse {
+    flex-direction: row-reverse;
+}
+
+.pytorch-step-heading {
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.pytorch-step-heading-mobile {
+    display: none;
+}
+
+#pytorch-trends-in-ml,
+#pytorch-trends-in-ml-dark {
+    width: 75%;
+}
+
+#pytorch-class-diagram,
+#pytorch-class-diagram-dark {
+    width: 64%;
+}
+
+#pytorch-boost-python-schematic,
+#pytorch-boost-python-schematic-dark {
+    width: 70%;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    .pytorch-step-row-reverse {
+        flex-direction: column;
+    }
+
+    .pytorch-step-heading {
+        display: none;
+    }
+
+    .pytorch-step-heading-mobile {
+        display: inline;
+    }
+
+    #pytorch-trends-in-ml,
+    #pytorch-trends-in-ml-dark {
+        width: 85%;
+    }
+
+    #pytorch-class-diagram,
+    #pytorch-class-diagram-dark {
+        width: 75%;
+    }
+
+    #pytorch-boost-python-schematic,
+    #pytorch-boost-python-schematic-dark {
+        width: 95%;
+    }
+}
