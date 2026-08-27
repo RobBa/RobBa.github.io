@@ -718,6 +718,8 @@ namespace {
 
       </details>
 
+      </div>
+
       <div class="article-text-div">
 
       <details class="pytorch-optional" id="optional-naive-softmax-kernel">
@@ -733,7 +735,7 @@ namespace {
       </div>
 
       <p>
-        The second kernel I think is worth looking at is the softmax kernel (the forward version - the backward 
+        The second kernel that I think is worth looking at is the softmax kernel (the forward version - the backward 
         version largely mirrors this one for obvious reasons). Optimization of this kernel won't be part of this 
         blogpost, so you will not see this one again, unless I expand on this series at a later point in time.
         It is interesting however because it shows pretty much any optimization pattern I chose to use in the first
@@ -930,8 +932,7 @@ namespace {
       res[globalIdx] = expVal / start[0];
     }
   }
-}
-</code></pre>
+}</code></pre>
 
         <p>
           Essentially they are what you would expect mostly. There is some logic first to find out 
@@ -1202,4 +1203,4 @@ namespace cuda_impl {
       </p>
     </div>
 
-    TODO: mention the memory error in one of the kernels and give an optional fix
+    <!-- TODO: mention the memory error in one of the kernels and give an optional fix -->
