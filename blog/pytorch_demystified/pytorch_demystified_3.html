@@ -712,7 +712,7 @@ namespace {
       cij += left[leftBase + k] * right[k * rightCols + resCol];
     }
 
-    res[gid] = cij; // smem[tid];
+    res[gid] = cij;
   }
 }</code></pre>
 
