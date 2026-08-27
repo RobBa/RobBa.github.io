@@ -3,7 +3,7 @@ layout: default
 title: "PyTorch demystified 3: Implementing the CUDA backend"
 section: Pytorch demystified - 3
 highlight: true
-mathjax: false
+mathjax: true
 ---
 
     <h1 class="heading-spaced">PyTorch demystified 3 -<br>Implementing the CUDA backend</h1>
@@ -84,13 +84,23 @@ mathjax: false
 
       <p>
         In part two we will optimize those kernels. Each optimization step is clearly marked by its headline, and we will
-        see profiling outputs both before and after the fix, showing how much each step actually improved on our pipeline.
+        see profiling outputs both before and after the fix, showing how much each step actually improved on our pipeline, 
+        and most interestingly to me personally: I give an explanation to each fix of why it actually worked.
         Additionally for those who want to follow along or maybe do even better fixes I have left every optimization step 
         on a branch of the repository. You can find it <a href="https://github.com/RobBa/dl_lib/tree/dev/cuda_optimization" 
         target="_blank">here</a>. Every finished optimization is clearly marked in its commit message, starting with an 
-        "Opt. [number]: 'Name of the fix'". In the end we will have improved our code execution on our benchmark from roughly 
-        997.691s, and after an initial fix 2.399s, down to 0.206s, a speedup with a factor of 4800x and 11.6x respectively. 
-        So let's get started building something we can optimize.
+        "Opt. [number]: 'Name of the fix'".
+      </p>
+
+      <p>
+        In the end we will have improved our code execution on our benchmark from  
+        2.399s down to 0.206s, a speedup with a factor of 11.6x. I note here that the initial naive CUDA version 
+        before I started to optimize took way longer on the benchmark - 997.691s. However, here I forgot to implement 
+        the optimizers in CUDA, resulting in unnecessary memcopies across the devices. So there is a speedup of 4800x, but 
+        that is noise that had to be debugged, rather than optimized. Anyway, we're gonna cook the full MNIST example from 25s 
+        training time down to 5 seconds (includes non-CUDA parts including data loading etc., parts that are not measured by the 
+        benchmark). And on larger models with more training data the gap is only to grow. That's a good prospect I say, 
+        so let's get started building something we can optimize.
       </p>
     </div>
 
@@ -344,7 +354,7 @@ namespace cuda_impl {
 
 // src/backend/data_modeling/cuda/tensor_ops.cu
 
-namespace {
+namespace { // anonymous namespace for all non-shared CUDA kernels in this project
   __global__ void scalarmulKernel(ftype* const res, const ftype* const left, ftype scalar, tensorSize_t size) {
     int gid = blockDim.x * blockIdx.x + threadIdx.x;
     if(gid &gt;= size)
@@ -407,7 +417,7 @@ namespace cuda_impl {
 
 <pre><code class="language-cpp">// src/backend/shared/cuda/common_kernels.cuh
 
-namespace cuda_impl {
+namespace cuda_impl { // in cuda_impl because it is shared
   template&lt;typename T&gt;
   __device__ __forceinline__ ftype cudaSigmoid(const ftype x) {
     if constexpr (std::is_same_v&lt;T, float&gt;) {
@@ -566,7 +576,630 @@ namespace cuda_impl {
       </details>
 
       <p>
-
+        Other optimizations consistently included in our first wiring up of CUDA are classic warp-level reductions by defining a 
+        volatile pointer to the beginning of the array, and then scan through the array based on thread-id, see below (we will switch
+        to modern warp shuffle instructions in an optimization step down below). I also used
+        shared memory where applicable, and bit-shifts for divisions by 2, which happens pretty much all the time for parallel
+        reduction kernels.
       </p>
 
+<pre><code class="language-cpp">// src/backend/module/activation_functions/cuda/activations.cu
+
+namespace { 
+  // example of a warp-level reduction kernel - pattern applied consistently throughout code
+  template<int maxoffset>
+  __forceinline__ __device__ void softmaxWarpSumReduce(volatile ftype* const input, const tensorSize_t stride, const int offset) {
+    static_assert(maxoffset > 0 && maxoffset <= 32, "Invalid value for template");
+    
+    if(maxoffset == 32) {
+      if(offset + 32 < stride) input[offset] += input[offset + 32];
+    }
+    if(maxoffset >= 16) {
+      if(offset + 16 < stride) input[offset] += input[offset + 16];
+    }
+    if(maxoffset >= 8) {
+      if(offset + 8 < stride) input[offset] += input[offset + 8];
+    }
+    if(maxoffset >= 4) {
+      if(offset + 4 < stride) input[offset] += input[offset + 4];
+    }
+    if(maxoffset >= 2) {
+      if(offset + 2 < stride) input[offset] += input[offset + 2];
+    }
+    if(maxoffset >= 1) {
+      if(offset + 1 < stride) input[offset] += input[offset + 1];
+    }
+  }
+}</code></pre>
+
+      <p>
+        To the astute reader wanting to see optimization, arguably the more interesting part of this blogpost,
+        I recommend to skip the next optional sections, covering two example kernels that were not that trivial, 
+        and that show my train of thought when I implemented the initial design. For those who are interested in 
+        seeing more what we will be dealing with before we optimize, the optional parts are for you.
+      </p>
+
+      </div>
+
+      <div class="article-text-div">
+
+      <details class="pytorch-optional" id="optional-naive-matmul-kernel">
+      <summary class="pytorch-optional-summary">
+        <h4>Optional: The first naive matmul kernel</h4>
+      </summary>
+
+      <div class="pytorch-optional-collapse-bar">
+        <button type="button" class="pytorch-optional-collapse-btn"
+          onclick="var s=document.getElementById('optional-naive-matmul-kernel'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
+
+      <p>
+        The first kernel we take a look at is the one we will be spending most of our time on optimizing, the infamous 
+        $\mathcal{O}(N^3)$ matmul kernel, object of interest of any linear transformation in geometry and linear algebra
+        as a whole. 
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cu
+
+namespace cuda_impl {
+  void matmul(Tensor& res, const Tensor& left, const Tensor& right) {
+    constexpr int threadsPerBlock = 256;
+    const int blocksPerGrid = (res.getSize() + threadsPerBlock - 1) / threadsPerBlock;
+    
+    // sizes of the 2D matrices respectively
+    const tensorSize_t leftSize = left.getDims().get(-1) * left.getDims().get(-2); 
+    const tensorSize_t rightSize = right.getDims().get(-1) * right.getDims().get(-2);
+    const tensorSize_t resSize = left.getDims().get(-2) * right.getDims().get(-1);
+
+    tensorSize_t leftOffset = 0;
+    tensorSize_t rightOffset = 0;
+    tensorSize_t resOffset = 0;
+
+    while(leftOffset < left.getSize()){
+      matMul2DKernel<<<blocksPerGrid, threadsPerBlock>>>(res.getData() + resOffset, left.getData() + leftOffset, right.getData() + rightOffset, 
+                                                         left.getDims().get(-2), left.getDims().get(-1), right.getDims().get(-1), resSize);
+
+      leftOffset += leftSize;
+      rightOffset += rightSize;
+      resOffset += resSize;
+    }
+    
+    cudaErrchk(cudaDeviceSynchronize());
+  }
+}</code></pre>
+
+        <p>
+          Because incoming tensors can be of arbitrary dimensions, I still stick to my own guns and only 
+          allow matmul on the last two dimensions. I.e. both in the C++ backend as well as in CUDA the basic 
+          assumption is that the matrix multiplication happens over two kernels with arbitrary dimensions, but 
+          the last two are the individual matrix sizes, as in (dim_1, dim_2, ..., n_rows, n_cols). The reason 
+          is basically because that saves me from a further abstraction level of indexing hell we already have 
+          anyway. But it also makes sense on an architectural level, because with this assumption we do have better 
+          memory access patterns than when spreading the matmul over non-aligned memory addresses.
+        </p>
+
+        <p>
+          As for the kernel, since I virtually already split the tensor down to its individual matrices, I can now 
+          use a simple 2D-matmul kernel that does the trick.
+        </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cu
+
+namespace {
+  __global__ void matMul2DKernel(ftype* const res, const ftype* const left, const ftype* const right,
+                               const tensorDim_t leftRows, const tensorDim_t leftCols,
+                               const tensorDim_t rightCols, const tensorSize_t resSize)
+  {
+    const int gid = blockDim.x * blockIdx.x + threadIdx.x;
+    if(gid >= resSize) 
+      return;
+
+    const int resCol = gid % rightCols;
+    const int resRow = gid / rightCols;
+    const int leftBase = resRow * leftCols;
+
+    // C[i, j] = sum_{k=0}^{leftCols} A[i, k] * B[k, j]
+    ftype cij = 0;
+    for(int k = 0; k < leftCols; k++) {
+      //smem[tid] += left[leftBase + k] * right[k * rightCols + resCol];
+      cij += left[leftBase + k] * right[k * rightCols + resCol];
+    }
+
+    res[gid] = cij; // smem[tid];
+  }
+}</code></pre>
+
+        <p>
+          Anyone who understands CUDA can already see a few openings for optimization, but we will get 
+          back to this later in this post.
+        </p>
+
+      </details>
+
+      <div class="article-text-div">
+
+      <details class="pytorch-optional" id="optional-naive-softmax-kernel">
+      <summary class="pytorch-optional-summary">
+        <h4>Optional: Softmax kernel</h4>
+      </summary>
+
+      <div class="pytorch-optional-collapse-bar">
+        <button type="button" class="pytorch-optional-collapse-btn"
+          onclick="var s=document.getElementById('optional-naive-softmax-kernel'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
+
+      <p>
+        The second kernel I think is worth looking at is the softmax kernel (the forward version - the backward 
+        version largely mirrors this one for obvious reasons). Optimization of this kernel won't be part of this 
+        blogpost, so you will not see this one again, unless I expand on this series at a later point in time.
+        It is interesting however because it shows pretty much any optimization pattern I chose to use in the first
+        naive implementation. In my eyes it is still a very naive implementation, but perhaps it's not that naive 
+        after all. Anyway, once again I start with setting up the basic kernel calls. I start with the first out of 
+        the three options I employ here:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/module/activation_functions/cuda/activations.cu
+namespace cuda_impl {
+  /**
+   * @brief Does the softmax computation. Warning: Current implementation can only handle a stride of 
+   * at max 512 * 512 = 262144 floating point numbers. If number exceeds this an exception is throws.
+   * 
+   * For simplicity and for reasons of CUDA efficiency this function is split into 3 segments. 
+   * 1. stride <= 32 -> we use warp level.
+   * 2. stride > 32 && stride < 512 -> we can fit one stride into one block.
+   * 3. stride > 512 -> we have to use two-stage kernel cascading for parallel reduction.
+   */
+  void softmax(Tensor& res, const Tensor& in) {
+    const tensorSize_t stride = static_cast<tensorSize_t>(in.getDims().get(-1));
+    const int nStrides = in.getSize() / stride;
+
+    // TODO: use some static struct here to prevent this guy from keeping on re-allocating memory
+    ftype* maxValues;
+    cudaErrchk(cudaMalloc(&maxValues, nStrides * sizeof(ftype)));
+
+    constexpr int warpSize = 32;
+    if(stride <= warpSize) {
+      assert(DeviceProperties::getWarpSize() == 32);
+
+      // each warp does one stride
+      constexpr int threadsPerBlock = 256;
+      constexpr int warpsPerBlock = threadsPerBlock / 32;
+      const int blocks = (nStrides + warpsPerBlock - 1) / warpsPerBlock;
+
+      //cout << "nStrides " << nStrides << " - in " << in << endl;
+
+      if(stride <= 2) {
+        findMaxKernelOneWarp<1> <<<blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)>>>(maxValues, in.getData(), stride, nStrides);
+      }
+      // ... same for stride == 4, 8, and 16 
+      else if(stride <= 32) {
+        findMaxKernelOneWarp<16> <<<blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)>>>(maxValues, in.getData(), stride, nStrides);
+      }
+      cudaErrchk(cudaDeviceSynchronize());
+
+      if(stride <= 2) {
+        stableSoftmaxKernelOneWarp<ftype, 1> <<<blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)>>>
+                                                (res.getData(), in.getData(), maxValues, stride, in.getSize());
+      }
+      // ... same for stride == 4, 8, and 16 
+      else if(stride <= 32) {
+        stableSoftmaxKernelOneWarp<ftype, 16> <<<blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)>>>
+                                                (res.getData(), in.getData(), maxValues, stride, in.getSize());
+      }
+      cudaErrchk(cudaDeviceSynchronize());
+    }
+    else {
+      // ... comes after the explanation of the block above
+    }
+
+    cudaErrchk(cudaFree(maxValues));
+  }
+}
+</code></pre>
+
+        <p>
+          The softmax kernel consists of two subsequent parallel reductions. In <a href="pytorch_demystified_2b.html" 
+          target="_blank">part 2b</a> I have shown in an optional section that softmax suffers from numerical instability
+          due to the exponential functions it employs. To tackle that one can first find the maximum value, over which we 
+          normalize both numerator and denominator of a fraction, a standard math trick looking generically like 
+
+          $$\frac{e^x}{e^y} = \frac{e^x}{e^y} \cdot 1 = \frac{e^x}{e^y} \cdot \frac{e^-a}{e^-a} = \frac{e^{x-a}}{e^{y-a}}$$
+
+          The steps of a softmax are then
+
+          <ol>
+            <li>Find the maximum exponent $max_{\hat{x} x_i}$ and subtract each exponent by it - $\hat{x_i} = x_i - x_{max}.</li>
+            <li>Compute the normalized denominator $s=\sum_i \hat{x_i}$.</li>
+            <li>Compute the softmax-distribution according to $softmax(x_i)=\frac{\hat{x_i}}{s}$.</li>
+          </ol>
+        </p>
+
+        <p>
+          I might have overblown the initial softmax kernel a bit like this, since that was work of 3-4 mornings considering 
+          all the debugging I also put into it, but it was a nice one to practice and deepen my CUDA skills for me. So I went 
+          the hard way and split it into three distinct parts, depending on how large the distribution we softmax over was: 
+
+          <ol>
+            <li>Distribution fits in a warp - $|x| \leq 32$.</li>
+            <li>Distribution larger than warp but fits in a block - $|x| \leq \text{blockSize}$.</li>
+            <li>Distribution larger than a block - $|x| > \text{blockSize}$.</li>
+          </ol>
+
+          This is the first part. The two kernels are obviously templated, and I think it is better to show them to you 
+          directly to answer why the templates:
+        </p>
+
+<pre><code class="language-cpp">// src/backend/shared/cuda/common_softmax.cuh
+
+namespace cuda_impl {
+  template<int maxoffset>
+  __forceinline__ __device__ void warpMaxReduce(volatile ftype* const input, const tensorSize_t stride, const int offset) {
+    static_assert(maxoffset > 0 && maxoffset <= 32, "Invalid value for template");
+    
+    if(maxoffset == 32) {
+      if(offset + 32 < stride) input[offset] = cudaMax<ftype>(input[offset], input[offset + 32]);
+    }
+    if(maxoffset >= 16) {
+      if(offset + 16 < stride) input[offset] = cudaMax<ftype>(input[offset], input[offset + 16]);
+    }
+    // ... and so on down to maxoffset == 1
+  }
+
+  /**
+   * @brief Here we find the maximum within a stride. Assumption: One warp does exactly one stride!
+   * Reduction via warp reduce. res has the maximum values stored.
+   */
+  template<int maxoffset>
+  static __global__ void findMaxKernelOneWarp(ftype* const res, const ftype* const input, const tensorSize_t stride, const tensorSize_t nStrides) {
+    assert(blockDim.x % 32 == 0);
+
+    const int tid = threadIdx.x;
+    const int gid = blockIdx.x * blockDim.x + tid;
+
+    const int strideNumber = gid / 32; // same as warp number
+    const int withinStrideOffset = gid % 32; // each warp covers up to 32 elements within a stride
+    const bool isNotPadded = withinStrideOffset < stride && strideNumber < nStrides;
+
+    extern __shared__ ftype smem[];
+    smem[tid] = isNotPadded ? input[strideNumber * stride + withinStrideOffset] : -INFINITY; // TODO: is this memory access pattern bad?
+    __syncthreads();
+
+    if(strideNumber >= nStrides) {
+      return;
+    }
+
+    volatile ftype* const start = smem + (tid / 32) * 32;
+    warpMaxReduce<maxoffset>(start, stride, withinStrideOffset);
+
+    if(withinStrideOffset == 0) {
+      res[strideNumber] = start[0];
+    }
+  }
+}
+
+// src/backend/module/activation_functions/cuda/activations.cu
+
+namespace {
+  // already shown above, just for reference
+  template<int maxoffset>
+  __forceinline__ __device__ void softmaxWarpSumReduce(volatile ftype* const input, const tensorSize_t stride, const int offset) {
+    static_assert(maxoffset > 0 && maxoffset <= 32, "Invalid value for template");
+    
+    if(maxoffset == 32) {
+      if(offset + 32 < stride) input[offset] += input[offset + 32];
+    }
+    if(maxoffset >= 16) {
+      if(offset + 16 < stride) input[offset] += input[offset + 16];
+    }
+    // ... and so on until maxoffset == 1
+  }
+
+  /**
+   * @brief Numerically stable version of softmax kernel. Just as in findMaxKernelOneWarp we assume that stride <= warpsize.
+   * Numerical stability comes from computing the maximum values per row, see findMaxKernelOneWarp and argument maxValues.
+   */
+  template<typename T, int maxoffset>
+  __global__ void stableSoftmaxKernelOneWarp(ftype* const res, const ftype* const input, const ftype* const maxValues,
+                                             const tensorSize_t stride, const tensorSize_t size) {
+    assert(blockDim.x % 32 == 0);
+
+    const int tid = threadIdx.x;
+    const int gid = blockIdx.x * blockDim.x + tid;
+
+    const int strideNumber = gid / 32; // same as warp number
+    const int withinStrideOffset = gid % 32; // each warp covers up to 32 elements within a stride
+
+    const int globalIdx = strideNumber * stride + withinStrideOffset;
+    const bool isNotPadded = withinStrideOffset < stride && globalIdx < size;
+
+    const auto maxValue = maxValues[strideNumber];
+    const ftype expVal = isNotPadded ? stableExp<ftype>(input[globalIdx], maxValue) : 0;
+
+    extern __shared__ ftype smem[];
+    smem[tid] = expVal;
+    __syncthreads();
+
+    volatile ftype* const start = smem + (tid / 32) * 32;
+    softmaxWarpSumReduce<maxoffset>(start, stride, withinStrideOffset); // TODO: do we need the bounds check here at all?
+
+    if(isNotPadded) {
+      res[globalIdx] = expVal / start[0];
+    }
+  }
+}
+</code></pre>
+
+        <p>
+          Essentially they are what you would expect mostly. There is some logic first to find out 
+          which element this thread is supposed to process. I have the name stride throughout the 
+          project to refer to a continuous line of elements of interest in memory. For softmax that 
+          would be the quantity $|x|$ already mentioned above. This is also the last assumed dimension
+          of our input, so the input shape is expected to be (dim_1, dim_2, ..., stride). Same reasoning
+          as with the matmul: better memory access pattern. That leads to improved performance, at least 
+          locally in the kernel. 
+        </p>
+
+        <p>
+          The surrounding logic then is to find out which stride we belong to right now, e.g. which batch 
+          we are processing. I do this currently via <code>const int withinStrideOffset = gid % 32;</code>,
+          which can lead us to wasted threads within a warp, but given that the alternative would be warp
+          divergence we don't really lose out here, but at least have more predictable execution patterns.
+          Whether this has a real cost will be interesting when we try to squeeze out everything out of 
+          our code, but I suspect that the effect is either positive or negligible.
+        </p>
+
+        <p>
+          I also note that the indexing pattern I use here using the modulo operator is overhead. We will at 
+          a later point in this post switch to better indexing using the <b>y- and z-</b>axes of regular 
+          CUDA indexing patterns, which saves us a few operations per kernel, in this case an expensive division 
+          through <code>int strideNumber = gid / 32;</code>, and an also expensive modulo through 
+          <code>int withinStrideOffset = gid % 32;</code>. I note that if a modulo here was actually necessary
+          we could alternatively get it through a bitmask, since $32 = 2 ^ 5$.
+        </p>
+
+        <p>
+          We also employ shared memory, since this saves us writes back into cache memory or global memory.
+          Each thread loads its operand into shared memory, then comes the template overloaded reduction. The 
+          templating is a compile time optimization, where the C++ host side selects the template overload 
+          and saves unnecessary if-checks if the stride is smaller than a certain size. Whether this is a good
+          design decision is another story, since we trade-off device code size and host side instruction cycles against
+          device side instruction cycles. But for now we leave it as is. 
+        </p>
+
+        <p>
+          To keep this section from blowing out of proportion I sidestep the case when the stride fits into a block, it 
+          naturally derives from the more complicated case three, when the stride is too large for a block. Instead I just 
+          give you this most complicated case to round up the picture. The cascade of kernel calls happens on the host side 
+          of course:
+        </p>
+
+<pre><code>// src/backend/module/activation_functions/cuda/activations.cu
+
+namespace cuda_impl {
+  void softmax(Tensor& res, const Tensor& in) {
+    // ...
+
+    if(stride <= 32) {
+      // shown above...
+    }
+    else if (stride <= 512) {
+      // ....
+    }
+    else {
+      // stride does not fit into one block. We employ a 2 pass system, where pass one does a partial 
+      // reduction, and pass two does a reduction over the partial reductions.
+    
+      // each block handles up to 512 elements (2 * 256 threads)
+      constexpr int maxThreadsPerBlock = 256;
+      constexpr int elemsPerBlock = 2 * maxThreadsPerBlock; // constant folding
+      const int blocksPerStride = (stride + elemsPerBlock - 1) / elemsPerBlock;
+      assert_debug(blocksPerStride <= 512, "Stride too large for two-pass reduction");
+      
+      const int totalBlocks = nStrides * blocksPerStride;
+
+      // ...
+    }
+
+    cudaErrchk(cudaFree(maxValues));
+  }
+}</code></pre>
+
+        <p>
+          At first we choose the number of threads per block. Because it is a reduction kernel, for which in 
+          every reduction cycle the number of active threads halves, we start out with 256 threads, instead of
+          the full 512 threads. In the first cycle each of those will process two elements: The one corresponding
+          with its current thread-id, and where applicable the one with index thread-id + size-of-block. This 
+          saves us from launching overhead threads that do no work. A second optimization pattern employed here 
+          is the division <code>const int blocksPerStride = (stride + elemsPerBlock - 1) / elemsPerBlock;</code>.
+          The pattern $\frac{a + b -1}{b}$ is really a <code>ceil(a, b);</code>, but cheaper in execution.
+        </p>
+
+        <p>
+          Because the stride is larger than one block we have to employ a cascaded reduction through asking multiple 
+          kernels to first reduce into partial reductions, then reduce further, like the following:
+        </p>
+
+<pre><code class="language-cpp">// src/backend/module/activation_functions/cuda/activations.cu
+
+namespace cuda_impl {
+  void softmax(Tensor& res, const Tensor& in) {
+    // ...
+
+    if(stride <= 32) {
+      // shown above...
+    }
+    else if (stride <= 512) {
+      // ....
+    }
+    else {
+      // ...
+      ftype* partialMaxValues;
+      const tensorSize_t nPartialMax = totalBlocks;
+      cudaErrchk(cudaMalloc(&maxValues, nStrides * sizeof(ftype)));
+      cudaErrchk(cudaMalloc(&partialMaxValues, nPartialMax * sizeof(ftype)));
+
+      // pass 1: reduce each chunk of 512 elements to one partial max
+      // launch blocksPerStride blocks per stride
+      findMaxKernelLargePass1<<<totalBlocks, maxThreadsPerBlock, 2 * maxThreadsPerBlock * sizeof(ftype)>>>(
+                                partialMaxValues, in.getData(), stride, blocksPerStride);
+      cudaErrchk(cudaDeviceSynchronize());
+
+      // pass 2: reduce partial maxes to one max per stride
+      int threadsPass2 = 1;
+      while(threadsPass2 < blocksPerStride) threadsPass2 <<= 1; // threadsPass2 needs to be power of 2
+      threadsPass2 = max(1, threadsPass2 / 2);
+      
+      findMaxKernelLargePass2<<<nStrides, threadsPass2, threadsPass2 * sizeof(ftype)>>>(maxValues, partialMaxValues, blocksPerStride);
+      cudaErrchk(cudaDeviceSynchronize());
+
+      // ...
+    }
+
+    cudaErrchk(cudaFree(maxValues));
+  }
+}</code></pre>
+
+        <p>
+          The kernel for the first pass looks like this:
+        </p>
+
+<pre><code class="language-cpp">// src/backend/module/activation_functions/cuda/activations.cu
+
+namespace {
+  static __global__ void findMaxKernelLargePass1(ftype* const partialMaxValues, const ftype* const input, 
+                                          const tensorSize_t stride, const int blocksPerStride) {
+    const int tid = threadIdx.x;
+    const int strideIdx = blockIdx.x / blocksPerStride;
+    const int blockWithinStride = blockIdx.x % blocksPerStride;
+
+    // block 0 within stride handles elements [0, 2*blockDim.x], block 1 within stride handles elements [2*blockDim.x, 4*blockDim.x], ...
+    const int inputBase = strideIdx * stride + blockWithinStride * 2 * blockDim.x; 
+      
+    extern __shared__ ftype smem[];
+    const tensorSize_t localIdx0 = inputBase + tid;
+    const tensorSize_t localIdx1 = inputBase + tid + blockDim.x;
+      
+    // localIdx0 < (strideIdx + 1) * stride <- checks whether thread idx exceeds bounds of this stride; one stride per block at cudaMax<ftype>
+    smem[tid] = (localIdx0 < (strideIdx + 1) * stride) ? input[localIdx0] : -INFINITY;
+    smem[tid + blockDim.x] = (localIdx1 < (strideIdx + 1) * stride) ? input[localIdx1] : -INFINITY;
+    __syncthreads();
+
+    // same reduction as findMaxKernelOneBlock from here
+    for(tensorSize_t offset = blockDim.x; offset > 32; offset >>= 1) {
+      if(tid < offset){
+        smem[tid] = cudaMax<ftype>(smem[tid], smem[tid + offset]);
+      } 
+      __syncthreads();
+    }
+
+    volatile ftype* start = smem;
+    if(tid < 32) {
+      start[tid] = cudaMax<ftype>(start[tid], start[tid + 32]);
+      start[tid] = cudaMax<ftype>(start[tid], start[tid + 16]);
+      start[tid] = cudaMax<ftype>(start[tid], start[tid + 8]);
+      start[tid] = cudaMax<ftype>(start[tid], start[tid + 4]);
+      start[tid] = cudaMax<ftype>(start[tid], start[tid + 2]);
+      start[tid] = cudaMax<ftype>(start[tid], start[tid + 1]);
+    }
+
+    if(tid == 0) {
+      partialMaxValues[blockIdx.x] = start[0];
+    }
+  }  
+}
+</code></pre>
+
+        <p>
+          Here the thread first does similar awkward arithmetics as in the single warp case to actually find 
+          out where in the processing machine it stands. The kernel then reduces the range it is covering into
+          an array of partial reductions, which will then be passed down to reduction kernel two, which is the 
+          kernel we employ when we have a single block.
+        </p>
+
+        <p>
+          I want to point out the reduction scheme empployed here too. Looking at the loop we have 
+          <code>for(tensorSize_t offset = blockDim.x; offset > 32; offset >>= 1)</code>. The reduction
+          works until the offset is 32, and in each iteration we divide by two via a bitshift to the right
+          through <code>offset >>= 1</code>. That is a classical pattern we can employ in reduction algorithms,
+          but it only works cleanly when blockDim.x is a $2^n$ with $n$ of course being an integer. Otherwise we 
+          will likely miss values, because a bitshift to the right is really a floor division by two. Additionally
+          we'd have to perform boundary checks in the following warp level reduction. Say for example we had 
+          blockDim.x==100. Then we'd get 50 for offset after one iteration, and then 25. In the raw reduction pattern 
+          we'd have 32 threads that are supposed to cover 50 elements. Without a boundary check we'd reduce over range
+          [0-63], putting everything above index 49 twice into our final result.
+        </p>
+
+        <p>
+          I will spare you the kernel for pass 2, since it is very similar to pass 1. Insted I note that with this design, 
+          a two pass, we have given ourselves a limit on the stride ($|x|$) we can process. That is ok for us now, since 
+          so far we do not expect inputs of that size, but once we move to really large networks we will have to revisit that.
+        </p>
+
+        <p>
+          The last part of the softmax comes naturally from the rest:
+        </p>
+
+<pre><code class="language-cpp">// src/backend/module/activation_functions/cuda/activations.cu
+
+namespace cuda_impl {
+  void softmax(Tensor& res, const Tensor& in) {
+    // ...
+
+    if(stride <= 32) {
+      // shown above...
+    }
+    else if (stride <= 512) {
+      // ....
+    }
+    else {
+      // ...
+      
+      ftype* partialSums;
+      cudaErrchk(cudaMalloc(&partialSums, nPartialMax * sizeof(ftype)));
+
+      stableSoftmaxLargePass1<ftype><<<totalBlocks, maxThreadsPerBlock, 2 * maxThreadsPerBlock * sizeof(ftype)>>>(
+                        res.getData(), partialSums, in.getData(), maxValues, stride, blocksPerStride);
+      cudaErrchk(cudaDeviceSynchronize());
+
+      // pass 2: reduce partial sums
+      stableSoftmaxLargePass2<<<nStrides, threadsPass2, threadsPass2 * sizeof(ftype)>>>(partialSums, partialSums, blocksPerStride);
+      cudaErrchk(cudaDeviceSynchronize());
+
+      // final division pass: divide each exp value by its stride's sum
+      const int nBlocksDivision = (in.getSize() + maxThreadsPerBlock - 1) / maxThreadsPerBlock;
+      divideKernel<<<nBlocksDivision, maxThreadsPerBlock>>>(res.getData(), partialSums, stride, in.getSize());
+      cudaErrchk(cudaDeviceSynchronize());
+
+      cudaErrchk(cudaFree(partialMaxValues));
+      cudaErrchk(cudaFree(partialSums));
+    }
+
+    cudaErrchk(cudaFree(maxValues));
+  }
+}</code></pre>
+
+        <p>
+          There are no surprises here anymore, since this is just the same two-pass structure we already 
+          have seen above, just this time we perform a sum rather than a scan. I think it is safe to say
+          we harvested enough from our softmax kernel and can move on to the optimization part. For 
+          everyone that is interested in the kernel implementations I refer to the code on 
+          <a href="https://github.com/RobBa/dl_lib/releases/tag/Naive_CUDA" target="_blank">GitHub</a>.
+        </p>
+
+      </details>
     </div>
+
+    <div id="cuda-backend-optimization" class="article-text-div">
+      <h2 class="heading-spaced">Optimizing the CUDA backend</h2>
+
+      <p>
+        Finally we have arrived at one of my personal highlights of this whole project, the 
+        CUDA backend optimization. 
+      </p>
+    </div>
+
+    TODO: mention the memory error in one of the kernels and give an optional fix
