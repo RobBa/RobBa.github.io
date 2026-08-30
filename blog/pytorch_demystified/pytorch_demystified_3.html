@@ -1203,9 +1203,36 @@ namespace cuda_impl {
       <h2 class="heading-spaced">Optimizing the CUDA backend</h2>
 
       <p>
-        Finally we have arrived at one of my personal highlights of this whole project, the 
-        CUDA backend optimization. 
+        Finally we have arrived at one of my personal highlights of this whole project, the CUDA backend 
+        optimization. We will be going through the optimization step-by-step and explain it and why it 
+        works. For everyone who wants to follow along I kept every step on a separate branch which you can 
+        find on my <a href="https://github.com/RobBa/dl_lib/tree/dev/cuda_optimization" target="_blank">GitHub</a>.
+        There is a script I used for benchmarking, which may or may not have been updated in betwen optimization
+        steps to reflect the new setting. You can find the script 
+        <a href="https://github.com/RobBa/dl_lib/blob/dev/cuda_optimization/optimization/mnist_cuda.py" target="_blank">here</a>.
       </p>
+
+      <p>
+        As a short disclaimer, there was an out-of-bounds indexing bug I found later in the <code>createContiguousCopyKernel</code> 
+        in file <i>https://github.com/RobBa/dl_lib/blob/dev/cuda_optimization/src/backend/data_modeling/cuda/tensor_ops.cu</i>. It 
+        shows up rarely and thus had been undiscovered. If you follow along and your code crashes you can fix it by copying the version
+        at the end of the branch. However, the bug has no influence on the benchmarking and optimization results.
+      </p>
+    </div>
+
+    <div id="cuda-opt-1" class="article-text-div">
+      <h3 class="heading-spaced">Remove unnecessary memcopies</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="27.3880s" after="0.5023s" 
+        speedup="54.53" commit="a979eaf1c4f148c296cf13cd166bd2a6896d772b" %}
+
+      <p>
+        This example is benchmarked on a small example, because it was so slow to run. We will move on from that very quickly and 
+        get to larger examples, but for now we benchmark on a mere 5 epochs with 10 batches each. The batch-size remains 64 samples
+        throughout this whole blog entry. 
+      </p>
+
     </div>
 
     TODO: mention the memory error in one of the kernels and give an optional fix

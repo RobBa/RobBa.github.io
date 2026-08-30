@@ -1,5 +1,40 @@
 /* -------------- Pytorch demystified 3: Implementing the CUDA backend ---------------- */
 
+/*
+ * Summary tile for each optimization step: before/after/speedup/commit.
+ * Reuses the same background/shadow tokens as .blog-index-div, but static
+ * (no hover effects) since this sits inline within an article, not a list.
+ */
+.pytorch-opt-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 16px 24px;
+    border-radius: 8px;
+    background-color: var(--color-blog-odd);
+    box-shadow: 4px 6px 16px var(--color-blog-shadow);
+}
+
+.pytorch-opt-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pytorch-opt-stat-label {
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--color-article-date);
+}
+
+.pytorch-opt-stat-value {
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
 #pytorch-cpp-cuda-separation,
 #pytorch-cpp-cuda-separation-dark {
     width: 85%;
@@ -9,5 +44,10 @@
     #pytorch-cpp-cuda-separation,
     #pytorch-cpp-cuda-separation-dark {
         width: 85%;
+    }
+
+    .pytorch-opt-summary {
+        gap: 16px;
+        padding: 14px 18px;
     }
 }

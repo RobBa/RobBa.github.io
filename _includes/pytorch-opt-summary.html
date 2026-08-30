@@ -1,0 +1,18 @@
+<div class="pytorch-opt-summary">
+  <div class="pytorch-opt-stat">
+    <span class="pytorch-opt-stat-label">Before</span>
+    <span class="pytorch-opt-stat-value">{{ include.before }}</span>
+  </div>
+  <div class="pytorch-opt-stat">
+    <span class="pytorch-opt-stat-label">After</span>
+    <span class="pytorch-opt-stat-value">{{ include.after }}</span>
+  </div>
+  <div class="pytorch-opt-stat">
+    <span class="pytorch-opt-stat-label">Speedup</span>
+    <span class="pytorch-opt-stat-value">{{ include.speedup }}</span>
+  </div>
+  <div class="pytorch-opt-stat">
+    <span class="pytorch-opt-stat-label">Commit</span>
+    <span class="pytorch-opt-stat-value"><code title="{{ include.commit }}">{{ include.commit | slice: 0, 7 }}</code></span>
+  </div>
+</div>
