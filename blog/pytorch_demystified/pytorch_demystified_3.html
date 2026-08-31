@@ -1215,7 +1215,7 @@ namespace cuda_impl {
       <p>
         <b>Brief disclaimer:</b> There was an out-of-bounds indexing bug I found later in the <code>createContiguousCopyKernel</code> 
         in file <a href="https://github.com/RobBa/dl_lib/blob/dev/cuda_optimization/src/backend/data_modeling/cuda/tensor_ops.cu"
-        target="_blank">tensorops.cu</a>. It 
+        target="_blank">tensorops.cu</a>, and have been phased out by optimization step 3. It 
         shows up rarely and thus had been undiscovered. If you follow along and your code crashes you can fix it by copying the version
         at the end of the branch. However, the bug has no influence on the benchmarking and optimization results.
       </p>
@@ -1589,12 +1589,16 @@ namespace cuda_impl {
 
     </div>
 
-    <div id="cuda-opt-1" class="article-text-div">
-      <h3 class="heading-spaced">Opt. 3 - Speed up slicing by using non-blocking CUDA kernel</h3>
+    <div id="cuda-opt-3" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 3 - Speed up matmul in the backward block</h3>
 
       {% include pytorch-opt-summary.html 
-        before="0.7337s" after="0.1635s" 
-        speedup="4.49x" commit="a68493d2faa74f2cf2cb1ee8b302f6b784126595" %}
+        before="0.1635s" after="0.0704s" 
+        speedup="2.32x" commit="a68493d2faa74f2cf2cb1ee8b302f6b784126595" %}
+
+        <p>
+          
+        </p>
 
     </div>
 
