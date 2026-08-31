@@ -40,6 +40,10 @@
     width: 85%;
 }
 
+.pytorch-nsight {
+    width: 100%;
+}
+
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     #pytorch-cpp-cuda-separation,
     #pytorch-cpp-cuda-separation-dark {

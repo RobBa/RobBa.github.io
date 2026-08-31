@@ -1213,26 +1213,389 @@ namespace cuda_impl {
       </p>
 
       <p>
-        As a short disclaimer, there was an out-of-bounds indexing bug I found later in the <code>createContiguousCopyKernel</code> 
-        in file <i>https://github.com/RobBa/dl_lib/blob/dev/cuda_optimization/src/backend/data_modeling/cuda/tensor_ops.cu</i>. It 
+        <b>Brief disclaimer:</b> There was an out-of-bounds indexing bug I found later in the <code>createContiguousCopyKernel</code> 
+        in file <a href="https://github.com/RobBa/dl_lib/blob/dev/cuda_optimization/src/backend/data_modeling/cuda/tensor_ops.cu"
+        target="_blank">tensorops.cu</a>. It 
         shows up rarely and thus had been undiscovered. If you follow along and your code crashes you can fix it by copying the version
         at the end of the branch. However, the bug has no influence on the benchmarking and optimization results.
       </p>
     </div>
 
-    <div id="cuda-opt-1" class="article-text-div">
-      <h3 class="heading-spaced">Remove unnecessary memcopies</h3>
+    <div class="article-text-div">
 
-      {% include pytorch-opt-summary.html 
-        before="27.3880s" after="0.5023s" 
-        speedup="54.53" commit="a979eaf1c4f148c296cf13cd166bd2a6896d772b" %}
+      <details class="pytorch-optional" id="optional-benchmark-explained">
+      <summary class="pytorch-optional-summary">
+        <h4>Optional: The benchmark explained</h4>
+      </summary>
+
+      <div class="pytorch-optional-collapse-bar">
+        <button type="button" class="pytorch-optional-collapse-btn"
+          onclick="var s=document.getElementById('optional-benchmark-explained'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
 
       <p>
-        This example is benchmarked on a small example, because it was so slow to run. We will move on from that very quickly and 
-        get to larger examples, but for now we benchmark on a mere 5 epochs with 10 batches each. The batch-size remains 64 samples
-        throughout this whole blog entry. 
+        For everyone interested I give a quick rundown on the benchmark. This will be a very quick one, as it is code 
+        have seen mostly. In essence, it is the MNIST training loop we have already seen, but with a few modifications.
+        Let's look at the main loop:
+      </p>
+
+<pre><code class="language-python">&#35; optimization/mnist_cuda.py
+if __name__ == "__main__":
+    x, y_int = load_mnist()
+    y = to_one_hot(y_int)
+
+    x_train, x_val, y_train, y_val = train_test_split(
+        x, y, test_size=0.1, random_state=42
+    )
+
+    # upload once; all batching and shuffling happens on the GPU
+    x_train_gpu = to_gpu(x_train)
+    y_train_gpu = to_gpu(y_train)
+    x_val_gpu   = to_gpu(x_val)
+
+    net = make_net()
+    loss_fn = CrossEntropyWithSoftmax()
+    optim = RmsProp(net.parameters(), 0.0001, 0.999)
+
+    # warm up GPU
+    BATCH_COUNT = 10
+    train_epoch(net, loss_fn, optim, x_train_gpu, y_train_gpu, max_batch_count=BATCH_COUNT)
+
+    times = []
+    n_epochs = 5
+    for epoch in range(n_epochs):
+        
+        start = time.perf_counter()
+        train_loss = train_epoch(net, loss_fn, optim, x_train_gpu, y_train_gpu, max_batch_count=BATCH_COUNT)
+        elapsed = time.perf_counter() - start
+        print(f"Elapsed time GPU: {elapsed:.4f}s")
+
+        times.append(elapsed)
+
+    median_time = sorted(times)[len(times) // 2]
+    print(f"Median time GPU: {median_time:.4f}s")</code></pre>
+
+      <p>
+        At first we copy the whole dataset onto the GPU and create and initialize our network. This ensures that
+        we do not benchmark the initial Python overhead and the overhead that comes from setting up training (after 
+        all we are interested in the training loop, not its one-off initialization). We then run one epoch before 
+        we start benchmarking to initialize the CUDA context and warm-up the caches. Without this step the first 
+        epoch is at a great disadvantage.  
+      </p>
+
+      <p>
+        Next we define how many epochs and how many batches per epoch we want to benchmark. These numbers will
+        start low and increase over time, as our loop gets faster and more pleasant to benchmark on larger samples.
+        I also kicked out code that our benchmarking does not need, but that incurs penalties, such as printouts 
+        and preceding status checks associated with them. The reduced training loop looks like this: 
+      </p>
+
+<pre><code class="language-python">&#35; optimization/mnist_cuda.py
+
+def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_count=50):
+    n = x_gpu.dims[0]
+
+    indices = list(range(n))
+    random.shuffle(indices)
+    x_shuf = x_gpu.slice(indices)
+    y_shuf = y_gpu.slice(indices)
+
+    total_loss = 0.0
+    n_batches = 0
+    max_batches = math.ceil(n / batch_size) &#35; not used - my bad
+    for start in range(0, n, batch_size):
+        end = min(start + batch_size, n)
+        xb = x_shuf.slice(start, end)
+        yb = y_shuf.slice(start, end)
+
+        pred = net.forward(xb)
+        loss = loss_fn(yb, pred)
+        loss.backward()
+
+        optim.clipGradients(1.0)
+        optim.step()
+        optim.zeroGrad()
+
+        total_loss += loss.getitem(0)
+        n_batches += 1
+        if n_batches == max_batch_count:
+          return total_loss / n_batches</code></pre>
+
+      </details>
+
+      <p>
+        No surprises here, just a normal training loop. Lastly we benchmark through running this training 
+        loop five times, and taking the time, and we record the media. I note here that initially in the 
+        script I made a mistake of taking the last number that was put out. The numbers I give in this 
+        blogpost in the initial steps are thus not the median, but the last output, but that should be ok, 
+        as throughout this whole run of the benchmarks did not vary significantly in between the five training 
+        loops. Rerunning will very likely give me the same numbers with minimal deviations.
       </p>
 
     </div>
 
-    TODO: mention the memory error in one of the kernels and give an optional fix
+    <div id="cuda-opt-1" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 1 - Remove unnecessary memcopies</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="27.3880s" after="0.5023s" 
+        speedup="54.53x" commit="a979eaf1c4f148c296cf13cd166bd2a6896d772b" %}
+
+      <p>
+        This example is benchmarked on a small example, because it was so slow to run. We will move on from that very quickly and 
+        get to larger examples, but for now we benchmark on a mere 5 epochs with 10 batches each. The batch-size remains 64 samples
+        throughout this whole blog entry, as well as the next. We start off by running NSight to see the execution on a continuous timeline.
+        I note that because NSight significantly slows down the run and generates huge amounts of data then needs to load (sometimes
+        overwhelming itself) I ran NSight on a smaller example than the benchmark itself. A screenshot of this run is in the following:
+      </p>
+
+      <img
+      class="blog-image pytorch-nsight"
+      src="./img_3/nsight/step_1.png"
+      alt="NSight profiling for optimization step 1">
+
+      <p>
+        The main information is that rather embarassingly, 99.4% of the time we spend copying data, with about half of that being 
+        device-to-host copies. This kind of copy specifically should be neglilible in this script, since we copy once from the host
+        to the device, and afterwards the only real copies back should just be the training losses and network outputs at best. 
+        We can use NSight to go deeper into where the memcopy-calls are actually made and find that I forgot to map the gradient clipping
+        onto the GPU. That is, each time an optimizer clips the gradients the CPU would execute the associated parts of the code. 
+      </p>
+
+      <p>
+        Additionally, since we copy each element singular through <code>auto g = (*grads)[i];</code> and 
+        <code>grads->set((*grads)[i] * scale, i);</code> we have created the worst possible way to copy to and from the device
+        as well. The fix then is straight forward: Write a kernel for gradient clipping and incorporate it into the CUDA framework.
+      </p>
+
+      <p>
+        I personally struggle with calling this an optimization step, since it is more of a debugging. The code did not do what I 
+        expected it to do, and I diagnosed and fixed it. However, I already had my naive CUDA implementation as a release out there,
+        and this serves as a stark example of how expensive seemingly innocuous memcopies can wreck your application, so I kept it in.
+        The speedup is magnificent. In this example I used a reduced benchmark, but going to the final benchmark I used for my last
+        optimization steps, this step has reduced the runtime from 997.691s down to a meager 2.399s. Can't really complain about that.
+      </p>
+
+    </div>
+
+    <div id="cuda-opt-1" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 2 - Speed up slicing by using non-blocking CUDA kernel</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="0.7337s" after="0.1635s" 
+        speedup="4.49x" commit="a68493d2faa74f2cf2cb1ee8b302f6b784126595" %}
+
+      <p>
+        For everyone looking at the before-after numbers and wondering about the contradiction with the optimization step before, 
+        I have increased the workload for the benchmark now. More specifically, the number of batches we push through per epoch
+        has been increased from 10 to 50 now, making the before number larger than the after from the previous example.
+      </p>
+
+      <p>To start out with the optimization, we once again employ NSight, giving us the following timeline:</p>
+
+      <img
+      class="blog-image pytorch-nsight"
+      src="./img_3/nsight/step_2.png"
+      alt="NSight profiling for optimization step 2">
+
+      <p>
+        We find ourselves still copying a lot of data, but this time we spend the bulk of it on device-to-device copies.
+        The culprit this time is the slicing operation. Looking into the Python code we use slicing to implement the 
+        shuffling operation at the beginning of each epoch. The code for that looks like this:  
+      </p>
+
+<pre><code class="language-python">def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_count=50):
+    n = x_gpu.dims[0]
+
+    indices = list(range(n))
+    random.shuffle(indices)
+    x_shuf = x_gpu.slice(indices)
+    y_shuf = y_gpu.slice(indices)
+    &#35; ...</code></pre>
+
+    <p>
+      The slicing, at it stands before optimizing, looks like this:
+    </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
+
+Tensor Tensor::getSlice(span<const tensorDim_t> indices) const {
+  // .. set up result
+
+  values->copyValues(*res.values, indices, res.getDims().getStride(0));
+  return res;
+}
+
+void Tensor::tensorValues_t::copyValues(tensorValues_t& target, span<const tensorDim_t> indices, 
+                                        const tensorSize_t sizeOfDim) const {
+  assert(target.size >= sizeOfDim * indices.size());
+
+  switch(device){
++     // CPU version ...
+    case Device::CUDA:
+      #ifdef __CUDA
+        tensorSize_t targetOffset = 0;
+        for(tensorDim_t idx: indices){
+          tensorSize_t thisOffset = idx * sizeOfDim;
+          copyValues(target, thisOffset, thisOffset+sizeOfDim, targetOffset);
+          targetOffset += sizeOfDim;
+        }
+        cudaErrchk(cudaDeviceSynchronize());
+      #else // the casual check for any CUDA call
+        __throw_invalid_argument("Not compiled with CUDA");
+      #endif
+      break;
+  }
+}
+
+void Tensor::tensorValues_t::copyValues(tensorValues_t& target, tensorSize_t low, 
+                                        tensorSize_t high, tensorSize_t targetOffset) const {
+  // safety checks here
+
+  switch(device){
+    case Device::CPU:
+      std::memcpy(target.values+targetOffset, values+low, (high-low) * sizeof(ftype));
+      break;
+    case Device::CUDA:
+      #ifdef __CUDA
+        cudaErrchk(cudaMemcpy(target.values+targetOffset, values+low, (high-low) * sizeof(ftype), cudaMemcpyDeviceToDevice));
+      #else
+        __throw_runtime_error("Not compiled with CUDA");
+      #endif
+      break;
+  }
+}
+</code></pre>
+
+      <p>
+        The gist is the following: Initially, getSlice sets up the result, and the first copyValues-methods called 
+        determines a range to copy from for each index to slice over. This for-loop then calls subsequent memcopies.
+        Pretty straight forward, but the astute reader can find two issues with this design. 
+      </p>
+
+      <p>
+        The first problem is that memcopies are blocking. That is, if somewhere along the code I call a standard 
+        cudaMemcpy, then the memcopy is issued on the host, and the host code blocks until all data is on the device - 
+        there is an actual reason for this design I talk about optionally below. For now it is worth knowing that we 
+        lose momentum by issuing a series of subsequent memcopies, each one waiting for the previous one to finish. 
+        For better bus utilization we should focus on having less memcopies, but each one better transport a large 
+        chunk of neighboring memory cells. I.e. we'd rather have large coalesced memory accesses than many smaller 
+        ones where applicable.
+      </p>
+
+      <p>
+        The second problem is negligible compared with the first one, but still worth mentioning: We do have two 
+        overloads of copyValues here, and each one checks the device. Given that the device does not change in between
+        the two we could just manually get the memcopies from the inner call into the outer call, saving a conditional 
+        check. For now we will only fix the first one though, as this is where we lose the bulk, and the CUDA fix naturally
+        does away with this. What's left on the CPU side is work for later.
+      </p>
+
+      <p>
+        To fix this issue we have multiple ways. For instance, we could use multiple CUDA streams, hence overlap the 
+        memcopies via overlapping the memcopies. The runtime overhead then lies in context creation for each stream, 
+        plus the complexity we introduce in the source code itself.
+      </p>
+
+      <p>
+        There is however an easier solution that I chose instead. Since we already have a destination allocated on the GPU
+        we can bypass the memcopies entirely and simply write a quick manual kernel copying the data for us. The overhead here 
+        is in thread creation, but once they exist each thread will do its own indexing, giving us both coalesced memory accesses
+        where applicable, it bypasses the additional stream initialization for now, and it gives us an easy way to synchronize,
+        since we can just launch it on the default stream asynchronously. The kernel is depicated below.
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cu
+
+namespace cuda_impl {
+  void getSlice(Tensor& res, const Tensor& src, span<const tensorDim_t> idx) {
+    constexpr int threadsPerBlock = 256;
+    const int blocks = (res.getSize() + threadsPerBlock - 1) / threadsPerBlock;
+
+    tensorDim_t* idx_d;
+    cudaErrchk(cudaMalloc(&idx_d, idx.size() * sizeof(tensorDim_t)));
+    const auto sizeOfDim = res.getDims().getStride(0);
+
+    cudaErrchk(cudaMalloc(&idx_d, idx.size() * sizeof(tensorDim_t)));
+    cudaErrchk(cudaMemcpy(idx_d, idx.data(), idx.size() * sizeof(tensorDim_t), cudaMemcpyHostToDevice));
+
+    getSliceKernel<<<blocks, threadsPerBlock>>>(res.getData(), src.getData(), idx_d, sizeOfDim, res.getSize());
+    cudaErrchk(cudaDeviceSynchronize());
+    cudaErrchk(cudaFree(idx_d));
+  }
+}
+</code></pre>
+      
+    </div>
+
+
+    <div class="article-text-div">
+
+      <details class="pytorch-optional" id="optional-cuda-memcopies-explained">
+      <summary class="pytorch-optional-summary">
+        <h4>Optional: The synchronizity of CUDA memcopies</h4>
+      </summary>
+
+      <div class="pytorch-optional-collapse-bar">
+        <button type="button" class="pytorch-optional-collapse-btn"
+          onclick="var s=document.getElementById('optional-cuda-memcopies-explained'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
+
+      <p>
+        Ok, before I start going into the more interesting part of this the actual boring answer is "It's just the API design". 
+        CUDA does support asynchronous memcopies, there's especially little problem with them when they happen inside the device.
+        However, what matters is also safety. Asynchronous programming is susceptible to all kinds of race conditions and subseqeunt 
+        errors, hence the CUDA team decided to give guarantees on memcopies. Once the host moves to the next instruction the data
+        is guaranteed to be where you expect it to be. 
+      </p>
+
+      <p>
+        There is however a subtle problem with asynchronous memcopies as well, and it has to do with how memory is managed on a
+        computer. This is a big can of worms that would burst the scope of this blogpost, but in short, computers manage memory 
+        through virtual memory. That is, when you have a program using internal addresses, the operating system uses a multilevel 
+        lookup table to map the program's internal addresses to the real, physical addresses. As a result of that we never have to 
+        load the entire program into the memory. That is the reason why an 100GB large video game can fit into 16GB of RAM - it only 
+        ever is partially there. 
+      </p>
+
+      <p>
+        To enable that mechanism memory is always loaded in chunks of memory into RAM, and we call such a chunk a page. Pages are loaded 
+        into memory dynamically: If the CPU requests a piece of data the operating system checks if it is already there (that's only half-true,
+        but it's enough to explain what is going on here). Data thus can also be ejected from RAM back into main memory, especially when RAM is
+        full. And that can easily happen if we run multiple programs.
+      </p>
+
+      <p>
+        Now imagine that we now have a tensor, and we want to copy its content onto the GPU. The host does not know about the internals of 
+        the GPU, so we tell the GPU where the data remains that it wants, as well as where it wants it to be (the dst-pointer we give the 
+        cudaMemcpy commands). The GPU starts to copy, but now the host moves on and frees the page again. In that moment the operating 
+        system has free hands to kick out our page we are in the process of copying from, and replace it with another page, possibly 
+        even from another program. Sounds terrible, no? +
+      </p>
+
+      <p>
+        The workaround is to use asynchronous memcopies if you want to use them, but they have a pre-condition for exactly that reason: 
+        At first we have to tell the operating system that the chunk of memory we want to copy from cannot be swapped out. This is called
+        page locked memory, CUDA calls it pinned memory, and is subject for a later blogpost. For us here this is technically irrelevant, 
+        since we copied device-to-device, but CUDA does not differentiate. I.e. it all boils down to the original reason: CUDA keeps you 
+        save from tripping over your own shoes, and if you want you can use the asynchronous method with a little bit of extra code.
+      </p>
+
+      </details>
+
+    </div>
+
+    <div id="cuda-opt-1" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 3 - Speed up slicing by using non-blocking CUDA kernel</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="0.7337s" after="0.1635s" 
+        speedup="4.49x" commit="a68493d2faa74f2cf2cb1ee8b302f6b784126595" %}
+
+    </div>
+
+    TODO: a figure for page locked memory? 
