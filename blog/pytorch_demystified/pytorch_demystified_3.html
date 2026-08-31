@@ -1353,7 +1353,7 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
 
       <img
       class="blog-image pytorch-nsight"
-      src="./img_3/nsight/step_1.png"
+      src="./img_3/nsight/before_step_1.png"
       alt="NSight profiling for optimization step 1">
 
       <p>
@@ -1397,7 +1397,7 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
 
       <img
       class="blog-image pytorch-nsight"
-      src="./img_3/nsight/step_2.png"
+      src="./img_3/nsight/before_step_2.png"
       alt="NSight profiling for optimization step 2">
 
       <p>
@@ -1466,8 +1466,7 @@ void Tensor::tensorValues_t::copyValues(tensorValues_t& target, tensorSize_t low
       #endif
       break;
   }
-}
-</code></pre>
+}</code></pre>
 
       <p>
         The gist is the following: Initially, getSlice sets up the result, and the first copyValues-methods called 
@@ -1597,8 +1596,205 @@ namespace cuda_impl {
         speedup="2.32x" commit="a68493d2faa74f2cf2cb1ee8b302f6b784126595" %}
 
         <p>
-          
+          As per usual, we start by profiling through NSight. The following timeline shows that we finally moved into kernel space:
         </p>
+
+        <img
+        class="blog-image pytorch-nsight"
+        src="./img_3/nsight/before_step_3.png"
+        alt="NSight profiling for optimization step 3">
+
+        <p>
+          We find ourselves 60% of the time running kernels, and out of that more than 70% in the createContiguousCopyKernel. The question 
+          is where this one gets called the most, but since this is a new kernel not explained yet I give an optional explanation below. If 
+          you are familiar with it you can skip this section and move on to the next one.
+        </p>
+
+        <details class="pytorch-optional" id="optional-dimensionality-revisited">
+        <summary class="pytorch-optional-summary">
+          <h4>Optional: Dimensionality revisited</h4>
+        </summary>
+
+        <div class="pytorch-optional-collapse-bar">
+          <button type="button" class="pytorch-optional-collapse-btn"
+            onclick="var s=document.getElementById('optional-dimensionality-revisited'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+            &#9650; Collapse
+          </button>
+        </div>
+
+        <p>
+          In part one of this series I introduced a class representing the dimension of a tensor. I have silently refined that a little bit, 
+          and if you are not familiar with strided dimensions this is for you. To recap on the previous design, I introduced a class Dimension, 
+          and gave it an internal vector representing the dimensions. If you look at the transpose method as it was before, then you saw just 
+          fixed hardcoded transposition.
+        </p>
+
+        <p>
+          The refactoring step has been circumventing that. We might not want to move data around every time we call transpose, so I made that 
+          lazily. I gave the Dimension class two additional fields representing the logical layout, juxtaposed with the physical layout that 
+          the previously introduced fields represent. The beginning of the class now looks like this:
+        </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/dim_type.h
+
+class Dimension final {
+  using dim_t = std::array<tensorSize_t, MAX_NDIMS>;
+  struct shallowCopyToken {};
+
+  private:
+    // those two indicate the structure of the contiguous data that lies underneath
+    std::shared_ptr< std::vector<tensorDim_t> > contiguousDims;
+    std::shared_ptr<dim_t> contiguousStrides;
+
+    std::vector<tensorDim_t> dims;
+    dim_t strides;
+    
+    // ...
+
+  public:
+
+    // ...
+
+    bool inOriginalState() const noexcept {
+      return *contiguousStrides == strides;
+    }
+
+    const auto getStrides() const noexcept { return strides; }
+    const auto getContiguousStrides() const noexcept { return contiguousStrides; }
+    void makeContiguous();
+
+    // ...
+}
+</code></pre>
+
+          <p>
+            I already made an initial step for a later optimization, replacing the std::vector containers with std::array ones. That will 
+            require some Python-C++ translation and some refactoring here and there, but will likely also be a nice small little speedup, 
+            moving data from the heap right into the stack where the code is.
+          </p>
+
+          <p>
+            More important now is the function of the logical representation. Essentially it boils down to lazy computation. Calling 
+            transpose on a tensor now does not change the underlying data structure, but just the representation of strides. The 
+            contiguousStrides represent the physical layout, and only when the tensor is requested to be made contiguous do we 
+            move the data so to represent the view we created through our transpose earlier.
+          </p>
+
+          <p>
+            This design does two things for us:
+            <ol>
+              <li>We can create transposed views on tensors without moving data unnecessarily.</li>
+              <li>Some operations might not need the tensor to be contiguous to run efficient - hence this design opens up future optimization vectors.</li>
+            </ol> 
+          </p>
+
+        </details>
+
+        <p>
+          By digging deeper we find that the kernel is extensively called in the backward-pass of the matrix multiplication 
+          operation. Looking at the node again we find the following operation: 
+        </p>
+
+<pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/matmul_node.cpp
+
+vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
+    assert(!upstreamGrad.getRequiresGrad());
+    
+    return {
+        make_shared<Tensor>(upstreamGrad.matmul(*parents[1])), 
+        make_shared<Tensor>(parents[0]->matmul(upstreamGrad))
+    };
+}</code></pre>
+
+      <p>
+        I talked about this method earlier in <a href="pytorch_demystified_2a.css" target="_blank">part 2a</a> in an optional 
+        block, but if you allow me to quote myself, "Given two matrices $A$ and $B$, and computing their 
+        matrix multiplication $C = A @ B$, we obtain the following for the derivatives: 
+        $\frac{\partial C}{\partial A} = C @ B^T$ and $\frac{\partial C}{\partial B} = A @ C^T$". The code on the other side does 
+        the following: It first transposes one of the two tensors, which induces a copy with a reshuffling of the underlying data, 
+        then multiplies. But since we need the transposition how to solve that one? 
+      </p>
+
+      <p>
+        <b>Kernel fusion</b> to the rescue: We need to do the transposition in any case, but what we can do is bake it directly 
+        into our matrix multiplication, where we will have to think about our indexing so that we hit the right elements. 
+        Luckily this is also rather straight forward, all we have to do is virtually swap rows and columns inside the kernel, 
+        but the logic remains the same. To further avoid decision making at runtime we template our kernel, and the transposition
+        information will be evaluated at compile time, leaning on modern constexpr-features. The kernel looks like the following 
+        after the refactor:
+      </p>
+
+<pre><code>// src/backend/data_modeling/cuda/tensor_ops.cu
+
+namespace {
+  __global__ void matMul2DKernel(ftype* const res, 
+                                 const ftype* const left, const ftype* const right,
+                                 const tensorDim_t leftRows, const tensorDim_t rightRows, 
+                                 const tensorDim_t leftCols, const tensorDim_t rightCols, 
+                                 const tensorSize_t resSize)
+  {
+    const int tid = threadIdx.x;
+    const int gid = blockDim.x * blockIdx.x + tid;
+    if(gid >= resSize) 
+      return;
+
+    const int K = transposeLeft ? leftRows :  leftCols;
+    const int N = transposeRight ? rightRows : rightCols;
+
+    const int i = gid / N;
+    const int j = gid % N;
+
+    // C[i, j] = sum_{k=0}^{leftCols} A[i, k] * B[k, j]
+    ftype cij = 0;
+    for (int k = 0; k < K; k++) {
+
+      int leftIdx = transposeLeft ? k * leftCols + i : i * leftCols + k;
+      int rightIdx = transposeRight ? j * rightCols + k : k * rightCols + j;
+            
+      cij += left[leftIdx] * right[rightIdx];
+    }
+
+    res[gid] = cij; // smem[tid];
+  }
+}</code></pre>
+
+      <p>
+        Important to note here is that there's a decision to be made on whether the input parameters, i.e. the number of 
+        rows and columns, represent the physical or the logical layout, with the physical being the actual alignment in 
+        memory and the logical the alignment as it would virtually exist after transposing the respective tensor. I 
+        preferred being lazy here and chose that they represent the physical layout, for no other reason as that being 
+        easier for me to imagine and reason about. 
+      </p>
+
+      <p>
+        The basic difference with the previous, unoptimized kernel is then the introduction of K and N, representing the 
+        virtual layout then, and finally moving over that in the inner loop. The loop decides whether it wants to move over
+        rows or columns then, i.e. it does the index swap. All we have to do then is to update the call to matmul through
+      </p>
+
+<pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/matmul_node.cpp
+
+vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
+    assert(!upstreamGrad.getRequiresGrad());
+    // TODO: optimize operators
+    return {
+        make_shared<Tensor>(upstreamGrad.matmul(*parents[1], false, true)), 
+        make_shared<Tensor>(parents[0]->matmul(upstreamGrad, true, false))
+    };
+}
+</code></pre>
+
+      <p>
+        The signature for matmul has been adjusted to pass the flags down into the actual matmul implementation as in 
+        <code>Tensor matmul(const Tensor& other, const bool transposeLeft, const bool transposeRight) const;</code>, 
+        and the code decides dynamically which template instance of the kernel to call. 
+      </p>
+
+      <p>
+        We will see this kernel again later and optimize it further, and then the same for the CPU later as well, so do not 
+        feel obliged to dig into all the knitty-gritties of that one if you missed some detail. Getting the idea and why 
+        this optimization step works is enough for now. 
+      </p>
 
     </div>
 
