@@ -1793,9 +1793,88 @@ vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
       <p>
         We will see this kernel again later and optimize it further, and then the same for the CPU later as well, so do not 
         feel obliged to dig into all the knitty-gritties of that one if you missed some detail. Getting the idea and why 
-        this optimization step works is enough for now. 
+        this optimization step works is enough for now.
       </p>
 
     </div>
+
+    <div id="cuda-opt-4" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 4 - Memcopies revisited: On-device initialization and memory pool</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="1.1201s" after="0.0909s" 
+        speedup="12.32" commit="61c4dd534831df8853b3bc7bd40026b91943ab44" %}
+
+      
+        <p>
+          This optimization step is certainly one of my favorite ones due to the simplicity and elegance of the solutions. Because 
+          we are already in really fast area, at least on this small dataset, we disabled the number of batches now, and an epoch 
+          trains on the whole dataset from now on. Looking at NSight again we once find ourselves running lots of memcopy-operations,
+          shown below. So the fix will once again be to reduce those.
+        </p>
+
+        <img
+        class="blog-image pytorch-nsight"
+        src="./img_3/nsight/before_step_4.png"
+        alt="NSight profiling for optimization step 4">
+
+        <p>
+          This step will, unlike the other ones, be split up in two parts. The first part
+          won't have an impact on the training dataset, but since I was looking at memory management again I wanted to forward pass
+          this one for myself (and something smelled fishy for me for a while already). The second one is the impactful optimization 
+          that brings down the benchmark then.
+        </p>
+
+      </div>
+
+      <divclass="article-text-div">
+        <h4 class="heading-spaced">Opt. 4.1 - On-device initialization</h4>
+
+        <p>
+          This first part is pretty straight forward. When initializing weights for networks, so far the code went the following route:
+          First, it would allocate an array on the CPU, populate it with values, and then copy that whole chunk of memory onto the GPU. 
+          This is happening in the constructor of the layer module we implemented earlier, as in 
+        </p>
+
+<pre><code class="language-cpp">// src/backend/module/layers/ff_layer.cpp
+
+FfLayer::FfLayer(tensorDim_t inSize, tensorDim_t outSize, Device d, 
+    bool useBias, bool requiresGrad, shared_ptr<InitializerBase> init)
+  : requiresGrad{requiresGrad} 
+{
+  if(!init){
+    init = make_shared<NormalXavierInitializer>(inSize, outSize);  
+  }
+
+  weights = make_shared<Tensor>(Dimension({inSize, outSize}), d, requiresGrad);
+  weights->reset(init);
+    
+  if(useBias){
+    bias = make_shared<Tensor>(vector<tensorDim_t>{outSize}, d, requiresGrad);
+    TensorFunctions::ToZeros(*bias);
+  }
+}</code></pre>
+
+        <p>
+          The fix is then to initialize the weights directly on the GPU. CUDA offers CuRand as a ready solution for that, so I won't 
+          go into detail here. The initializers in their final forms for now can be found in the src/backend/shared directory.
+        </p>
+
+      </div>
+
+      <div class="article-text-div">
+        <h4 class="heading-spaced">Opt. 4.2 - Use a memory pool for tensors</h4>
+
+        <p>
+          This time around we do not really see any unnecessary memcopies attributed to any single kernel. However, we do see
+          many memcopies, especially from the host onto the device. This should not immediately be alarming and technically we 
+          do have to go a little deeper in order to rule out where they happen.
+        </p>
+
+      </div>
+
+          That also means that improvements will get more and more neglible on this small 
+          dataset, but will show much more on larger datasets and bigger networks. We don't have that implemented (yet), so for 
+          now we will keep on going with this one.
 
     TODO: a figure for page locked memory? 
