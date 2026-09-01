@@ -1207,10 +1207,30 @@ namespace cuda_impl {
         optimization. We will be going through the optimization step-by-step and explain it and why it 
         works. For everyone who wants to follow along I kept every step on a separate branch which you can 
         find on my <a href="https://github.com/RobBa/dl_lib/tree/dev/cuda_optimization" target="_blank">GitHub</a>.
+      </p>
+
+      <p>
         There is a script I used for benchmarking, which may or may not have been updated in betwen optimization
         steps to reflect the new setting. You can find the script 
         <a href="https://github.com/RobBa/dl_lib/blob/dev/cuda_optimization/optimization/mnist_cuda.py" target="_blank">here</a>.
+        The base loop is depicted below, and for everyone who does want the code of the benchmark explained I do that in a optional
+        box below.
       </p>
+
+      <figure class="fig-light">
+          <img
+          id="pytorch-benchmark-explained"
+          class="blog-image"
+          src="./img_3/benchmark-explained.png"
+          alt="The benchmark loop.">
+          </figure>
+          <figure class="fig-dark">
+          <img
+          id="pytorch-benchmark-explained-dark"
+          class="blog-image"
+          src="./img_3/benchmark-explained-dark.png"
+          alt="The benchmark loop.">
+      </figure>
 
       <p>
         <b>Brief disclaimer:</b> There was an out-of-bounds indexing bug I found later in the <code>createContiguousCopyKernel</code> 
@@ -1219,13 +1239,14 @@ namespace cuda_impl {
         shows up rarely and thus had been undiscovered. If you follow along and your code crashes you can fix it by copying the version
         at the end of the branch. However, the bug has no influence on the benchmarking and optimization results.
       </p>
+
     </div>
 
     <div class="article-text-div">
 
       <details class="pytorch-optional" id="optional-benchmark-explained">
       <summary class="pytorch-optional-summary">
-        <h4>Optional: The benchmark explained</h4>
+        <h4>Optional: The benchmark in detail</h4>
       </summary>
 
       <div class="pytorch-optional-collapse-bar">
@@ -1576,6 +1597,33 @@ namespace cuda_impl {
         even from another program. Sounds terrible, no? +
       </p>
 
+      <figure class="fig-light">
+          <img
+          id="pytorch-paging-explained"
+          class="blog-image"
+          src="./img_3/paging-explained.png"
+          alt="Sketching the CUDA device's interaction with host memory management.">
+          <figcaption>
+            The paging mechanism outlined. The host code tells the CUDA device that it can copy a code segment, and the OS kernel manages
+            memory. The problem arises when the OS kernel swaps out pages back into main memory while the CUDA is still copying from them. This 
+            is guaranteed to not happen if we block the host code, but if the memcopy-operation is performed asynchronously additional safety
+            features have to be used, such as 'pinned memory'.
+          </figcaption>
+          </figure>
+          <figure class="fig-dark">
+          <img
+          id="pytorch-paging-explained-dark"
+          class="blog-image"
+          src="./img_3/paging-explained-dark.png"
+          alt="Sketching the CUDA device's interaction with host memory management.">
+          <figcaption>
+            The paging mechanism outlined. The host code tells the CUDA device that it can copy a code segment, and the OS kernel manages
+            memory. The problem arises when the OS kernel swaps out pages back into main memory while the CUDA is still copying from them. This 
+            is guaranteed to not happen if we block the host code, but if the memcopy-operation is performed asynchronously additional safety
+            features have to be used, such as 'pinned memory'.
+          </figcaption>
+      </figure>
+
       <p>
         The workaround is to use asynchronous memcopies if you want to use them, but they have a pre-condition for exactly that reason: 
         At first we have to tell the operating system that the chunk of memory we want to copy from cannot be swapped out. This is called
@@ -1810,7 +1858,7 @@ vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
           This optimization step is certainly one of my favorite ones due to the simplicity and elegance of the solutions. Because 
           we are already in really fast area, at least on this small dataset, we disabled the number of batches now, and an epoch 
           trains on the whole dataset from now on. Looking at NSight again we once find ourselves running lots of memcopy-operations,
-          shown below. So the fix will once again be to reduce those.
+          shown below. So this is another chance for us to look at memory management.
         </p>
 
         <img
@@ -1820,14 +1868,14 @@ vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
 
         <p>
           This step will, unlike the other ones, be split up in two parts. The first part
-          won't have an impact on the training dataset, but since I was looking at memory management again I wanted to forward pass
-          this one for myself (and something smelled fishy for me for a while already). The second one is the impactful optimization 
-          that brings down the benchmark then.
+          won't have an impact on the training dataset, but will alter the NSight output, as it will reduce those host-to-device copies. 
+          The second one won't change the memcopies, hence not alter the NSight output, but it is something that has been burning under
+          my fingers for a while now, and now I finally have a chance to make it shine.
         </p>
 
       </div>
 
-      <divclass="article-text-div">
+      <div class="article-text-div">
         <h4 class="heading-spaced">Opt. 4.1 - On-device initialization</h4>
 
         <p>
@@ -1856,8 +1904,9 @@ FfLayer::FfLayer(tensorDim_t inSize, tensorDim_t outSize, Device d,
 }</code></pre>
 
         <p>
-          The fix is then to initialize the weights directly on the GPU. CUDA offers CuRand as a ready solution for that, so I won't 
-          go into detail here. The initializers in their final forms for now can be found in the src/backend/shared directory.
+          The fix is then to initialize the weights directly on the GPU. CUDA offers <a href="https://docs.nvidia.com/cuda/curand/index.html" 
+          target="_blank">CuRand</a> as a ready solution for that, so I won't go into detail here. The initializers in their final forms for 
+          now can be found in the src/backend/shared directory.
         </p>
 
       </div>
@@ -1866,10 +1915,15 @@ FfLayer::FfLayer(tensorDim_t inSize, tensorDim_t outSize, Device d,
         <h4 class="heading-spaced">Opt. 4.2 - Use a memory pool for tensors</h4>
 
         <p>
-          This time around we do not really see any unnecessary memcopies attributed to any single kernel. However, we do see
-          many memcopies, especially from the host onto the device. This should not immediately be alarming and technically we 
-          do have to go a little deeper in order to rule out where they happen.
+          With that done we finally find ourselves only doing necessary memcopies from host to device and back, set apart a few
+          not-so-obvious cases. For now we can consider that done though. However, there is another part of the code that I know 
+          stings, and we're gonna take it down. Let's take a brief look at the construction and destruction of the tensorValues_t: 
         </p>
+
+<pre><code>// 
+
+
+</code></pre>
 
       </div>
 
