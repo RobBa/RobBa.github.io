@@ -1,0 +1,23 @@
+/* -------------- Pytorch demystified 2b: Deep learning modules and the training pipeline ---------------- */
+
+#pytorch-train-loop-illustrated,
+#pytorch-train-loop-illustrated-dark {
+    width: 75%;
+}
+
+#pytorch-library-diagram,
+#pytorch-library-diagram-dark {
+    width: 90%;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    #pytorch-train-loop-illustrated,
+    #pytorch-train-loop-illustrated-dark {
+        width: 80%;
+    }
+
+    #pytorch-library-diagram,
+    #pytorch-library-diagram-dark {
+        width: 95%;
+    }
+}

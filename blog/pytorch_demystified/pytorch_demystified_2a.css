@@ -1,0 +1,58 @@
+/* -------------- Pytorch demystified 2a: Autograd engine ---------------- */
+
+.pytorch-graph-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 30px;
+    margin-bottom: 20px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.pytorch-graph-example {
+    max-width: 75%;
+}
+
+.pytorch-graph-pass {
+    max-width: 100%;
+}
+
+.pytorch-graph-fig {
+    flex: 1 1 50%;
+    min-width: 0;
+}
+
+#pytorch-reference-illustration,
+#pytorch-reference-illustration-dark {
+    width: 82%;
+}
+
+#pytorch-backward-order-illustration,
+#pytorch-backward-order-illustration-dark {
+    width: 85%;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    .pytorch-graph-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .pytorch-graph-example {
+        max-width: 80%;
+    }
+
+    .pytorch-graph-pass {
+        max-width: 90%;
+    }
+
+    #pytorch-reference-illustration,
+    #pytorch-reference-illustration-dark {
+        width: 90%;
+    }
+
+    #pytorch-backward-order-illustration,
+    #pytorch-backward-order-illustration-dark {
+        width: 95%;
+    }
+}

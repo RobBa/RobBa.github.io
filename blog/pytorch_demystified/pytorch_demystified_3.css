@@ -1,0 +1,13 @@
+/* -------------- Pytorch demystified 3: Implementing the CUDA backend ---------------- */
+
+#pytorch-cpp-cuda-separation,
+#pytorch-cpp-cuda-separation-dark {
+    width: 85%;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    #pytorch-cpp-cuda-separation,
+    #pytorch-cpp-cuda-separation-dark {
+        width: 85%;
+    }
+}
