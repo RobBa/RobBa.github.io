@@ -593,27 +593,27 @@ namespace cuda_impl { // in cuda_impl because it is shared
 
 namespace { 
   // example of a warp-level reduction kernel - pattern applied consistently throughout code
-  template<int maxoffset>
+  template&lt;int maxoffset&gt;
   __forceinline__ __device__ void softmaxWarpSumReduce(volatile ftype* const input, const tensorSize_t stride, const int offset) {
-    static_assert(maxoffset > 0 && maxoffset <= 32, "Invalid value for template");
+    static_assert(maxoffset &gt; 0 && maxoffset &lt;= 32, "Invalid value for template");
     
     if(maxoffset == 32) {
-      if(offset + 32 < stride) input[offset] += input[offset + 32];
+      if(offset + 32 &lt; stride) input[offset] += input[offset + 32];
     }
-    if(maxoffset >= 16) {
-      if(offset + 16 < stride) input[offset] += input[offset + 16];
+    if(maxoffset &gt;= 16) {
+      if(offset + 16 &lt; stride) input[offset] += input[offset + 16];
     }
-    if(maxoffset >= 8) {
-      if(offset + 8 < stride) input[offset] += input[offset + 8];
+    if(maxoffset &gt;= 8) {
+      if(offset + 8 &lt; stride) input[offset] += input[offset + 8];
     }
-    if(maxoffset >= 4) {
-      if(offset + 4 < stride) input[offset] += input[offset + 4];
+    if(maxoffset &gt;= 4) {
+      if(offset + 4 &lt; stride) input[offset] += input[offset + 4];
     }
-    if(maxoffset >= 2) {
-      if(offset + 2 < stride) input[offset] += input[offset + 2];
+    if(maxoffset &gt;= 2) {
+      if(offset + 2 &lt; stride) input[offset] += input[offset + 2];
     }
-    if(maxoffset >= 1) {
-      if(offset + 1 < stride) input[offset] += input[offset + 1];
+    if(maxoffset &gt;= 1) {
+      if(offset + 1 &lt; stride) input[offset] += input[offset + 1];
     }
   }
 }</code></pre>
@@ -663,8 +663,8 @@ namespace cuda_impl {
     tensorSize_t rightOffset = 0;
     tensorSize_t resOffset = 0;
 
-    while(leftOffset < left.getSize()){
-      matMul2DKernel<<<blocksPerGrid, threadsPerBlock>>>(res.getData() + resOffset, left.getData() + leftOffset, right.getData() + rightOffset, 
+    while(leftOffset &lt; left.getSize()){
+      matMul2DKernel&lt;&lt;&lt;blocksPerGrid, threadsPerBlock&gt;&gt;&gt;(res.getData() + resOffset, left.getData() + leftOffset, right.getData() + rightOffset, 
                                                          left.getDims().get(-2), left.getDims().get(-1), right.getDims().get(-1), resSize);
 
       leftOffset += leftSize;
@@ -699,7 +699,7 @@ namespace {
                                const tensorDim_t rightCols, const tensorSize_t resSize)
   {
     const int gid = blockDim.x * blockIdx.x + threadIdx.x;
-    if(gid >= resSize) 
+    if(gid &gt;= resSize) 
       return;
 
     const int resCol = gid % rightCols;
@@ -708,7 +708,7 @@ namespace {
 
     // C[i, j] = sum_{k=0}^{leftCols} A[i, k] * B[k, j]
     ftype cij = 0;
-    for(int k = 0; k < leftCols; k++) {
+    for(int k = 0; k &lt; leftCols; k++) {
       cij += left[leftBase + k] * right[k * rightCols + resCol];
     }
 
@@ -753,15 +753,15 @@ namespace {
 namespace cuda_impl {
   /**
    * @brief Does the softmax computation. Warning: Current implementation can only handle a stride of 
-   * at max 512 * 512 = 262144 floating point numbers. If number exceeds this an exception is throws.
+   * at max 512 * 512 = 262144 floating point numbers. If number exceeds this an exception is thrown.
    * 
    * For simplicity and for reasons of CUDA efficiency this function is split into 3 segments. 
-   * 1. stride <= 32 -> we use warp level.
-   * 2. stride > 32 && stride < 512 -> we can fit one stride into one block.
-   * 3. stride > 512 -> we have to use two-stage kernel cascading for parallel reduction.
+   * 1. stride &lt;= 32 -&gt; we use warp level.
+   * 2. stride &gt; 32 && stride &lt; 512 -&gt; we can fit one stride into one block.
+   * 3. stride &gt; 512 -&gt; we have to use two-stage kernel cascading for parallel reduction.
    */
   void softmax(Tensor& res, const Tensor& in) {
-    const tensorSize_t stride = static_cast<tensorSize_t>(in.getDims().get(-1));
+    const tensorSize_t stride = static_cast&lt;tensorSize_t&gt;(in.getDims().get(-1));
     const int nStrides = in.getSize() / stride;
 
     // TODO: use some static struct here to prevent this guy from keeping on re-allocating memory
@@ -769,7 +769,7 @@ namespace cuda_impl {
     cudaErrchk(cudaMalloc(&maxValues, nStrides * sizeof(ftype)));
 
     constexpr int warpSize = 32;
-    if(stride <= warpSize) {
+    if(stride &lt;= warpSize) {
       assert(DeviceProperties::getWarpSize() == 32);
 
       // each warp does one stride
@@ -777,24 +777,24 @@ namespace cuda_impl {
       constexpr int warpsPerBlock = threadsPerBlock / 32;
       const int blocks = (nStrides + warpsPerBlock - 1) / warpsPerBlock;
 
-      //cout << "nStrides " << nStrides << " - in " << in << endl;
+      //cout &lt;&lt; "nStrides " &lt;&lt; nStrides &lt;&lt; " - in " &lt;&lt; in &lt;&lt; endl;
 
-      if(stride <= 2) {
-        findMaxKernelOneWarp<1> <<<blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)>>>(maxValues, in.getData(), stride, nStrides);
+      if(stride &lt;= 2) {
+        findMaxKernelOneWarp&lt;1&gt; &lt;&lt;&lt;blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)&gt;&gt;&gt;(maxValues, in.getData(), stride, nStrides);
       }
       // ... same for stride == 4, 8, and 16 
-      else if(stride <= 32) {
-        findMaxKernelOneWarp<16> <<<blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)>>>(maxValues, in.getData(), stride, nStrides);
+      else if(stride &lt;= 32) {
+        findMaxKernelOneWarp&lt;16&gt; &lt;&lt;&lt;blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)&gt;&gt;&gt;(maxValues, in.getData(), stride, nStrides);
       }
       cudaErrchk(cudaDeviceSynchronize());
 
-      if(stride <= 2) {
-        stableSoftmaxKernelOneWarp<ftype, 1> <<<blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)>>>
+      if(stride &lt;= 2) {
+        stableSoftmaxKernelOneWarp&lt;ftype, 1&gt; &lt;&lt;&lt;blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)&gt;&gt;&gt;
                                                 (res.getData(), in.getData(), maxValues, stride, in.getSize());
       }
       // ... same for stride == 4, 8, and 16 
-      else if(stride <= 32) {
-        stableSoftmaxKernelOneWarp<ftype, 16> <<<blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)>>>
+      else if(stride &lt;= 32) {
+        stableSoftmaxKernelOneWarp&lt;ftype, 16&gt; &lt;&lt;&lt;blocks, threadsPerBlock, threadsPerBlock * sizeof(ftype)&gt;&gt;&gt;
                                                 (res.getData(), in.getData(), maxValues, stride, in.getSize());
       }
       cudaErrchk(cudaDeviceSynchronize());
@@ -819,9 +819,9 @@ namespace cuda_impl {
           The steps of a softmax are then
 
           <ol>
-            <li>Find the maximum exponent $max_{\hat{x} x_i}$ and subtract each exponent by it - $\hat{x_i} = x_i - x_{max}.</li>
-            <li>Compute the normalized denominator $s=\sum_i \hat{x_i}$.</li>
-            <li>Compute the softmax-distribution according to $softmax(x_i)=\frac{\hat{x_i}}{s}$.</li>
+            <li>Find the maximum exponent $x_{max} = \max_i x_i$ and subtract it from each exponent - $\hat{x}_i = x_i - x_{max}$.</li>
+            <li>Compute the normalizing denominator $s=\sum_i e^{\hat{x}_i}$.</li>
+            <li>Compute the softmax distribution according to $softmax(x_i)=\frac{e^{\hat{x}_i}}{s}$.</li>
           </ol>
         </p>
 
@@ -843,15 +843,15 @@ namespace cuda_impl {
 <pre><code class="language-cpp">// src/backend/shared/cuda/common_softmax.cuh
 
 namespace cuda_impl {
-  template<int maxoffset>
+  template&lt;int maxoffset&gt;
   __forceinline__ __device__ void warpMaxReduce(volatile ftype* const input, const tensorSize_t stride, const int offset) {
-    static_assert(maxoffset > 0 && maxoffset <= 32, "Invalid value for template");
+    static_assert(maxoffset &gt; 0 && maxoffset &lt;= 32, "Invalid value for template");
     
     if(maxoffset == 32) {
-      if(offset + 32 < stride) input[offset] = cudaMax<ftype>(input[offset], input[offset + 32]);
+      if(offset + 32 &lt; stride) input[offset] = cudaMax&lt;ftype&gt;(input[offset], input[offset + 32]);
     }
-    if(maxoffset >= 16) {
-      if(offset + 16 < stride) input[offset] = cudaMax<ftype>(input[offset], input[offset + 16]);
+    if(maxoffset &gt;= 16) {
+      if(offset + 16 &lt; stride) input[offset] = cudaMax&lt;ftype&gt;(input[offset], input[offset + 16]);
     }
     // ... and so on down to maxoffset == 1
   }
@@ -860,7 +860,7 @@ namespace cuda_impl {
    * @brief Here we find the maximum within a stride. Assumption: One warp does exactly one stride!
    * Reduction via warp reduce. res has the maximum values stored.
    */
-  template<int maxoffset>
+  template&lt;int maxoffset&gt;
   static __global__ void findMaxKernelOneWarp(ftype* const res, const ftype* const input, const tensorSize_t stride, const tensorSize_t nStrides) {
     assert(blockDim.x % 32 == 0);
 
@@ -869,18 +869,18 @@ namespace cuda_impl {
 
     const int strideNumber = gid / 32; // same as warp number
     const int withinStrideOffset = gid % 32; // each warp covers up to 32 elements within a stride
-    const bool isNotPadded = withinStrideOffset < stride && strideNumber < nStrides;
+    const bool isNotPadded = withinStrideOffset &lt; stride && strideNumber &lt; nStrides;
 
     extern __shared__ ftype smem[];
     smem[tid] = isNotPadded ? input[strideNumber * stride + withinStrideOffset] : -INFINITY; // TODO: is this memory access pattern bad?
     __syncthreads();
 
-    if(strideNumber >= nStrides) {
+    if(strideNumber &gt;= nStrides) {
       return;
     }
 
     volatile ftype* const start = smem + (tid / 32) * 32;
-    warpMaxReduce<maxoffset>(start, stride, withinStrideOffset);
+    warpMaxReduce&lt;maxoffset&gt;(start, stride, withinStrideOffset);
 
     if(withinStrideOffset == 0) {
       res[strideNumber] = start[0];
@@ -892,24 +892,24 @@ namespace cuda_impl {
 
 namespace {
   // already shown above, just for reference
-  template<int maxoffset>
+  template&lt;int maxoffset&gt;
   __forceinline__ __device__ void softmaxWarpSumReduce(volatile ftype* const input, const tensorSize_t stride, const int offset) {
-    static_assert(maxoffset > 0 && maxoffset <= 32, "Invalid value for template");
+    static_assert(maxoffset &gt; 0 && maxoffset &lt;= 32, "Invalid value for template");
     
     if(maxoffset == 32) {
-      if(offset + 32 < stride) input[offset] += input[offset + 32];
+      if(offset + 32 &lt; stride) input[offset] += input[offset + 32];
     }
-    if(maxoffset >= 16) {
-      if(offset + 16 < stride) input[offset] += input[offset + 16];
+    if(maxoffset &gt;= 16) {
+      if(offset + 16 &lt; stride) input[offset] += input[offset + 16];
     }
     // ... and so on until maxoffset == 1
   }
 
   /**
-   * @brief Numerically stable version of softmax kernel. Just as in findMaxKernelOneWarp we assume that stride <= warpsize.
+   * @brief Numerically stable version of softmax kernel. Just as in findMaxKernelOneWarp we assume that stride &lt;= warpsize.
    * Numerical stability comes from computing the maximum values per row, see findMaxKernelOneWarp and argument maxValues.
    */
-  template<typename T, int maxoffset>
+  template&lt;typename T, int maxoffset&gt;
   __global__ void stableSoftmaxKernelOneWarp(ftype* const res, const ftype* const input, const ftype* const maxValues,
                                              const tensorSize_t stride, const tensorSize_t size) {
     assert(blockDim.x % 32 == 0);
@@ -921,17 +921,17 @@ namespace {
     const int withinStrideOffset = gid % 32; // each warp covers up to 32 elements within a stride
 
     const int globalIdx = strideNumber * stride + withinStrideOffset;
-    const bool isNotPadded = withinStrideOffset < stride && globalIdx < size;
+    const bool isNotPadded = withinStrideOffset &lt; stride && globalIdx &lt; size;
 
     const auto maxValue = maxValues[strideNumber];
-    const ftype expVal = isNotPadded ? stableExp<ftype>(input[globalIdx], maxValue) : 0;
+    const ftype expVal = isNotPadded ? stableExp&lt;ftype&gt;(input[globalIdx], maxValue) : 0;
 
     extern __shared__ ftype smem[];
     smem[tid] = expVal;
     __syncthreads();
 
     volatile ftype* const start = smem + (tid / 32) * 32;
-    softmaxWarpSumReduce<maxoffset>(start, stride, withinStrideOffset); // TODO: do we need the bounds check here at all?
+    softmaxWarpSumReduce&lt;maxoffset&gt;(start, stride, withinStrideOffset); // TODO: do we need the bounds check here at all?
 
     if(isNotPadded) {
       res[globalIdx] = expVal / start[0];
@@ -989,10 +989,10 @@ namespace cuda_impl {
   void softmax(Tensor& res, const Tensor& in) {
     // ...
 
-    if(stride <= 32) {
+    if(stride &lt;= 32) {
       // shown above...
     }
-    else if (stride <= 512) {
+    else if (stride &lt;= 512) {
       // ....
     }
     else {
@@ -1003,7 +1003,7 @@ namespace cuda_impl {
       constexpr int maxThreadsPerBlock = 256;
       constexpr int elemsPerBlock = 2 * maxThreadsPerBlock; // constant folding
       const int blocksPerStride = (stride + elemsPerBlock - 1) / elemsPerBlock;
-      assert_debug(blocksPerStride <= 512, "Stride too large for two-pass reduction");
+      assert_debug(blocksPerStride &lt;= 512, "Stride too large for two-pass reduction");
       
       const int totalBlocks = nStrides * blocksPerStride;
 
@@ -1035,10 +1035,10 @@ namespace cuda_impl {
   void softmax(Tensor& res, const Tensor& in) {
     // ...
 
-    if(stride <= 32) {
+    if(stride &lt;= 32) {
       // shown above...
     }
-    else if (stride <= 512) {
+    else if (stride &lt;= 512) {
       // ....
     }
     else {
@@ -1050,16 +1050,16 @@ namespace cuda_impl {
 
       // pass 1: reduce each chunk of 512 elements to one partial max
       // launch blocksPerStride blocks per stride
-      findMaxKernelLargePass1<<<totalBlocks, maxThreadsPerBlock, 2 * maxThreadsPerBlock * sizeof(ftype)>>>(
+      findMaxKernelLargePass1&lt;&lt;&lt;totalBlocks, maxThreadsPerBlock, 2 * maxThreadsPerBlock * sizeof(ftype)&gt;&gt;&gt;(
                                 partialMaxValues, in.getData(), stride, blocksPerStride);
       cudaErrchk(cudaDeviceSynchronize());
 
       // pass 2: reduce partial maxes to one max per stride
       int threadsPass2 = 1;
-      while(threadsPass2 < blocksPerStride) threadsPass2 <<= 1; // threadsPass2 needs to be power of 2
+      while(threadsPass2 &lt; blocksPerStride) threadsPass2 &lt;&lt;= 1; // threadsPass2 needs to be power of 2
       threadsPass2 = max(1, threadsPass2 / 2);
       
-      findMaxKernelLargePass2<<<nStrides, threadsPass2, threadsPass2 * sizeof(ftype)>>>(maxValues, partialMaxValues, blocksPerStride);
+      findMaxKernelLargePass2&lt;&lt;&lt;nStrides, threadsPass2, threadsPass2 * sizeof(ftype)&gt;&gt;&gt;(maxValues, partialMaxValues, blocksPerStride);
       cudaErrchk(cudaDeviceSynchronize());
 
       // ...
@@ -1089,27 +1089,27 @@ namespace {
     const tensorSize_t localIdx0 = inputBase + tid;
     const tensorSize_t localIdx1 = inputBase + tid + blockDim.x;
       
-    // localIdx0 < (strideIdx + 1) * stride <- checks whether thread idx exceeds bounds of this stride; one stride per block at cudaMax<ftype>
-    smem[tid] = (localIdx0 < (strideIdx + 1) * stride) ? input[localIdx0] : -INFINITY;
-    smem[tid + blockDim.x] = (localIdx1 < (strideIdx + 1) * stride) ? input[localIdx1] : -INFINITY;
+    // localIdx0 &lt; (strideIdx + 1) * stride &lt;- checks whether thread idx exceeds bounds of this stride; one stride per block at cudaMax&lt;ftype&gt;
+    smem[tid] = (localIdx0 &lt; (strideIdx + 1) * stride) ? input[localIdx0] : -INFINITY;
+    smem[tid + blockDim.x] = (localIdx1 &lt; (strideIdx + 1) * stride) ? input[localIdx1] : -INFINITY;
     __syncthreads();
 
     // same reduction as findMaxKernelOneBlock from here
-    for(tensorSize_t offset = blockDim.x; offset > 32; offset >>= 1) {
-      if(tid < offset){
-        smem[tid] = cudaMax<ftype>(smem[tid], smem[tid + offset]);
+    for(tensorSize_t offset = blockDim.x; offset &gt; 32; offset &gt;&gt;= 1) {
+      if(tid &lt; offset){
+        smem[tid] = cudaMax&lt;ftype&gt;(smem[tid], smem[tid + offset]);
       } 
       __syncthreads();
     }
 
     volatile ftype* start = smem;
-    if(tid < 32) {
-      start[tid] = cudaMax<ftype>(start[tid], start[tid + 32]);
-      start[tid] = cudaMax<ftype>(start[tid], start[tid + 16]);
-      start[tid] = cudaMax<ftype>(start[tid], start[tid + 8]);
-      start[tid] = cudaMax<ftype>(start[tid], start[tid + 4]);
-      start[tid] = cudaMax<ftype>(start[tid], start[tid + 2]);
-      start[tid] = cudaMax<ftype>(start[tid], start[tid + 1]);
+    if(tid &lt; 32) {
+      start[tid] = cudaMax&lt;ftype&gt;(start[tid], start[tid + 32]);
+      start[tid] = cudaMax&lt;ftype&gt;(start[tid], start[tid + 16]);
+      start[tid] = cudaMax&lt;ftype&gt;(start[tid], start[tid + 8]);
+      start[tid] = cudaMax&lt;ftype&gt;(start[tid], start[tid + 4]);
+      start[tid] = cudaMax&lt;ftype&gt;(start[tid], start[tid + 2]);
+      start[tid] = cudaMax&lt;ftype&gt;(start[tid], start[tid + 1]);
     }
 
     if(tid == 0) {
@@ -1127,10 +1127,10 @@ namespace {
         </p>
 
         <p>
-          I want to point out the reduction scheme empployed here too. Looking at the loop we have 
-          <code>for(tensorSize_t offset = blockDim.x; offset > 32; offset >>= 1)</code>. The reduction
+          I want to point out the reduction scheme employed here too. Looking at the loop we have
+          <code>for(tensorSize_t offset = blockDim.x; offset &gt; 32; offset &gt;&gt;= 1)</code>. The reduction
           works until the offset is 32, and in each iteration we divide by two via a bitshift to the right
-          through <code>offset >>= 1</code>. That is a classical pattern we can employ in reduction algorithms,
+          through <code>offset &gt;&gt;= 1</code>. That is a classical pattern we can employ in reduction algorithms,
           but it only works cleanly when blockDim.x is a $2^n$ - with $n$ of course being an integer. Otherwise we 
           will likely miss values, because a bitshift to the right is really a floor division by two. Additionally
           we'd have to perform boundary checks in the following warp level reduction. Say for example we had 
@@ -1140,7 +1140,7 @@ namespace {
         </p>
 
         <p>
-          I will spare you the kernel for pass 2, since it is very similar to pass 1. Insted I note that with this design, 
+          I will spare you the kernel for pass 2, since it is very similar to pass 1. Instead I note that with this design,
           a two pass, we have given ourselves a limit on the stride ($|x|$) we can process. That is ok for us now, since 
           so far we do not expect inputs of that size, but once we move to really large networks we will have to revisit that.
         </p>
@@ -1155,10 +1155,10 @@ namespace cuda_impl {
   void softmax(Tensor& res, const Tensor& in) {
     // ...
 
-    if(stride <= 32) {
+    if(stride &lt;= 32) {
       // shown above...
     }
-    else if (stride <= 512) {
+    else if (stride &lt;= 512) {
       // ....
     }
     else {
@@ -1167,17 +1167,17 @@ namespace cuda_impl {
       ftype* partialSums;
       cudaErrchk(cudaMalloc(&partialSums, nPartialMax * sizeof(ftype)));
 
-      stableSoftmaxLargePass1<ftype><<<totalBlocks, maxThreadsPerBlock, 2 * maxThreadsPerBlock * sizeof(ftype)>>>(
+      stableSoftmaxLargePass1&lt;ftype&gt;&lt;&lt;&lt;totalBlocks, maxThreadsPerBlock, 2 * maxThreadsPerBlock * sizeof(ftype)&gt;&gt;&gt;(
                         res.getData(), partialSums, in.getData(), maxValues, stride, blocksPerStride);
       cudaErrchk(cudaDeviceSynchronize());
 
       // pass 2: reduce partial sums
-      stableSoftmaxLargePass2<<<nStrides, threadsPass2, threadsPass2 * sizeof(ftype)>>>(partialSums, partialSums, blocksPerStride);
+      stableSoftmaxLargePass2&lt;&lt;&lt;nStrides, threadsPass2, threadsPass2 * sizeof(ftype)&gt;&gt;&gt;(partialSums, partialSums, blocksPerStride);
       cudaErrchk(cudaDeviceSynchronize());
 
       // final division pass: divide each exp value by its stride's sum
       const int nBlocksDivision = (in.getSize() + maxThreadsPerBlock - 1) / maxThreadsPerBlock;
-      divideKernel<<<nBlocksDivision, maxThreadsPerBlock>>>(res.getData(), partialSums, stride, in.getSize());
+      divideKernel&lt;&lt;&lt;nBlocksDivision, maxThreadsPerBlock&gt;&gt;&gt;(res.getData(), partialSums, stride, in.getSize());
       cudaErrchk(cudaDeviceSynchronize());
 
       cudaErrchk(cudaFree(partialMaxValues));
@@ -1210,10 +1210,10 @@ namespace cuda_impl {
       </p>
 
       <p>
-        There is a script I used for benchmarking, which may or may not have been updated in betwen optimization
+        There is a script I used for benchmarking, which may or may not have been updated in between optimization
         steps to reflect the new setting. You can find the script 
         <a href="https://github.com/RobBa/dl_lib/blob/dev/cuda_optimization/optimization/mnist_cuda.py" target="_blank">here</a>.
-        The base loop is depicted below, and for everyone who does want the code of the benchmark explained I do that in a optional
+        The base loop is depicted below, and for everyone who does want the code of the benchmark explained I do that in an optional
         box below.
       </p>
 
@@ -1233,9 +1233,9 @@ namespace cuda_impl {
       </figure>
 
       <p>
-        <b>Brief disclaimer:</b> There was an out-of-bounds indexing bug I found later in the <code>createContiguousCopyKernel</code> 
+        <b>Brief disclaimer:</b> There was an out-of-bounds indexing bug I found later in the <code>createContiguousCopyKernel</code>
         in file <a href="https://github.com/RobBa/dl_lib/blob/dev/cuda_optimization/src/backend/data_modeling/cuda/tensor_ops.cu"
-        target="_blank">tensorops.cu</a>, and have been phased out by optimization step 3. It 
+        target="_blank">tensor_ops.cu</a>, and it has been phased out by optimization step 3. It
         shows up rarely and thus had been undiscovered. If you follow along and your code crashes you can fix it by copying the version
         at the end of the branch. However, the bug has no influence on the benchmarking and optimization results.
       </p>
@@ -1348,7 +1348,7 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
 
       <p>
         No surprises here, just a normal training loop. Lastly we benchmark through running this training 
-        loop five times, and taking the time, and we record the media. I note here that initially in the 
+        loop five times, and taking the time, and we record the median. I note here that initially in the
         script I made a mistake of taking the last number that was put out. The numbers I give in this 
         blogpost in the initial steps are thus not the median, but the last output, but that should be ok, 
         as throughout this whole run of the benchmarks did not vary significantly in between the five training 
@@ -1378,16 +1378,16 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
       alt="NSight profiling for optimization step 1">
 
       <p>
-        The main information is that rather embarassingly, 99.4% of the time we spend copying data, with about half of that being 
-        device-to-host copies. This kind of copy specifically should be neglilible in this script, since we copy once from the host
+        The main information is that rather embarrassingly, 99.4% of the time we spend copying data, with about half of that being
+        device-to-host copies. This kind of copy specifically should be negligible in this script, since we copy once from the host
         to the device, and afterwards the only real copies back should just be the training losses and network outputs at best. 
         We can use NSight to go deeper into where the memcopy-calls are actually made and find that I forgot to map the gradient clipping
         onto the GPU. That is, each time an optimizer clips the gradients the CPU would execute the associated parts of the code. 
       </p>
 
       <p>
-        Additionally, since we copy each element singular through <code>auto g = (*grads)[i];</code> and 
-        <code>grads->set((*grads)[i] * scale, i);</code> we have created the worst possible way to copy to and from the device
+        Additionally, since we copy each element individually through <code>auto g = (*grads)[i];</code> and
+        <code>grads-&gt;set((*grads)[i] * scale, i);</code> we have created the worst possible way to copy to and from the device
         as well. The fix then is straight forward: Write a kernel for gradient clipping and incorporate it into the CUDA framework.
       </p>
 
@@ -1401,7 +1401,7 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
 
     </div>
 
-    <div id="cuda-opt-1" class="article-text-div">
+    <div id="cuda-opt-2" class="article-text-div">
       <h3 class="heading-spaced">Opt. 2 - Speed up slicing by using non-blocking CUDA kernel</h3>
 
       {% include pytorch-opt-summary.html 
@@ -1442,19 +1442,20 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
 
 <pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
 
-Tensor Tensor::getSlice(span<const tensorDim_t> indices) const {
+Tensor Tensor::getSlice(span&lt;const tensorDim_t&gt; indices) const {
   // .. set up result
 
-  values->copyValues(*res.values, indices, res.getDims().getStride(0));
+  values-&gt;copyValues(*res.values, indices, res.getDims().getStride(0));
   return res;
 }
 
-void Tensor::tensorValues_t::copyValues(tensorValues_t& target, span<const tensorDim_t> indices, 
+void Tensor::tensorValues_t::copyValues(tensorValues_t& target, span&lt;const tensorDim_t&gt; indices, 
                                         const tensorSize_t sizeOfDim) const {
-  assert(target.size >= sizeOfDim * indices.size());
+  assert(target.size &gt;= sizeOfDim * indices.size());
 
   switch(device){
-+     // CPU version ...
+    case Device::CPU:
+      // ...
     case Device::CUDA:
       #ifdef __CUDA
         tensorSize_t targetOffset = 0;
@@ -1524,13 +1525,13 @@ void Tensor::tensorValues_t::copyValues(tensorValues_t& target, tensorSize_t low
         we can bypass the memcopies entirely and simply write a quick manual kernel copying the data for us. The overhead here 
         is in thread creation, but once they exist each thread will do its own indexing, giving us both coalesced memory accesses
         where applicable, it bypasses the additional stream initialization for now, and it gives us an easy way to synchronize,
-        since we can just launch it on the default stream asynchronously. The kernel is depicated below.
+        since we can just launch it on the default stream asynchronously. The kernel is depicted below.
       </p>
 
 <pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cu
 
 namespace cuda_impl {
-  void getSlice(Tensor& res, const Tensor& src, span<const tensorDim_t> idx) {
+  void getSlice(Tensor& res, const Tensor& src, span&lt;const tensorDim_t&gt; idx) {
     constexpr int threadsPerBlock = 256;
     const int blocks = (res.getSize() + threadsPerBlock - 1) / threadsPerBlock;
 
@@ -1538,10 +1539,9 @@ namespace cuda_impl {
     cudaErrchk(cudaMalloc(&idx_d, idx.size() * sizeof(tensorDim_t)));
     const auto sizeOfDim = res.getDims().getStride(0);
 
-    cudaErrchk(cudaMalloc(&idx_d, idx.size() * sizeof(tensorDim_t)));
     cudaErrchk(cudaMemcpy(idx_d, idx.data(), idx.size() * sizeof(tensorDim_t), cudaMemcpyHostToDevice));
 
-    getSliceKernel<<<blocks, threadsPerBlock>>>(res.getData(), src.getData(), idx_d, sizeOfDim, res.getSize());
+    getSliceKernel&lt;&lt;&lt;blocks, threadsPerBlock&gt;&gt;&gt;(res.getData(), src.getData(), idx_d, sizeOfDim, res.getSize());
     cudaErrchk(cudaDeviceSynchronize());
     cudaErrchk(cudaFree(idx_d));
   }
@@ -1568,7 +1568,7 @@ namespace cuda_impl {
       <p>
         Ok, before I start going into the more interesting part of this the actual boring answer is "It's just the API design". 
         CUDA does support asynchronous memcopies, there's especially little problem with them when they happen inside the device.
-        However, what matters is also safety. Asynchronous programming is susceptible to all kinds of race conditions and subseqeunt 
+        However, what matters is also safety. Asynchronous programming is susceptible to all kinds of race conditions and subsequent
         errors, hence the CUDA team decided to give guarantees on memcopies. Once the host moves to the next instruction the data
         is guaranteed to be where you expect it to be. 
       </p>
@@ -1594,7 +1594,7 @@ namespace cuda_impl {
         the GPU, so we tell the GPU where the data remains that it wants, as well as where it wants it to be (the dst-pointer we give the 
         cudaMemcpy commands). The GPU starts to copy, but now the host moves on and frees the page again. In that moment the operating 
         system has free hands to kick out our page we are in the process of copying from, and replace it with another page, possibly 
-        even from another program. Sounds terrible, no? +
+        even from another program. Sounds terrible, no?
       </p>
 
       <figure class="fig-light">
@@ -1629,7 +1629,7 @@ namespace cuda_impl {
         At first we have to tell the operating system that the chunk of memory we want to copy from cannot be swapped out. This is called
         page locked memory, CUDA calls it pinned memory, and is subject for a later blogpost. For us here this is technically irrelevant, 
         since we copied device-to-device, but CUDA does not differentiate. I.e. it all boils down to the original reason: CUDA keeps you 
-        save from tripping over your own shoes, and if you want you can use the asynchronous method with a little bit of extra code.
+        safe from tripping over your own shoes, and if you want you can use the asynchronous method with a little bit of extra code.
       </p>
 
       </details>
@@ -1641,7 +1641,7 @@ namespace cuda_impl {
 
       {% include pytorch-opt-summary.html 
         before="0.1635s" after="0.0704s" 
-        speedup="2.32x" commit="a68493d2faa74f2cf2cb1ee8b302f6b784126595" %}
+        speedup="2.32x" commit="82ee6524d55606a1a188d7e9a3b452d8d1d0d677" %}
 
         <p>
           As per usual, we start by profiling through NSight. The following timeline shows that we finally moved into kernel space:
@@ -1686,15 +1686,15 @@ namespace cuda_impl {
 <pre><code class="language-cpp">// src/backend/data_modeling/dim_type.h
 
 class Dimension final {
-  using dim_t = std::array<tensorSize_t, MAX_NDIMS>;
+  using dim_t = std::array&lt;tensorSize_t, MAX_NDIMS&gt;;
   struct shallowCopyToken {};
 
   private:
     // those two indicate the structure of the contiguous data that lies underneath
-    std::shared_ptr< std::vector<tensorDim_t> > contiguousDims;
-    std::shared_ptr<dim_t> contiguousStrides;
+    std::shared_ptr&lt; std::vector&lt;tensorDim_t&gt; &gt; contiguousDims;
+    std::shared_ptr&lt;dim_t&gt; contiguousStrides;
 
-    std::vector<tensorDim_t> dims;
+    std::vector&lt;tensorDim_t&gt; dims;
     dim_t strides;
     
     // ...
@@ -1732,7 +1732,7 @@ class Dimension final {
             This design does two things for us:
             <ol>
               <li>We can create transposed views on tensors without moving data unnecessarily.</li>
-              <li>Some operations might not need the tensor to be contiguous to run efficient - hence this design opens up future optimization vectors.</li>
+              <li>Some operations might not need the tensor to be contiguous to run efficiently - hence this design opens up future optimization vectors.</li>
             </ol> 
           </p>
 
@@ -1745,17 +1745,17 @@ class Dimension final {
 
 <pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/matmul_node.cpp
 
-vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
+vector&lt;shared_ptr&lt;Tensor&gt;&gt; MatMulNode::backward(const Tensor& upstreamGrad) {
     assert(!upstreamGrad.getRequiresGrad());
     
     return {
-        make_shared<Tensor>(upstreamGrad.matmul(*parents[1])), 
-        make_shared<Tensor>(parents[0]->matmul(upstreamGrad))
+        make_shared&lt;Tensor&gt;(upstreamGrad.matmul(*parents[1])), 
+        make_shared&lt;Tensor&gt;(parents[0]-&gt;matmul(upstreamGrad))
     };
 }</code></pre>
 
       <p>
-        I talked about this method earlier in <a href="pytorch_demystified_2a.css" target="_blank">part 2a</a> in an optional 
+        I talked about this method earlier in <a href="pytorch_demystified_2a.html" target="_blank">part 2a</a> in an optional
         block, but if you allow me to quote myself, "Given two matrices $A$ and $B$, and computing their 
         matrix multiplication $C = A @ B$, we obtain the following for the derivatives: 
         $\frac{\partial C}{\partial A} = C @ B^T$ and $\frac{\partial C}{\partial B} = A @ C^T$". The code on the other side does 
@@ -1783,7 +1783,7 @@ namespace {
   {
     const int tid = threadIdx.x;
     const int gid = blockDim.x * blockIdx.x + tid;
-    if(gid >= resSize) 
+    if(gid &gt;= resSize) 
       return;
 
     const int K = transposeLeft ? leftRows :  leftCols;
@@ -1794,7 +1794,7 @@ namespace {
 
     // C[i, j] = sum_{k=0}^{leftCols} A[i, k] * B[k, j]
     ftype cij = 0;
-    for (int k = 0; k < K; k++) {
+    for (int k = 0; k &lt; K; k++) {
 
       int leftIdx = transposeLeft ? k * leftCols + i : i * leftCols + k;
       int rightIdx = transposeRight ? j * rightCols + k : k * rightCols + j;
@@ -1822,12 +1822,12 @@ namespace {
 
 <pre><code class="language-cpp">// src/backend/computational_graph/tensor_ops/matmul_node.cpp
 
-vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
+vector&lt;shared_ptr&lt;Tensor&gt;&gt; MatMulNode::backward(const Tensor& upstreamGrad) {
     assert(!upstreamGrad.getRequiresGrad());
     // TODO: optimize operators
     return {
-        make_shared<Tensor>(upstreamGrad.matmul(*parents[1], false, true)), 
-        make_shared<Tensor>(parents[0]->matmul(upstreamGrad, true, false))
+        make_shared&lt;Tensor&gt;(upstreamGrad.matmul(*parents[1], false, true)), 
+        make_shared&lt;Tensor&gt;(parents[0]-&gt;matmul(upstreamGrad, true, false))
     };
 }
 </code></pre>
@@ -1851,7 +1851,7 @@ vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
 
       {% include pytorch-opt-summary.html 
         before="1.1201s" after="0.0909s" 
-        speedup="12.32" commit="61c4dd534831df8853b3bc7bd40026b91943ab44" %}
+        speedup="12.32x" commit="61c4dd534831df8853b3bc7bd40026b91943ab44" %}
 
       
         <p>
@@ -1887,18 +1887,18 @@ vector<shared_ptr<Tensor>> MatMulNode::backward(const Tensor& upstreamGrad) {
 <pre><code class="language-cpp">// src/backend/module/layers/ff_layer.cpp
 
 FfLayer::FfLayer(tensorDim_t inSize, tensorDim_t outSize, Device d, 
-    bool useBias, bool requiresGrad, shared_ptr<InitializerBase> init)
+    bool useBias, bool requiresGrad, shared_ptr&lt;InitializerBase&gt; init)
   : requiresGrad{requiresGrad} 
 {
   if(!init){
-    init = make_shared<NormalXavierInitializer>(inSize, outSize);  
+    init = make_shared&lt;NormalXavierInitializer&gt;(inSize, outSize);  
   }
 
-  weights = make_shared<Tensor>(Dimension({inSize, outSize}), d, requiresGrad);
-  weights->reset(init);
+  weights = make_shared&lt;Tensor&gt;(Dimension({inSize, outSize}), d, requiresGrad);
+  weights-&gt;reset(init);
     
   if(useBias){
-    bias = make_shared<Tensor>(vector<tensorDim_t>{outSize}, d, requiresGrad);
+    bias = make_shared&lt;Tensor&gt;(vector&lt;tensorDim_t&gt;{outSize}, d, requiresGrad);
     TensorFunctions::ToZeros(*bias);
   }
 }</code></pre>
@@ -1920,15 +1920,17 @@ FfLayer::FfLayer(tensorDim_t inSize, tensorDim_t outSize, Device d,
           stings, and we're gonna take it down. Let's take a brief look at the construction and destruction of the tensorValues_t: 
         </p>
 
-<pre><code>// 
+<pre><code>//
 
 
 </code></pre>
 
+        <p>
+          That also means that improvements will get more and more negligible on this small
+          dataset, but will show much more on larger datasets and bigger networks. We don't have that implemented (yet), so for
+          now we will keep on going with this one.
+        </p>
+
       </div>
 
-          That also means that improvements will get more and more neglible on this small 
-          dataset, but will show much more on larger datasets and bigger networks. We don't have that implemented (yet), so for 
-          now we will keep on going with this one.
-
-    TODO: a figure for page locked memory? 
+    <p>TODO: a figure for page locked memory?</p> 
