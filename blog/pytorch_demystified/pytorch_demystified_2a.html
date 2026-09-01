@@ -404,8 +404,8 @@ optim.step(loss)</code></pre>
         src="./img_2/reference-creation.png"
         alt="Illustration of memory management">
         <figcaption>
-          Example of the loop illustrated above, and how we solve the ownership problem.<br>As long as the final output
-          tensor remains alive so does the whole chain of tensor.
+          Example of the loop illustrated above, and how we solve the ownership problem. The references held must be owning references for 
+          the setup to work. Then, as long as the final output tensor remains alive so does the whole chain of tensor.
         </figcaption>
         </figure>
         <figure class="fig-dark">
@@ -415,8 +415,8 @@ optim.step(loss)</code></pre>
         src="./img_2/reference-creation-dark.png"
         alt="Illustration of memory management">
         <figcaption>
-          Example of the loop illustrated above, and how we solve the ownership problem.<br>As long as the final output
-          tensor remains alive so does the whole chain of tensor.
+          Example of the loop illustrated above, and how we solve the ownership problem. The references held must be owning references for 
+          the setup to work. Then, as long as the final output tensor remains alive so does the whole chain of tensor.
         </figcaption>
       </figure>
 
