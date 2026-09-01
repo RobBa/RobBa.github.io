@@ -62,7 +62,7 @@ mathjax: true
         While writing I found that this second entry turned out be really large with a huge storyline, so I split it into two parts. 
         This one, part 2a, focuses on the autograd engine
         itself: the computational graph, how it gets built dynamically as tensors interact, and how we propagate gradients backward
-        through it. <a href="pytorch_demystified_2b.html" target="_blank">Part 2b</a> then picks up from there and adds the deep learning
+        through it. <!-- <a href="pytorch_demystified_2b.html" target="_blank"> -->Part 2b<!-- </a> --> then picks up from there and adds the deep learning
         modules &mdash; activation functions, layers, loss functions, optimizers &mdash; and wires everything into a Python frontend and a
         full MNIST training pipeline.
       </p>
@@ -820,8 +820,8 @@ assert t2.grads.getitem(0) == pytest.approx(10.0)</code></pre>
       <p>
         That's it for part 2a of this second entry of my blogposts. We implemented the autograd engine, 
         consisting of building a computational graph that builds itself as tensors interact, and a
-        method to propagate gradients through the graph via topological sort. <a href="pytorch_demystified_2b.html" 
-        target="_blank">Part 2b</a> heavily banks on what we established here and adds everything needed for a full
+        method to propagate gradients through the graph via topological sort.<!--  <a href="pytorch_demystified_2b.html" 
+        target="_blank"> -->Part 2b<!-- </a> --> heavily banks on what we established here and adds everything needed for a full
         deep learning training loop: activation and loss functions, feedforward-layers, and optimizers. It then 
         puts everything into the Python frontend and ties it together with a full MNIST-example.
       </p>
