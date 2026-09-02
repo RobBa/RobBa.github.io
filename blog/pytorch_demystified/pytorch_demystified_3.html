@@ -7,7 +7,7 @@ mathjax: true
 ---
 
     <h1 class="heading-spaced">PyTorch demystified 3 -<br>Implementing the CUDA backend</h1>
-    <p class="article-date">Published: -</p>
+    <p class="article-date">Published: Sept. 2026</p>
 
     <br>
 
@@ -101,7 +101,7 @@ mathjax: true
       <p>
         In the end we will have improved our code execution on our benchmark from  
         2.399s down to 0.206s, a speedup with a factor of 11.6x. I note here that the initial naive CUDA version 
-        before I started to optimize took way longer on the benchmark - 997.691s. However, here I forgot to implement 
+        before I started to optimize took way longer on the benchmark, a whopping 997.691s. However, here I forgot to implement 
         the optimizers in CUDA, resulting in unnecessary memcopies across the devices. So there is a speedup of 4800x, but 
         that is noise that had to be debugged, rather than optimized. Anyway, we're gonna cook the full MNIST example from 25s 
         training time down to 5 seconds (includes non-CUDA parts including data loading etc., parts that are not measured by the 
@@ -1850,15 +1850,16 @@ vector&lt;shared_ptr&lt;Tensor&gt;&gt; MatMulNode::backward(const Tensor& upstre
       <h3 class="heading-spaced">Opt. 4 - Memcopies revisited: On-device initialization and memory pool</h3>
 
       {% include pytorch-opt-summary.html 
-        before="1.1201s" after="0.0909s" 
-        speedup="12.32x" commit="61c4dd534831df8853b3bc7bd40026b91943ab44" %}
-
+        before="0.9672s" after="0.8147s" 
+        speedup="1.19x" commit="61c4dd534831df8853b3bc7bd40026b91943ab44" %}
+         
       
         <p>
           This optimization step is certainly one of my favorite ones due to the simplicity and elegance of the solutions. Because 
           we are already in really fast area, at least on this small dataset, we disabled the number of batches now, and an epoch 
-          trains on the whole dataset from now on. Looking at NSight again we once find ourselves running lots of memcopy-operations,
-          shown below. So this is another chance for us to look at memory management.
+          trains on the whole dataset from now on. However, since we are already very quick in general we will see more and more 
+          negligible improvements only. Looking at NSight again we once find ourselves running lots of 
+          memcopy-operations, shown below. So this is another chance for us to look at memory management.
         </p>
 
         <img
@@ -2100,13 +2101,109 @@ void Tensor::tensorValues_t::resize(const tensorSize_t size) {
       <h3 class="heading-spaced">Opt. 5 - Fuse matmul kernels into a single kernel call</h3>
 
       {% include pytorch-opt-summary.html 
-        before="0.0909s" after="" 
-        speedup="12.32x" commit="61c4dd534831df8853b3bc7bd40026b91943ab44" %}
+        before="0.8147s" after="0.8159s"
+        speedup="0.99x" commit="1802666341d94d1727d870dcad772b23ba30b6d5" %}
 
         <p>
-          That also means that improvements will get more and more negligible on this small
-          dataset, but will show much more on larger datasets and bigger networks. We don't have that implemented (yet), so for
-          now we will keep on going with this one.
+          This one is very interesting. Technically it should have improved things, but on the practical 
+          side it did not. Before I get into that let's take a look at the nsys output. I increased the amount 
+          of computation in the script we run to profile, therefore the amount of computation has heavily 
+          lifted from the initial offloading of data onto the GPU and toward more computation. In other words,
+          we have a lot more computation now, and much less memcopies. We find ourselves with the following output:
+        </p>
+
+        <img
+        class="blog-image pytorch-nsight"
+        src="./img_3/nsight/before_step_5.png"
+        alt="NSight profiling for optimization step 5">
+
+        <p>
+          As can be seen here, the vast majority of the CUDA side is happening in the matmul-kernel, so that is the one 
+          we are going to take a look at. On top of that, looking at the timeline as it happens, it is also clear why 
+          our improvements are getting smaller and smaller. The spikes that are happing in the row of the kernel calls, 
+          those are our training loop. Visually they occupy only roughly 30% of our entire timeline we are working on in 
+          our benchmarks. Given how the rest of the code is already that large compared with that segment we can see how 
+          fast we already are, since it is vastly outnumbered by a small series of Python calls surrounding everything in 
+          the beginning and the end of the whole script.
+        </p>
+
+        <p>
+          Anyway, in a previous post we already laid hands on the matmul, introducing a templated kernel that overloads 
+          in transposition of either the left or the right kernel. NSys now tells us that one of those is dominating all 
+          the others, more clearly to be seen in the command-line via an <code>nsys stat my_file.nsys-rep</code>, parroting
+          back at us
+        </p>
+
+<pre> Time (%)  Total Time (ns)  Instances  Avg (ns)   Med (ns)   Min (ns)  Max (ns)   StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  ---------  ---------  --------  ---------  -----------  ----------------------------------------------------------------------------------------------------
+     65.2      909,975,555      9,000  101,108.4   50,561.0       960    255,717    108,457.5  void <unnamed>::matMul2DKernel<(bool)0, (bool)1>(float *, const float *, const float *,unsigned in…
+     14.5      202,607,249      9,000   22,511.9    9,856.0     5,760     90,050     20,763.3  void <unnamed>::matMul2DKernel<(bool)0, (bool)0>(float *, const float *, const float *, unsigned in…
+     10.0      139,692,572      9,000   15,521.4    8,096.0     2,944     36,321     14,293.5  void <unnamed>::matMul2DKernel<(bool)1, (bool)0>(float *, const float *, const float *, unsigned in…
+      1.8       24,791,568     18,000    1,377.3      704.0       640      6,752      1,321.4  <unnamed>::stepRmsPropKernel(float *, float *, const float *, float, float, unsigned int)
+      1.2       17,160,733     30,009      571.9      480.0       448      1,345        236.7  void cub::_V_300304_SM_750::detail::transform::transform_kernel<cub::_V_300304_SM_750::detail::tran…
+      1.2       16,404,385     17,994      911.7      512.0       448      6,176        770.6  <unnamed>::elementwiseaddKernel(float *, const float *, const float *, unsigned int)</pre>
+
+        <p>
+          Interestingly, the NSys-UI (NSight) and its command line output disagree on the real big kernels by a few percentage points, but 
+          not on the overarching picture. The smaller kernels do fit well again. We take it as is and see that the majority of the 
+          kernel space is used by the matmul templated overload transposing the right matrix, leaving the left one intact. That is the most 
+          counterintuitive for us, since manually written we can create the best memory accesses pattern out of the box for that case.
+          Interesting is also that this one has the fastest execution in the best case, which is to be expected, but the worst in the worst 
+          case. 
+        </p>
+
+        <p>
+          Running NCU it tells us that this is due to partial waves, see the figure below. This means that at some point we run a wave of blocks
+          that keep some streaming multiprocessors (SMs) empty, hence wasting compute resources that sit idle. The fix would be to tune the number 
+          of blocks, ideally in a way that they are a multiple of the SMs, and distribute the threads over them. 
+        </p>
+
+        <img
+        class="blog-image pytorch-nsight"
+        src="./img_3/nsight/step_5_ncu.png"
+        alt="NCU output for matmul-kernel in step 5">
+
+        <p>
+          However, I am going to be a little unprofessional here. I already hinted earlier that there are some inefficencies in the matmul-kernels, 
+          and before proceeding to what the compiler tells us we can do away with the obvious first. Otherwise we start tuning a kernel that we 
+          will phase out anyway, and our work was for naught. To show the current problem again here again the kernel call.
+        </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cu
+
+namespace cuda_impl {
+  void matmul(Tensor& res, const Tensor& left, const Tensor& right) {
+    constexpr int threadsPerBlock = 256;
+    const int blocksPerGrid = (res.getSize() + threadsPerBlock - 1) / threadsPerBlock;
+    
+    // sizes of the 2D matrices respectively
+    const tensorSize_t leftSize = left.getDims().get(-1) * left.getDims().get(-2); 
+    const tensorSize_t rightSize = right.getDims().get(-1) * right.getDims().get(-2);
+    const tensorSize_t resSize = left.getDims().get(-2) * right.getDims().get(-1);
+
+    tensorSize_t leftOffset = 0;
+    tensorSize_t rightOffset = 0;
+    tensorSize_t resOffset = 0;
+
+    while(leftOffset < left.getSize()){
+      if(!(transposeLeft || transposeRight)) {
+        matMul2DKernel<false, false><<<blocks, threadsPerBlock>>>(res.getData() + resOffset, left.getData() + leftOffset, right.getData() + rightOffset, 
+                                       left.getDims().get(-2), right.getDims().get(-2), left.getDims().get(-1), right.getDims().get(-1), resSize);
+      }
+      else if(transposeLeft && transposeRight) [[unlikely]] {
+        // another kernel call
+      }
+      // ... cover other template overloads 
+    
+    cudaErrchk(cudaDeviceSynchronize());
+  }
+}</code></pre>
+
+        <p>
+          As shown here, the host code separates the batch of matrices into segments of 2D-matrices, and then multiplies them individually
+          in a loop. We do not use CUDA streams here, meaning that instead of processing an entire batch of 2D-matrices in parallel, we 
+          take each of them and multiply them in a sequential fashion. Needless to say that this design is horrible at best. Thus, in this step 
+          we remove the outer while loop. To use 
         </p>
 
       </div>
