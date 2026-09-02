@@ -57,6 +57,9 @@ mathjax: true
             <li>
               <a href="#cuda-opt-5">Opt. 5 - Fuse matmul kernels into a single kernel call</a>
             </li>
+            <li>
+              <a href="#cuda-opt-6">Opt. 6 - Tiled matmul kernel</a>
+            </li>
           </ul>
         </li>
       </ul>
@@ -2179,8 +2182,8 @@ void Tensor::tensorValues_t::resize(const tensorSize_t size) {
         <p>
           However, we don't always have to follow the profiler when we think there's a better way. I already hinted earlier that there are some 
           inefficiencies in the matmul-kernels, and before proceeding to what the compiler tells us we can do away with the obvious first. 
-          Otherwise we start tuning a kernel that we will phase out anyway, and our work was for naught. To show the current problem again here 
-          again the kernel call.
+          Otherwise we start tuning a kernel that we will phase out anyway, and our work was for naught. To show the current problem again,
+          here's the kernel call.
         </p>
 
 <pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cu
@@ -2246,12 +2249,12 @@ cij += left[leftOffset + leftIdx] * right[rightOffset + rightIdx];
 // same for indexing into result</code></pre>
 
         <p>
-          This step now clearly marked a trade-off. We had a series of sequential calls to the kernels, which we replaced by one single 
-          kernel call. The kernel itself however became larger by adding more input arguments, but also slightly more computations. This 
+          This step clearly marks a trade-off. We had a series of sequential calls to the kernels, which we replaced by one single
+          kernel call. The kernel itself however became larger by adding more input arguments, but also slightly more computations. This
           can have additional side effects, such as increasing register pressure, if they happened to be at the limit already. Asking NSys
-          and NCU however gives us a rather sobering answer: Our fix didn't seem to have any impact on anything at all. However, we also did 
-          not regress and have some more elegant code in the end, so why not? For reference below the new NSys report before we move on to 
-          fix 6. 
+          and NCU however gives us a rather sobering answer: Our fix didn't seem to have any impact on anything at all. However, we also did
+          not regress and have some more elegant code in the end, so why not? For reference, below is the new NSys report before we move on to
+          fix 6.
         </p>
 
 <pre> Time (%)  Total Time (ns)  Instances  Avg (ns)   Med (ns)   Min (ns)  Max (ns)   StdDev (ns)                                                  Name                                                
@@ -2262,7 +2265,7 @@ cij += left[leftOffset + leftIdx] * right[rightOffset + rightIdx];
 
       </div>
 
-    <div id="cuda-opt-5" class="article-text-div">
+    <div id="cuda-opt-6" class="article-text-div">
       <h3 class="heading-spaced">Opt. 6 - Tiled matmul kernel</h3>
 
       {% include pytorch-opt-summary.html 
