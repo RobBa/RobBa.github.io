@@ -1920,10 +1920,188 @@ FfLayer::FfLayer(tensorDim_t inSize, tensorDim_t outSize, Device d,
           stings, and we're gonna take it down. Let's take a brief look at the construction and destruction of the tensorValues_t: 
         </p>
 
-<pre><code>//
+<pre><code>// src/backend/data_modeling/tensor.cpp
 
+// note: I removed the CUDA safety checks here for legibility 
 
-</code></pre>
+Tensor::tensorValues_t::~tensorValues_t() noexcept {
+  switch(device){
+    case Device::CPU:
+      free(values);
+      break;
+    case Device::CUDA:
+      cudaErrchk(cudaFree(values));
+      break;
+  }
+}
+
+// called by Tensor-class constructor
+void Tensor::tensorValues_t::resize(const tensorSize_t size) {
+  this->size = size;
+  switch (device) {
+    case Device::CPU:
+      values = static_cast<ftype*>(std::malloc(this->size * sizeof(ftype)));
+      break;
+    case Device::CUDA:
+      
+      cudaErrchk(cudaMalloc((void**) &values, this->size * sizeof(ftype)));
+      break;
+  }
+}</code></pre>
+
+        <p>
+          We see that both construction and destruction are fairly simple: They encounter a malloc for a new 
+          tensor, and when it goes down, it frees that space again. The problem is that many of those allocations 
+          and free-operations are unnecessary. Say we have a training loop. Then in each forward pass a chain of 
+          tensors is constructed in the background. All these tensors have their lifetime limited to a maximum of a 
+          forward-backward pass, and get destroyed and re-created during the next pass at the very maximum achievable 
+          lifetime. Then, in the next forward pass we create tensors with exactly the same shapes and dimensions 
+          all over again. And the same goes for the backward pass.
+        </p>
+
+        <figure class="fig-light">
+            <img
+            id="pytorch-mempool-motivation"
+            class="blog-image"
+            src="./img_3/mempool-motivation.png"
+            alt="Sketching out motivation for the memory pool.">
+            <figcaption>
+              Illustration of allocations during forward pass. Every module that is part of the forward pass chain creates a new tensor (in 
+              red in the top row), that gets destroyed at the end of the forward-backward pass cycle.
+            </figcaption>
+            </figure>
+            <figure class="fig-dark">
+            <img
+            id="pytorch-mempool-motivation-dark"
+            class="blog-image"
+            src="./img_3/mempool-motivation-dark.png"
+            alt="Sketching out motivation for the memory pool.">
+            <figcaption>
+              Illustration of allocations during forward pass. Every module that is part of the forward pass chain creates a new tensor (in 
+              red in the top row), that gets destroyed at the end of the forward-backward pass cycle.
+            </figcaption>
+        </figure>
+
+        <p>
+          The problem with this is at hand. But so is the solution: This is an ideal case for a memory pool. Because sizes and dimensions are
+          the same in every forward- and backward pass, and when requesting memory we only really care about the full size of the tensor, we 
+          can simply request and free based on the size. I give the memory pool with its main two functions in the following:
+        </p>
+
+<pre><code class="language-cpp">// src/backend/shared/memory_pool.h
+
+// for legibility I removed the CUDA safety checks below 
+
+namespace mempool_impl {
+  template<typename T>
+  class MemoryPool final {
+    private:
+      // hold pointers to unused allocated memory.
+      std::unordered_map<tensorSize_t, std::vector<T*>> freeLists;
+      std::unordered_map<tensorSize_t, std::vector<T*>> freeListsCuda;
+      
+    public:
+      MemoryPool() = default;
+      ~MemoryPool() noexcept;
+
+      T* request(Device d, tensorSize_t n);
+      void giveback(T* ptr, Device d, tensorSize_t n);
+      void flush(Device d) noexcept;
+  };
+
+  template<typename T>
+  T* MemoryPool<T>::request(const Device d, const tensorSize_t n) {
+    switch(d) {
+      case Device::CPU:
+      {
+        // CPU version mirrors CUDA version
+      }
+      case Device::CUDA:
+      {
+        auto& list = freeListsCuda[n];
+        if(!list.empty()) {
+          T* ptr = list.back();
+          list.pop_back();
+          return ptr;
+        }
+
+        T* ptr;
+        auto err = cudaMalloc((void**) &ptr, n * sizeof(T));
+        if(err != cudaSuccess) {
+          // ran out of memory, free up cached memory and retry
+          flush(Device::CUDA);
+          cudaErrchk(cudaMalloc((void**) &ptr, n * sizeof(T)));
+        }
+
+        return ptr;
+      }
+    }
+  }
+
+  template<typename T>
+  void MemoryPool<T>::giveback(T* ptr, const Device d, const tensorSize_t n) {
+    switch(d) {
+      case Device::CPU:
+        freeLists[n].push_back(ptr); 
+        break;
+      case Device::CUDA:
+        freeListsCuda[n].push_back(ptr); 
+        break;
+    }
+  }
+}</code></pre>
+
+        <p>
+          As we can see we see nothing; Well, not so true. I omitted a few methods in the snipped above, since they
+          should be obvious. The interesting one is request, and giveBack does the inverse, which is much simpler. 
+          Request essentially first checks for what device we request a memory allocation. The CPU version here is 
+          commented away, because it mirrors the GPU version nearly one-by-one, just with different API calls. 
+        </p>
+
+        <p>
+          After requesting the device we can then perform a (cuda-)malloc. If nothing comes back we ran out of memory,
+          in which case we have two choices. Either we let the program crash, or we decide to give up memory and continue.
+          The latter case gets the program running, but could do so very inefficiently, since we run risk of recycling the 
+          same memory all over again in a loop. I decided for the latter and went brute force for now, flushing the entire 
+          reserved memory the pool holds. There are surely smoother ways out there, but that's again future work.  
+        </p>
+
+        <p>
+          I also note that the template is not per se necessary. One could simply run one memory pool and demand the size 
+          to allocate in bytes instead. That way the responsibility to request the right amount of size is pushed back 
+          onto the programmer. This is almost purely a matter of taste, and I went with the simpler API, that in turn demands
+          that for other data types we need an extra pool. I have identified two pools so far, and I do not think that the
+          amount grows very much at all from this point on, so this is it for now. We then can instantiate the pool 
+          via <code>inline static mempool_impl::MemoryPool<ftype> tensorPool;</code>, which introduces a rather subtle bug that 
+          I fix in the next post. For now we can rewrite our earlier tensor-creation and destruction behavior as in the next
+          code segment and be done with this part of the optimization.
+        </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
+
+Tensor::tensorValues_t::~tensorValues_t() noexcept {
+  if(values != nullptr) {
+    mempool::tensorPool.giveback(values, device, size);
+  }
+}
+
+void Tensor::tensorValues_t::resize(const tensorSize_t size) {
+  this->size = size;
+
+  if(values != nullptr) [[unlikely]] {
+    mempool::tensorPool.giveback(values, device, size);
+  }
+  values = mempool::tensorPool.request(device, size);
+}</code></pre>
+
+      </div>
+
+    <div id="cuda-opt-5" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 5 - Fuse matmul kernels into a single kernel call</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="0.0909s" after="" 
+        speedup="12.32x" commit="61c4dd534831df8853b3bc7bd40026b91943ab44" %}
 
         <p>
           That also means that improvements will get more and more negligible on this small
