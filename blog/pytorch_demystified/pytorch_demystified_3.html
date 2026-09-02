@@ -42,7 +42,21 @@ mathjax: true
         <li>
           <a href="#cuda-backend-optimization">Optimizing the CUDA backend</a>
           <ul>
-            <li><a href="#">TODO</a></li>
+            <li>
+              <a href="#cuda-opt-1">Opt. 1 - Remove unnecessary memcopies</a>
+            </li>
+            <li>
+              <a href="#cuda-opt-2">Opt. 2 - Speed up slicing by using non-blocking CUDA kernel instead</a>
+            </li>
+            <li>
+              <a href="#cuda-opt-3">Opt. 3 - Speed up matmul in the backward block through kernel fusion</a>
+            </li>
+            <li>
+              <a href="#cuda-opt-4">Opt. 4 - Memcopies revisited: On-device initialization and memory pool</a>
+            </li>
+            <li>
+              <a href="#cuda-opt-5">Opt. 5 - Fuse matmul kernels into a single kernel call</a>
+            </li>
           </ul>
         </li>
       </ul>
@@ -1402,7 +1416,7 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
     </div>
 
     <div id="cuda-opt-2" class="article-text-div">
-      <h3 class="heading-spaced">Opt. 2 - Speed up slicing by using non-blocking CUDA kernel</h3>
+      <h3 class="heading-spaced">Opt. 2 - Speed up slicing by using non-blocking CUDA kernel instead</h3>
 
       {% include pytorch-opt-summary.html 
         before="0.7337s" after="0.1635s" 
@@ -1637,7 +1651,7 @@ namespace cuda_impl {
     </div>
 
     <div id="cuda-opt-3" class="article-text-div">
-      <h3 class="heading-spaced">Opt. 3 - Speed up matmul in the backward block</h3>
+      <h3 class="heading-spaced">Opt. 3 - Speed up matmul in the backward block through kernel fusion</h3>
 
       {% include pytorch-opt-summary.html 
         before="0.1635s" after="0.0704s" 
@@ -1855,8 +1869,8 @@ vector&lt;shared_ptr&lt;Tensor&gt;&gt; MatMulNode::backward(const Tensor& upstre
          
       
         <p>
-          This optimization step is certainly one of my favorite ones due to the simplicity and elegance of the solutions. Because 
-          we are already in really fast area, at least on this small dataset, we disabled the number of batches now, and an epoch 
+          This optimization step is certainly one of my favorite ones due to the simplicity and elegance of the solutions. Because
+          we are already in a really fast area, at least on this small dataset, we disabled the number of batches now, and an epoch
           trains on the whole dataset from now on. However, since we are already very quick in general we will see more and more 
           negligible improvements only. Looking at NSight again we once find ourselves running lots of 
           memcopy-operations, shown below. So this is another chance for us to look at memory management.
@@ -1938,14 +1952,14 @@ Tensor::tensorValues_t::~tensorValues_t() noexcept {
 
 // called by Tensor-class constructor
 void Tensor::tensorValues_t::resize(const tensorSize_t size) {
-  this->size = size;
+  this-&gt;size = size;
   switch (device) {
     case Device::CPU:
-      values = static_cast<ftype*>(std::malloc(this->size * sizeof(ftype)));
+      values = static_cast&lt;ftype*&gt;(std::malloc(this-&gt;size * sizeof(ftype)));
       break;
     case Device::CUDA:
       
-      cudaErrchk(cudaMalloc((void**) &values, this->size * sizeof(ftype)));
+      cudaErrchk(cudaMalloc((void**) &values, this-&gt;size * sizeof(ftype)));
       break;
   }
 }</code></pre>
@@ -1994,12 +2008,12 @@ void Tensor::tensorValues_t::resize(const tensorSize_t size) {
 // for legibility I removed the CUDA safety checks below 
 
 namespace mempool_impl {
-  template<typename T>
+  template&lt;typename T&gt;
   class MemoryPool final {
     private:
       // hold pointers to unused allocated memory.
-      std::unordered_map<tensorSize_t, std::vector<T*>> freeLists;
-      std::unordered_map<tensorSize_t, std::vector<T*>> freeListsCuda;
+      std::unordered_map&lt;tensorSize_t, std::vector&lt;T*&gt;&gt; freeLists;
+      std::unordered_map&lt;tensorSize_t, std::vector&lt;T*&gt;&gt; freeListsCuda;
       
     public:
       MemoryPool() = default;
@@ -2010,8 +2024,8 @@ namespace mempool_impl {
       void flush(Device d) noexcept;
   };
 
-  template<typename T>
-  T* MemoryPool<T>::request(const Device d, const tensorSize_t n) {
+  template&lt;typename T&gt;
+  T* MemoryPool&lt;T&gt;::request(const Device d, const tensorSize_t n) {
     switch(d) {
       case Device::CPU:
       {
@@ -2039,8 +2053,8 @@ namespace mempool_impl {
     }
   }
 
-  template<typename T>
-  void MemoryPool<T>::giveback(T* ptr, const Device d, const tensorSize_t n) {
+  template&lt;typename T&gt;
+  void MemoryPool&lt;T&gt;::giveback(T* ptr, const Device d, const tensorSize_t n) {
     switch(d) {
       case Device::CPU:
         freeLists[n].push_back(ptr); 
@@ -2053,8 +2067,8 @@ namespace mempool_impl {
 }</code></pre>
 
         <p>
-          As we can see we see nothing; Well, not so true. I omitted a few methods in the snipped above, since they
-          should be obvious. The interesting one is request, and giveBack does the inverse, which is much simpler. 
+          As we can see, we see... nothing much; well, not entirely true. I omitted a few methods in the snippet above, since they
+          should be obvious. The interesting one is request, and giveback does the inverse, which is much simpler.
           Request essentially first checks for what device we request a memory allocation. The CPU version here is 
           commented away, because it mirrors the GPU version nearly one-by-one, just with different API calls. 
         </p>
@@ -2062,7 +2076,7 @@ namespace mempool_impl {
         <p>
           After requesting the device we can then perform a (cuda-)malloc. If nothing comes back we ran out of memory,
           in which case we have two choices. Either we let the program crash, or we decide to give up memory and continue.
-          The latter case gets the program running, but could do so very inefficiently, since we run risk of recycling the 
+          The latter case gets the program running, but could do so very inefficiently, since we run the risk of recycling the
           same memory all over again in a loop. I decided for the latter and went brute force for now, flushing the entire 
           reserved memory the pool holds. There are surely smoother ways out there, but that's again future work.  
         </p>
@@ -2073,7 +2087,7 @@ namespace mempool_impl {
           onto the programmer. This is almost purely a matter of taste, and I went with the simpler API, that in turn demands
           that for other data types we need an extra pool. I have identified two pools so far, and I do not think that the
           amount grows very much at all from this point on, so this is it for now. We then can instantiate the pool 
-          via <code>inline static mempool_impl::MemoryPool<ftype> tensorPool;</code>, which introduces a rather subtle bug that 
+          via <code>inline static mempool_impl::MemoryPool&lt;ftype&gt; tensorPool;</code>, which introduces a rather subtle bug that 
           I fix in the next post. For now we can rewrite our earlier tensor-creation and destruction behavior as in the next
           code segment and be done with this part of the optimization.
         </p>
@@ -2087,7 +2101,7 @@ Tensor::tensorValues_t::~tensorValues_t() noexcept {
 }
 
 void Tensor::tensorValues_t::resize(const tensorSize_t size) {
-  this->size = size;
+  this-&gt;size = size;
 
   if(values != nullptr) [[unlikely]] {
     mempool::tensorPool.giveback(values, device, size);
@@ -2118,9 +2132,9 @@ void Tensor::tensorValues_t::resize(const tensorSize_t size) {
         alt="NSight profiling for optimization step 5">
 
         <p>
-          As can be seen here, the vast majority of the CUDA side is happening in the matmul-kernel, so that is the one 
-          we are going to take a look at. On top of that, looking at the timeline as it happens, it is also clear why 
-          our improvements are getting smaller and smaller. The spikes that are happing in the row of the kernel calls, 
+          As can be seen here, the vast majority of the CUDA side is happening in the matmul-kernel, so that is the one
+          we are going to take a look at. On top of that, looking at the timeline as it happens, it is also clear why
+          our improvements are getting smaller and smaller. The spikes that are happening in the row of the kernel calls,
           those are our training loop. Visually they occupy only roughly 30% of our entire timeline we are working on in 
           our benchmarks. Given how the rest of the code is already that large compared with that segment we can see how 
           fast we already are, since it is vastly outnumbered by a small series of Python calls surrounding everything in 
@@ -2146,8 +2160,8 @@ void Tensor::tensorValues_t::resize(const tensorSize_t size) {
         <p>
           Interestingly, the NSys-UI (NSight) and its command line output disagree on the real big kernels by a few percentage points, but 
           not on the overarching picture. The smaller kernels do fit well again. We take it as is and see that the majority of the 
-          kernel space is used by the matmul templated overload transposing the right matrix, leaving the left one intact. That is the most 
-          counterintuitive for us, since manually written we can create the best memory accesses pattern out of the box for that case.
+          kernel space is used by the matmul templated overload transposing the right matrix, leaving the left one intact. That is the most
+          counterintuitive for us, since manually written we can create the best memory access pattern out of the box for that case.
           Interesting is also that this one has the fastest execution in the best case, which is to be expected, but the worst in the worst 
           case. 
         </p>
@@ -2164,9 +2178,10 @@ void Tensor::tensorValues_t::resize(const tensorSize_t size) {
         alt="NCU output for matmul-kernel in step 5">
 
         <p>
-          However, I am going to be a little unprofessional here. I already hinted earlier that there are some inefficencies in the matmul-kernels, 
-          and before proceeding to what the compiler tells us we can do away with the obvious first. Otherwise we start tuning a kernel that we 
-          will phase out anyway, and our work was for naught. To show the current problem again here again the kernel call.
+          However, we don't always have to follow the profiler when we think there's a better way. I already hinted earlier that there are some 
+          inefficiencies in the matmul-kernels, and before proceeding to what the compiler tells us we can do away with the obvious first. 
+          Otherwise we start tuning a kernel that we will phase out anyway, and our work was for naught. To show the current problem again here 
+          again the kernel call.
         </p>
 
 <pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cu
@@ -2185,16 +2200,21 @@ namespace cuda_impl {
     tensorSize_t rightOffset = 0;
     tensorSize_t resOffset = 0;
 
-    while(leftOffset < left.getSize()){
+    while(leftOffset &lt; left.getSize()){
       if(!(transposeLeft || transposeRight)) {
-        matMul2DKernel<false, false><<<blocks, threadsPerBlock>>>(res.getData() + resOffset, left.getData() + leftOffset, right.getData() + rightOffset, 
+        matMul2DKernel&lt;false, false&gt;&lt;&lt;&lt;blocksPerGrid, threadsPerBlock&gt;&gt;&gt;(res.getData() + resOffset, left.getData() + leftOffset, right.getData() + rightOffset,
                                        left.getDims().get(-2), right.getDims().get(-2), left.getDims().get(-1), right.getDims().get(-1), resSize);
       }
       else if(transposeLeft && transposeRight) [[unlikely]] {
         // another kernel call
       }
-      // ... cover other template overloads 
-    
+      // ... cover other template overloads
+
+      leftOffset += leftSize;
+      rightOffset += rightSize;
+      resOffset += resSize;
+    }
+
     cudaErrchk(cudaDeviceSynchronize());
   }
 }</code></pre>
