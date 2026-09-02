@@ -1,12 +1,12 @@
 ---
 layout: default
-title: "PyTorch demystified 3: Implementing the CUDA backend"
+title: "PyTorch demystified 3: Implementing and optimizing the CUDA backend"
 section: Pytorch demystified - 3
 highlight: true
 mathjax: true
 ---
 
-    <h1 class="heading-spaced">PyTorch demystified 3 -<br>Implementing the CUDA backend</h1>
+    <h1 class="heading-spaced">PyTorch demystified 3 -<br>Implementing and optimizing the CUDA backend</h1>
     <p class="article-date">Published: Sept. 2026</p>
 
     <br>
@@ -108,8 +108,7 @@ mathjax: true
         and most interestingly to me personally: I give an explanation to each fix of why it actually worked.
         Additionally for those who want to follow along or maybe do even better fixes I have left every optimization step 
         on a branch of the repository. You can find it <a href="https://github.com/RobBa/dl_lib/tree/dev/cuda_optimization" 
-        target="_blank">here</a>. Every finished optimization is clearly marked in its commit message, starting with an 
-        "Opt. [number]: 'Name of the fix'".
+        target="_blank">here</a>. I give a commit hash for every optimization step I perform below too.
       </p>
 
       <p>
@@ -2116,11 +2115,11 @@ void Tensor::tensorValues_t::resize(const tensorSize_t size) {
 
       {% include pytorch-opt-summary.html 
         before="0.8147s" after="0.8159s"
-        speedup="0.99x" commit="1802666341d94d1727d870dcad772b23ba30b6d5" %}
+        speedup="1.0x" commit="1802666341d94d1727d870dcad772b23ba30b6d5" %}
 
         <p>
           This one is very interesting. Technically it should have improved things, but on the practical 
-          side it did not. Before I get into that let's take a look at the nsys output. I increased the amount 
+          side things stagnated. Before I get into that let's take a look at the nsys output. I increased the amount 
           of computation in the script we run to profile, therefore the amount of computation has heavily 
           lifted from the initial offloading of data onto the GPU and toward more computation. In other words,
           we have a lot more computation now, and much less memcopies. We find ourselves with the following output:
@@ -2223,7 +2222,57 @@ namespace cuda_impl {
           As shown here, the host code separates the batch of matrices into segments of 2D-matrices, and then multiplies them individually
           in a loop. We do not use CUDA streams here, meaning that instead of processing an entire batch of 2D-matrices in parallel, we 
           take each of them and multiply them in a sequential fashion. Needless to say that this design is horrible at best. Thus, in this step 
-          we remove the outer while loop. To use 
+          we remove the outer while loop. Instead, we will use the CUDA utilities and use the additional y- and z- coordinates CUDA hands us for 
+          indexing threads and blocks. First, we have to compute how many of those multiplications we aim to perform:
         </p>
 
+<pre><code class="language-cpp">const tensorSize_t nMultiplications = res.getSize() / resSize;
+const int blocks = (resSize + threadsPerBlock - 1) / threadsPerBlock;
+dim3 numBlocks(blocks, nMultiplications);
+</code></pre>
+
+        <p>
+          These will be our kernel call parameters. Next, we have to change our kernel itself to index into the right array. We give the 
+          kernel itself the size parameters that we computed earlier, and we get the offsets inside the kernels through using the block-ids,
+          and we can then simply index inside the kernel.
+        </p>
+
+<pre><code class="language-cpp">const int leftOffset = blockIdx.y * leftSize;
+const int rightOffset = blockIdx.y * rightSize;
+
+// offsets computed outside of kernel before
+cij += left[leftOffset + leftIdx] * right[rightOffset + rightIdx];
+
+// same for indexing into result</code></pre>
+
+        <p>
+          This step now clearly marked a trade-off. We had a series of sequential calls to the kernels, which we replaced by one single 
+          kernel call. The kernel itself however became larger by adding more input arguments, but also slightly more computations. This 
+          can have additional side effects, such as increasing register pressure, if they happened to be at the limit already. Asking NSys
+          and NCU however gives us a rather sobering answer: Our fix didn't seem to have any impact on anything at all. However, we also did 
+          not regress and have some more elegant code in the end, so why not? For reference below the new NSys report before we move on to 
+          fix 6. 
+        </p>
+
+<pre> Time (%)  Total Time (ns)  Instances  Avg (ns)   Med (ns)   Min (ns)  Max (ns)   StdDev (ns)                                                  Name                                                
+ --------  ---------------  ---------  ---------  ---------  --------  ---------  -----------  ----------------------------------------------------------------------------------------------------
+     65.3      909,392,179      9,000  101,043.6   50,529.0       960    256,197    108,385.1  void <unnamed>::matMul2DKernel<(bool)0, (bool)1>(float *, const float *, const float *, unsigned in…
+     14.5      202,405,897      9,000   22,489.5    9,856.0     5,728     89,986     20,742.1  void <unnamed>::matMul2DKernel<(bool)0, (bool)0>(float *, const float *, const float *, unsigned in…
+     10.0      139,579,312      9,000   15,508.8    8,096.0     2,912     36,385     14,277.1  void <unnamed>::matMul2DKernel<(bool)1, (bool)0>(float *, const float *, const float *, unsigned in…</pre>
+
       </div>
+
+    <div id="cuda-opt-5" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 6 - Tiled matmul kernel</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="TODO" after="TODO"
+        speedup="TODO" commit="5864fac242482783a92ca7599a54c6de5cbbf248" %}
+
+
+      <p>
+        Here I kick in the cheatcode a little, knowing that eventually in the matmul operation cache locality becomes the next hotspot. And we already
+        have that 
+      </p>
+
+    </div>
