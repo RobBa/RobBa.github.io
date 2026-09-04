@@ -71,7 +71,7 @@ mathjax: true
       <p>
         Now that we have built our basic infrastructure, and we have a full pipeline, it is time for our long awaited
         part where we get to speed things up. This part will consist of two subparts. In part one, this post, we implement 
-        a CUDA backend and optimize it. We will use Nsight and NCU, two tools provided by NVIDIA, to profile our CUDA
+        a CUDA backend and optimize it. We will use NSys and NCU, two tools provided by NVIDIA, to profile our CUDA
         implementation, make deductions about bottlenecks, and do fixes.
       </p>
 
@@ -1383,21 +1383,21 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
       <p>
         This example is benchmarked on a small example, because it was so slow to run. We will move on from that very quickly and 
         get to larger examples, but for now we benchmark on a mere 5 epochs with 10 batches each. The batch-size remains 64 samples
-        throughout this whole blog entry, as well as the next. We start off by running NSight to see the execution on a continuous timeline.
-        I note that because NSight significantly slows down the run and generates huge amounts of data then needs to load (sometimes
-        overwhelming itself) I ran NSight on a smaller example than the benchmark itself. A screenshot of this run is in the following:
+        throughout this whole blog entry, as well as the next. We start off by running NSys to see the execution on a continuous timeline.
+        I note that because NSys significantly slows down the run and generates huge amounts of data then needs to load (sometimes
+        overwhelming itself) I ran NSys on a smaller example than the benchmark itself. A screenshot of this run is in the following:
       </p>
 
       <img
       class="blog-image pytorch-nsight"
       src="./img_3/nsight/before_step_1.png"
-      alt="NSight profiling for optimization step 1">
+      alt="NSys profiling for optimization step 1">
 
       <p>
         The main information is that rather embarrassingly, 99.4% of the time we spend copying data, with about half of that being
         device-to-host copies. This kind of copy specifically should be negligible in this script, since we copy once from the host
         to the device, and afterwards the only real copies back should just be the training losses and network outputs at best. 
-        We can use NSight to go deeper into where the memcopy-calls are actually made and find that I forgot to map the gradient clipping
+        We can use NSys to go deeper into where the memcopy-calls are actually made and find that I forgot to map the gradient clipping
         onto the GPU. That is, each time an optimizer clips the gradients the CPU would execute the associated parts of the code. 
       </p>
 
@@ -1430,12 +1430,12 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
         has been increased from 10 to 50 now, making the before number larger than the after from the previous example.
       </p>
 
-      <p>To start out with the optimization, we once again employ NSight, giving us the following timeline:</p>
+      <p>To start out with the optimization, we once again employ NSys, giving us the following timeline:</p>
 
       <img
       class="blog-image pytorch-nsight"
       src="./img_3/nsight/before_step_2.png"
-      alt="NSight profiling for optimization step 2">
+      alt="NSys profiling for optimization step 2">
 
       <p>
         We find ourselves still copying a lot of data, but this time we spend the bulk of it on device-to-device copies.
@@ -1660,13 +1660,13 @@ namespace cuda_impl {
         speedup="2.32x" commit="82ee6524d55606a1a188d7e9a3b452d8d1d0d677" %}
 
         <p>
-          As per usual, we start by profiling through NSight. The following timeline shows that we finally moved into kernel space:
+          As per usual, we start by profiling through NSys. The following timeline shows that we finally moved into kernel space:
         </p>
 
         <img
         class="blog-image pytorch-nsight"
         src="./img_3/nsight/before_step_3.png"
-        alt="NSight profiling for optimization step 3">
+        alt="NSys profiling for optimization step 3">
 
         <p>
           We find ourselves 60% of the time running kernels, and out of that more than 70% in the createContiguousCopyKernel. The question 
@@ -1874,19 +1874,19 @@ vector&lt;shared_ptr&lt;Tensor&gt;&gt; MatMulNode::backward(const Tensor& upstre
           This optimization step is certainly one of my favorite ones due to the simplicity and elegance of the solutions. Because
           we are already in a really fast area, at least on this small dataset, we disabled the number of batches now, and an epoch
           trains on the whole dataset from now on. However, since we are already very quick in general we will see more and more 
-          negligible improvements only. Looking at NSight again we once find ourselves running lots of 
+          negligible improvements only. Looking at NSys again we once find ourselves running lots of 
           memcopy-operations, shown below. So this is another chance for us to look at memory management.
         </p>
 
         <img
         class="blog-image pytorch-nsight"
         src="./img_3/nsight/before_step_4.png"
-        alt="NSight profiling for optimization step 4">
+        alt="NSys profiling for optimization step 4">
 
         <p>
           This step will, unlike the other ones, be split up in two parts. The first part
-          won't have an impact on the training dataset, but will alter the NSight output, as it will reduce those host-to-device copies. 
-          The second one won't change the memcopies, hence not alter the NSight output, but it is something that has been burning under
+          won't have an impact on the training dataset, but will alter the NSys output, as it will reduce those host-to-device copies. 
+          The second one won't change the memcopies, hence not alter the NSys output, but it is something that has been burning under
           my fingers for a while now, and now I finally have a chance to make it shine.
         </p>
 
@@ -2131,7 +2131,7 @@ void Tensor::tensorValues_t::resize(const tensorSize_t size) {
         <img
         class="blog-image pytorch-nsight"
         src="./img_3/nsight/before_step_5.png"
-        alt="NSight profiling for optimization step 5">
+        alt="NSys profiling for optimization step 5">
 
         <p>
           As can be seen here, the vast majority of the CUDA side is happening in the matmul-kernel, so that is the one
@@ -2332,13 +2332,28 @@ BM_MatMul_CUDA/64/128/10            11.0 us         11.0 us        63601 GFLOP/s
       <h3 class="heading-spaced">Opt. 6 - Tiled matmul kernel</h3>
 
       {% include pytorch-opt-summary.html 
-        before="0.8159s" after="TODO"
-        speedup="TODO" commit="5864fac242482783a92ca7599a54c6de5cbbf248" %}
+        before="0.8159s" after="0.5883s"
+        speedup="1.39x" commit="5864fac242482783a92ca7599a54c6de5cbbf248" %}
 
 
       <p>
-        Here I kick in the cheatcode a little, knowing that eventually in the matmul operation cache locality becomes the next hotspot. And we already
-        have that 
+        Because we just ran NSys to get the NSight visualization we do not need to do that again. We also do not need to, since we know
+        that the matuMul2DKernel absorbs all of our computational efforts. We can thus go directly into NCU and get a direct profile of 
+        our kernel. We call <code>ncu --set full -o [output-file] python3 [benchmark-file]</code>. Looking into the analysis and the 
+        recommendations we find from NCU we find two things: 1. It recommends us to tune our kernel again, specifically the launch grid 
+        configurations, and 2. it has a problem with our memory access pattern.
+      </p>
+
+      <img
+        class="blog-image pytorch-nsight"
+        src="./img_3/nsight/ncu_step_6.png"
+        alt="NCU output for matmul-kernel in step 6">
+
+      <p>
+        Because the grid launch configurations are a matter of both kernel and its input we will focus on the more generalizable fix, namely
+        the memory access pattern. We can see that in general it has an issue with both the load and the store into the L1 cache. Given our 
+        kernel it is pretty obvious where that is coming from: The memory access patterns from our two source tensors, and the stores back into 
+        the resulting tensor. 
       </p>
 
     </div>
