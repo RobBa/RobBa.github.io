@@ -2263,13 +2263,79 @@ cij += left[leftOffset + leftIdx] * right[rightOffset + rightIdx];
      14.5      202,405,897      9,000   22,489.5    9,856.0     5,728     89,986     20,742.1  void <unnamed>::matMul2DKernel<(bool)0, (bool)0>(float *, const float *, const float *, unsigned in…
      10.0      139,579,312      9,000   15,508.8    8,096.0     2,912     36,385     14,277.1  void <unnamed>::matMul2DKernel<(bool)1, (bool)0>(float *, const float *, const float *, unsigned in…</pre>
 
+
+      <p>
+        We can also take a look at the NSys output to compare with before and see that our fix did little here. For everyone who wants to go deeper 
+        into this fix I provide an optional section below. Everyone else can skip to the next section, as we never planned to hover here 
+        for too long and will refine the kernel further anyway. 
+      </p>
+
+      <img
+        class="blog-image pytorch-nsight"
+        src="./img_3/nsight/step_5_ncu.png"
+        alt="NCU output for matmul-kernel in step 5">
+
+      <p>
+        To be on the safe side that we made no mistake we quickly take a look at the matmul kernel itself in isolation. We employ Google benchmark
+        to write up a quick benchmark, and for completeness reasons we test the matmul in multiple settings. Because we are interested in comparing
+        the launch overhead and blocking with the fused kernel we can focus on one instance of the matmul kernel, rather than testing every 
+        template overload. The script looks like the following:
+      </p>
+
+      <p>
+        We get the following outputs. This is the output of the benchmarks before the fix:
+      </p>
+
+<pre>----------------------------------------------------------------------------------------
+Benchmark                              Time             CPU   Iterations UserCounters...
+----------------------------------------------------------------------------------------
+BM_MatMul_CUDA/64/64/64             8.35 us         8.35 us        82625 GFLOP/s=62.8207/s
+BM_MatMul_CUDA/256/256/256          55.3 us         55.3 us        12941 GFLOP/s=606.583/s
+BM_MatMul_CUDA/512/512/512           444 us          444 us         1539 GFLOP/s=605.077/s
+BM_MatMul_CUDA/1024/1024/1024       3738 us         3738 us          191 GFLOP/s=574.47/s
+BM_MatMul_CUDA/64/784/256           57.1 us         57.1 us        11573 GFLOP/s=449.763/s
+BM_MatMul_CUDA/64/256/128           15.2 us         15.2 us        45986 GFLOP/s=275.334/s
+BM_MatMul_CUDA/64/128/10            11.0 us         11.0 us        63442 GFLOP/s=14.8342/s</pre>
+
+      <p>
+        And this is the output after the fix:
+      </p>
+      
+<pre>----------------------------------------------------------------------------------------
+Benchmark                              Time             CPU   Iterations UserCounters...
+----------------------------------------------------------------------------------------
+BM_MatMul_CUDA/64/64/64             8.23 us         8.23 us        83068 GFLOP/s=63.7151/s
+BM_MatMul_CUDA/256/256/256          54.8 us         54.8 us        12880 GFLOP/s=611.837/s
+BM_MatMul_CUDA/512/512/512           440 us          440 us         1546 GFLOP/s=610.399/s
+BM_MatMul_CUDA/1024/1024/1024       3714 us         3714 us          193 GFLOP/s=578.278/s
+BM_MatMul_CUDA/64/784/256           57.0 us         56.9 us        11628 GFLOP/s=451.117/s
+BM_MatMul_CUDA/64/256/128           15.2 us         15.2 us        46025 GFLOP/s=276.244/s
+BM_MatMul_CUDA/64/128/10            11.0 us         11.0 us        63601 GFLOP/s=14.8537/s</pre>
+
+        <p>
+          Now there's good and bad news in here. The good news is that perhaps our fix indeed did do something. 
+          After all the improved kernels are slightly better across most inputs. Morover, the larger the batch 
+          dimension, that is the larger the number of loops the pre-fix version iterates over, the larger the 
+          improvement. The bad news is that the fix is in terms of around 20 microseconds even for a batch-size
+          of 1024, which is far beyond what our actual MNIST benchmark has. The fix thus only every gets really 
+          visible on extremely large inputs and only matters to those who want every last drop of performance.
+        </p>
+
+        <p>
+          Good to know, we wonder if we could have spent our time better than this. But I personally like this 
+          version much better, as the code itself is just more elegant. And why not, maybe those microseconds 
+          will matter at some point. And as a small bit of extra information, the degradation in performance we 
+          measured on the benchmark is likely noise rather than a genuine regression backward. The next fix however 
+          is going to change a lot for our kernel. 
+        </p>
+
       </div>
 
     <div id="cuda-opt-6" class="article-text-div">
       <h3 class="heading-spaced">Opt. 6 - Tiled matmul kernel</h3>
 
       {% include pytorch-opt-summary.html 
-        before="TODO" after="TODO"
+        before="0.8159s" after="TODO"
         speedup="TODO" commit="5864fac242482783a92ca7599a54c6de5cbbf248" %}
 
 
