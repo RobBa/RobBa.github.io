@@ -2279,11 +2279,8 @@ cij += left[leftOffset + leftIdx] * right[rightOffset + rightIdx];
         To be on the safe side that we made no mistake we quickly take a look at the matmul kernel itself in isolation. We employ Google benchmark
         to write up a quick benchmark, and for completeness reasons we test the matmul in multiple settings. Because we are interested in comparing
         the launch overhead and blocking with the fused kernel we can focus on one instance of the matmul kernel, rather than testing every 
-        template overload. The script looks like the following:
-      </p>
-
-      <p>
-        We get the following outputs. This is the output of the benchmarks before the fix:
+        template overload. It is to be noted that one dry run should be performed on the device to remove overhead that comes from CUDA's JIT behavior
+        and context initialization. Google Benchmarks returns us these numbers before the fix:
       </p>
 
 <pre>----------------------------------------------------------------------------------------
