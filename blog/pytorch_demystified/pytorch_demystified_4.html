@@ -31,6 +31,37 @@ mathjax: false
       <h2 class="heading-spaced">Introduction</h2>
 
       <p>
-        Text here
+        Now we have reached the last post of this initial series. After implementing a full MNIST training pipeline end-to-end in both C++ and CUDA
+        and giving it a Python binding to be compiled into a Python module, we are ready for our last optimization, the C++ backend optimization.
+        Because we already walked over the source code this time we can dive right into the optimization work. In the following we will learn about 
+        some CPU-native features, specifically looking at x86-64 (in the following only x64), among other optimization techniques. For everyone not familiar
+        with x86 I give a small optional primer that will be enough for you to follow this blogpost, given you are familiar with assembly language in general.
       </p>
+
+      <div class="pytorch-step-row pytorch-step-row-compact">
+        <div class="pytorch-step-text">
+          <p>
+            About the profiling tools, I personally run Linux, and the 
+            profiling tools of choice are Valgrind and perf. Since Valgrind requires us to set compile flags so that it can hook into the program we 
+            need to recompile every time we want to analyze it with Valgrind, but still want to compare with the actual release version. perf is the simpler 
+            tool for that, so this post will be using it throughout.
+          </p>
+        </div>
+        <div class="pytorch-step-figs">
+          <figure class="fig-light">
+          <img
+          id="pytorch-step-4"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_4.png"
+          alt="Diagram of part 4: CPU backend optimization">
+          </figure>
+          <figure class="fig-dark">
+          <img
+          id="pytorch-step-4-dark"
+          class="blog-image pytorch-step-img"
+          src="./img_shared/step_4_dark.png"
+          alt="Diagram of part 4: CPU backend optimization">
+          </figure>
+        </div>
+      </div>
     </div>
