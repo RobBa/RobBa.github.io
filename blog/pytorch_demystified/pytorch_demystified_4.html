@@ -7,7 +7,7 @@ mathjax: false
 ---
 
     <h1 class="heading-spaced">PyTorch demystified 4 -<br>Optimizing the CPU backend</h1>
-    <p class="article-date">Published: -</p>
+    <p class="article-date">Published: Sept. 2026</p>
 
     <br>
 
@@ -23,6 +23,14 @@ mathjax: false
       <ul>
         <li>
           <a href="#introduction">Introduction</a>
+          <ul>
+            <li>
+              <a href="#optional-risc-cisc">Optional: RISC vs. CISC, and where they stand today</a>
+            </li>
+            <li>
+              <a href="#optional-x86-primer">Optional: Primer on x86-64</a>
+            </li>
+          </ul>
         </li>
       </ul>
     </div>
@@ -64,4 +72,70 @@ mathjax: false
           </figure>
         </div>
       </div>
+    </div>
+
+    <div class="article-text-div">
+      <details class="pytorch-optional" id="optional-risc-cisc">
+      <summary class="pytorch-optional-summary">
+        <h4>Optional: RISC vs. CISC, and where they stand today</h4>
+      </summary>
+
+      <div class="pytorch-optional-collapse-bar">
+        <button type="button" class="pytorch-optional-collapse-btn"
+          onclick="var s=document.getElementById('optional-risc-cisc'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
+
+      <p>
+        For all those who want a refresher on x64 or who haven't had contact yet, this is for you. I assume you are familiar with assembly 
+        code. If you do not know what x86 is, in brief words, back in the days when computers started out there were two philosophies 
+        as to how to design CPUs, known as RISC (Reduced Instruction Set arChitecture) and CISC (Complex Instruction Set arChitecture). 
+        The difference, in my own faul words, is that RISC kept things simple. Instructions are reduced the very ones necessary to perform 
+        the desired operations. CISC on the other hand has more complex instructions. One instruction might fetch data from memory, add an 
+        operand on top, and save the data at a target address. Without digging the whole rabbit hole as what has happened since then, I 
+        still find it interesting to see why that was, and mark the trade-offs clearly.
+      </p>
+
+      <p>
+         Let's go a little back in time: Phones had actual buttons to be pressed when dialing a number, 
+         people still knew how to keep a proper conversation and the value of communities, and RAM in computers was in the KB range.
+         In order to reduce instructions to be held in memory the CISC community designed their CPUs in a way that one instruction 
+         would do more of the work. That meant less instructions and thus more compact code for any compiled and executable program. 
+         This trade-off was to be marked by more instruction decoding logic and wiring on the actual chip. Chips using this kind of
+         architecture are the ones designed and produced by Intel and AMD.
+      </p>
+
+      <p>
+        On the contrary RISC uses less instructions, but each instruction is necessary and serves a clear purpose. Advantages of this
+        architecture are more ways to optimize nowadays for compilers, since they can shift independent instructions around. That is,
+        instructions are not necessarily executed in the order you wrote your program in if the compiler determines it found a better
+        ordering. Another advantage is that the final CPU itself has less need for instruction decoding, and is thus likely to be simpler
+        and energy efficient (less wires to maintain). RISC architectures are known from ARM (Advanced RISC Machines) and the open-source
+        RISC-V (say RISC-five) instruction set architecture.
+      </p>
+
+      <p>
+        
+      </p>
+
+      </details>
+
+    </div>
+
+    <div class="article-text-div">
+      <details class="pytorch-optional" id="optional-x86-primer">
+      <summary class="pytorch-optional-summary">
+        <h4>Optional: Primer on x86-64</h4>
+      </summary>
+
+      <div class="pytorch-optional-collapse-bar">
+        <button type="button" class="pytorch-optional-collapse-btn"
+          onclick="var s=document.getElementById('optional-x86-primer'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
+
+
+      </details>
     </div>

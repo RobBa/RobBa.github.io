@@ -1,0 +1,13 @@
+/* -------------- Pytorch demystified 4: Optimizing the CPU backend ---------------- */
+
+#pytorch-step-4,
+#pytorch-step-4-dark {
+    width: 75%;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    #pytorch-step-4,
+    #pytorch-step-4-dark {
+        width: 87%;
+    }
+}
