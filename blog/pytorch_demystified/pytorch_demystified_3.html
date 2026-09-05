@@ -2489,4 +2489,240 @@ namespace {
         everything in 32 32-bit floating points.
       </p>
 
+      <p>
+        In summary, we squeezed everything into shared memory, where we reduced latency through memory accesses, and we achieved better memory access 
+        patterns. 
+      </p>
+
+    </div>
+
+    <div id="cuda-opt-7" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 7 - Remove unnecessary device syncs</h3>
+
+        {% include pytorch-opt-summary.html 
+        before="0.5883s" after="0.3317s"
+        speedup="1.77x" commit="265ca1a9e1c861a4a977dfdb5f4df1ae1e3922e1" %}
+
+        <p>
+          This will be a rather quick one again. Whenever we called a CUDA kernel, we have followed the pattern 
+          laid out by every CUDA tutorial: 1. Compute launch parameters, 2. call kernel, 3. synchronize the device, 
+          and 4. cleanup if necessary. However, on this whole project we never used an alternative stream, meaning 
+          two subsequent CUDA kernel calls will happen in a sequential fashion, even when kernel calls run asynchronous to 
+          the host code.
+        </p>
+
+        <p>
+          We can therefore remove any unnecessary cudaDeviceSynchronize() call. The host code will run through, 
+          schedule the CUDA code, and block as soon as it reaches a blocking statement, which is in between the trainings, as 
+          sometimes we copy dimensionality information onto the device, but it would be latest at the end of any training loop,
+          when we capture the loss or the host needs data from the device for its own decision making. 
+        </p>
+
+        <p>
+          The fix is then pretty straight forward. Showing the improvement in a profiler would be harder to capture. We can show 
+          that we spend less time on the synchronize, or spend less time in user space. I chose to do two Nsight profile, which 
+          we can see below. One version before the fix, one version after the fix. I capture the first 10ms of kernel calls in both
+          cases, and we can see the kernel calls are denser on the version after the fix.  
+        </p>
+
+        <figure>
+          <img
+          class="blog-image pytorch-nsight"
+          src="./img_3/nsight/before_step_7.png"
+          alt="NSight output for the first 10ms of kernel calls before fix 7.">
+          <figcaption>
+            The first 10ms of kernel calls before optimization 7.
+          </figcaption>
+        </figure>
+
+
+        <figure>
+          <img
+          class="blog-image pytorch-nsight"
+          src="./img_3/nsight/after_step_7.png"
+          alt="NSight output for the first 10ms of kernel calls after fix 7.">
+          <figcaption>
+            The first 10ms of kernel calls after optimization 7. Comparing the before and after we can see that the kernel calls 
+            got more dense after the fix.
+          </figcaption>
+        </figure>
+    </div>
+
+    <div id="cuda-opt-7" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 8 - Use modern warp shuffle intrinsics in reduction kernels</h3>
+
+        {% include pytorch-opt-summary.html 
+        before="0.3317s" after="0.3318s"
+        speedup="1.0x" commit="0e7a0d12323e2a18e4d5e8039094c805cabbc0e9" %}
+
+      <p>
+        This last one has been burning for a while, and if it's only for the simple reason that I grew tired of the the deprecated warnings 
+        of the compiler on how we used the warp unrolled reduction pattern in our reduction kernels. That is the pattern we used in our reduction 
+        kernels, specifically exemplified by the following kernel, which I copy here again:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/module/activation_functions/cuda/activations.cu
+
+namespace { 
+  template&lt;int maxoffset&gt;
+  __forceinline__ __device__ void softmaxWarpSumReduce(volatile ftype* const input, const tensorSize_t stride, const int offset) {
+    static_assert(maxoffset &gt; 0 && maxoffset &lt;= 32, "Invalid value for template");
+    
+    if(maxoffset == 32) {
+      if(offset + 32 &lt; stride) input[offset] += input[offset + 32];
+    }
+    if(maxoffset &gt;= 16) {
+      if(offset + 16 &lt; stride) input[offset] += input[offset + 16];
+    }
+    if(maxoffset &gt;= 8) {
+      if(offset + 8 &lt; stride) input[offset] += input[offset + 8];
+    }
+    if(maxoffset &gt;= 4) {
+      if(offset + 4 &lt; stride) input[offset] += input[offset + 4];
+    }
+    if(maxoffset &gt;= 2) {
+      if(offset + 2 &lt; stride) input[offset] += input[offset + 2];
+    }
+    if(maxoffset &gt;= 1) {
+      if(offset + 1 &lt; stride) input[offset] += input[offset + 1];
+    }
+  }
+}</code></pre>
+
+      <p>
+        This is normally applied to shared memory, i.e. input is normally a pointer to an address in device specific shared memory.
+        The reason for this is to suppress optimizations by the kernel, making sure that each warp writes back into shared memory.
+        That allows us to remove the synchronization instructions, which is what we actually save through this optimization.  
+      </p>
+
+      <p>
+        However, given that this is such a common pattern NVIDIA stepped in and gave us warp shuffles in later iterations of its 
+        hardware. Warp shuffles are essentially a means for warps to cooperate further by sharing values stored in thread-local 
+        registers with other threads of the warps. There are multiple instructions of how to do that, for instance cross-patter, 
+        enabling neighboring threads to share, shuffle ups, where each thread gives its register content to a thread with a higher
+        index. We obviously take the inverse route, meaning we shuffle down. I used the shuffle down with synchronization instructions, 
+        since we still need to synchronize in between threads for the reduction. The kernel above now looks like what I give below, 
+        and we apply this pattern to all reduction kernels. 
+      </p>
+
+<pre><code class="language-cpp">// src/backend/shared/cuda/common_softmax.cuh
+
+// baked directly into the kernel, bypassing the device kernel completely
+for(int offset = maxoffset; offset > 0; offset >>= 1) {
+  maxVal = cudaMax<ftype>(maxVal, __shfl_down_sync(0xFFFFFFFF, maxVal, offset, stride)); 
+}</code></pre>
+
+      <p>
+        I went for the looped version here, one can easily unroll that loop by hand, saving even more, or simply use a <code>&#35;pragma unroll</code>
+        before the loop to tell the compiler to do it for you. In my implementation referenced by the commit hash I did not unroll the loops,
+        which is where the benchmark number comes from. Just out of curiousity I also created a branch out of the commit to check if the loop unroll
+        does something, and the number went down from 0.3325s without the loop unrolling to 0.3318s with loop unrolling. Given that our kernels are 
+        mostly short and registers are likely free to use the unrolled version is likely the better one in most cases, but the three numbers I got 
+        out of this experiment here are in the milliseconds and not very clean numbers. So what actually is noise and what is a genuine improvement 
+        is hard to measure here, unless we isolate our kernels and do some hard benchmarking. I for my part am pretty happy knowing at the very least 
+        it does not tip the needle for now, but we stay canonical and got rid of the compile complaining to us that we're using phone booths and carrier
+        pigeons. And as a side, I just included the unrolled loops on my main branch.
+      </p>
+
+    </div>
+
+
+    <div id="wrap-up-and-outlook" class="article-text-div">
+      <h2 class="heading-spaced">Comparison with cuBLAS and outlook</h2>
+
+      {% include pytorch-opt-summary.html 
+        before="-" after="-"
+        speedup="-" commit="e02cab46912ec360051bb3d8e2f7b44a5fc2336d" %}
+
+      <p>
+        That wraps up our optimization journey so far. While there is still a lot that can be done we have to lower the gun at some point and call
+        it a day, or else we will never get to eat our hard-earned dinner today. As a last step, and just out of curiousity, I wanted to check out 
+        how much we can still squeeze out of it. Running NSight again we can see that we still lose the bulk in the matmul kernel, a well known 
+        problem by the way. Matrix multiplications are just expensive operations, and given that there are so many involved in every deep learning 
+        application including LLMs there is a lot of research out there just optimizing this one single operation. 
+      </p>
+
+      <p>
+        Anyway, since we lose most of our fuel in that operation I decided to quickly compare it with a baseline. cuBLAS has ready made implementations 
+        of common operations used in linear algebra, and is provided by NVIDIA and hence optimized by NVIDIA engineers. I ran the benchmarks implemented
+        in Google-Benchmark earlier (found <a href="https://github.com/RobBa/dl_lib/blob/main/benchmarks/cuda/bm_matmul.cu" target="_blank">here</a>), 
+        parroting back the following numbers at me for the cuBLAS version:
+      </p>
+
+<pre>----------------------------------------------------------------------------------------
+Benchmark                              Time             CPU   Iterations UserCounters...
+----------------------------------------------------------------------------------------
+BM_MatMul_CUDA/64/64/64             12.3 us         12.3 us        57092 GFLOP/s=42.5191/s
+BM_MatMul_CUDA/256/256/256          23.4 us         23.4 us        31298 GFLOP/s=1.4355k/s
+BM_MatMul_CUDA/512/512/512          66.1 us         66.1 us        10415 GFLOP/s=4.05948k/s
+BM_MatMul_CUDA/1024/1024/1024        400 us          400 us         1696 GFLOP/s=5.3725k/s
+BM_MatMul_CUDA/64/784/256           19.6 us         19.6 us        34714 GFLOP/s=1.31137k/s
+BM_MatMul_CUDA/64/256/128           12.3 us         12.3 us        55978 GFLOP/s=340.338/s
+BM_MatMul_CUDA/64/128/10            12.3 us         12.3 us        56551 GFLOP/s=13.3226/s</pre>
+
+      <p>
+        Doing the same with our custom kernel does the following now:
+      </p>
+
+<pre>----------------------------------------------------------------------------------------
+Benchmark                              Time             CPU   Iterations UserCounters...
+----------------------------------------------------------------------------------------
+BM_MatMul_CUDA/64/64/64             7.51 us         7.50 us        93948 GFLOP/s=69.8632/s
+BM_MatMul_CUDA/256/256/256          56.9 us         56.9 us        12746 GFLOP/s=589.361/s
+BM_MatMul_CUDA/512/512/512           408 us          408 us         1713 GFLOP/s=657.182/s
+BM_MatMul_CUDA/1024/1024/1024       3293 us         3293 us          218 GFLOP/s=652.158/s
+BM_MatMul_CUDA/64/784/256           56.8 us         56.8 us        11748 GFLOP/s=452.521/s
+BM_MatMul_CUDA/64/256/128           15.3 us         15.3 us        45443 GFLOP/s=273.79/s
+BM_MatMul_CUDA/64/128/10            9.10 us         9.10 us        76300 GFLOP/s=18.0097/s</pre>
+
+      <p>
+        Interestingly, on smaller input sizes our custom kernel wins, but gets its booty kicked really quick by cuBLAS on rising input sizes.
+        The question is why. Sadly cuBLAS is not open-source, hence we cannot really look into what it does differently. But given 
+        that the library call has no immediate kernel calls and hence not really kernel launch parameters we give it chances are that 
+        there is some checking going on beneath the hood on input sizes. It will likely also check our hardware and call subsequent 
+        kernels. Hence, step 1 for us to go further would also be to tune the kernel launch parameters accordingly, which was also one of the 
+        top NCU recommendations to follow next. Other optimizations we could perform are the use of dedicated hardware, since CUDA now 
+        has TensorCores, dedicated hardware specifically designed for deep learning applications.
+      </p>
+
+      <p>
+        Other optimizations that apply to the whole framework would be to use optimized libraries where applicable, but we can do more than that.
+        The sigmoid function screams at us to use compile time optimizations, where we can compile a precomputed table at compile time. The 
+        runtime interface then reduces to a mere lookup in the table. Other things we can do are kernel fusions, for instance a matmul and add
+        for the feedforward layer matmul and add bias term. This saves us further fetches from memory and one kernel launch overhead.
+      </p>
+
+      <p>
+        Another interesting direction to look at are mixed precision floating points. In the beginning of this blogpost I talked about floating
+        point numbers and mentioned that recently more floating point types have been introduced to both CUDA and C++. This increases throughput
+        by both saving memory, but more importantly, enabling larger memory and compute throughput. For instance, CUDA supports intrinsics where one
+        thread can perform one single operation on two FP-16 operands the same time, similar to what Intel did with AVX. That means that one warp
+        could have a throughput of 64 operands per cycle rather than 32 during those operations.
+      </p>
+
+      <p>
+        However, those optimizations will be part of a later blogpost, shall I find the time for it. For now it is as it is, but if you feel motivated
+        to go deeper into the matter feel free to pick up from where I left off, and if you find good optimizations let me know please.
+      </p>
+
+    </div>
+
+    <div id="summary" class="article-text-div">
+      <h2 class="heading-spaced">Summary</h2>
+
+      <p>
+        In the previous three blogposts leading up to this one we implemented a deep learning framework akin to PyTorch in C++. In contrast, this 
+        part of the series was all about CUDA. We implemented a CUDA backend, ending up with an end-to-end training pipeline in CUDA. We then 
+        used NSys and NCU to profile both our timeline and individual kernels, optimizing our CUDA backend with a speedup of 10x on our whole 
+        training-pipeline as is. To do so we used techniques such as kernel fusion, custom kernels to bypass streamlined memory-copies, a memory pool,
+        and tiled kernels for cache optimal behavior. In the end we compared with cuBLAS, where we still got beaten, we also now know how to 
+        continue in order to compete with it.
+      </p>
+
+      <p>
+        My next and last post of this series will go a similar path. With a satisfactory CUDA backend, at least for now, we will optimize the 
+        C++ side as well. We will use similar techniques and once again spend some time with the matmul operation, but we will also use other 
+        optimization techniques and find and fix some bugs that we silently introduced. This one will hopefully be very educational as well for 
+        you, as it surely was for me. Until then, and don't forget to reach out or give feedback if you engaged with this post. Cheers.
+      </p>
     </div>
