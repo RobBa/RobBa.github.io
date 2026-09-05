@@ -11,3 +11,25 @@
         width: 87%;
     }
 }
+
+.pytorch-perf {
+    width: 100%;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+/* Enlarge the perf screenshots for better legibility */
+
+@media (hover: hover) {
+    .pytorch-perf {
+        position: relative;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        cursor: zoom-in;
+    }
+
+    .pytorch-perf:hover {
+        transform: scale(1.6);
+        z-index: 50;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+}
