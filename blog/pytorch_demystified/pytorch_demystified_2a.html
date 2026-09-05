@@ -118,7 +118,7 @@ assert(C.has_grads() and C.has_grads())</code></pre>
         We can extend this arbitrarily long, having a chain of operations, and in the end we have to propagate the operations backward 
         to the tensors. If that now looks cryptic to you I won't blame you, so let's make sure we are on the same page of what this actually
         means. I will use this chance to dive right into the matmul operation here, since that one will come to haunt us later and is one of the
-        harder cases to wrap our heads around. Say we have two tensors $A \in \mathcal{R}^2$ and $B \in \mathcal{R}^2$. Then the matrix 
+        harder cases to wrap our heads around. Say we have two tensors $A \in \mathbb{R}^2$ and $B \in \mathbb{R}^2$. Then the matrix 
         multiplication of the two will be
 
         $$C = A @ B = \left [ \begin{matrix} 

@@ -2353,7 +2353,140 @@ BM_MatMul_CUDA/64/128/10            11.0 us         11.0 us        63601 GFLOP/s
         Because the grid launch configurations are a matter of both kernel and its input we will focus on the more generalizable fix, namely
         the memory access pattern. We can see that in general it has an issue with both the load and the store into the L1 cache. Given our 
         kernel it is pretty obvious where that is coming from: The memory access patterns from our two source tensors, and the stores back into 
-        the resulting tensor. 
+        the resulting tensor.
+      </p>
+
+      <p>
+        We once again have two ways to solve this: We can do what I have been doing in an earlier iteration already, that is to swap loops. 
+        I did this in <a href="pytorch_demystified_1.html" target="_blank">part 1</a> already, resulting in flat addressing. However, this 
+        will also only go that far. Our memory access pattern will be better, resulting in more coalesced fetches. But once a row or column, 
+        whatever we iterate through at the moment, becomes larger than our caches, we are again loading the same data over and over again 
+        into cache.
+      </p>
+
+      <p>
+        There is a better solution though, one very much worth knowing, and that is the <b>tiled matmul</b>. While this technique is not limited
+        to the matmul operation, the matmul operation is the one where it is normally first encountered. The basic idea is the following:
+        Say we have two matrices, both of size $\mathbb{R}^N$. The full matrix multiplication then costs $\mathcal{O}(N^3)$ operations (if one 
+        does not consider Strassen's algorithm). The normal matmul as one would do it by hand, walking through the rows of the left matrix and 
+        the columns of the right matrix, would load each datapoint anew from memory. 
+      </p>
+
+      <p>
+        The idea of the tiled approach is then to instead of loading one row and one column for one element, to load a block (a tile) of the left
+        matrix, a block of the right matrix, and then multiply those to get a tile of the result. If the tilesize is tuned correctly this method 
+        results in no wasted memory fetches, and since the multiplication runs on level 1 cache memory (both on CPU and GPU, the CPU version comes
+        in <a href="pytorch_demystified_4.html" target="_blank">part 4</a> of this series), we get amazing speed out of the memory hierarchy. 
+        Because this is a larger and interesting topic I personally think that it is worth it looking a little bit closer. Given that this is 
+        large enough to become a complete blogpost on its own, and also given that those already exist,
+        I softly nudge the interested reader toward <a href="https://andreasholt.com/posts/shared-tiled-matmul/" target="_blank">this</a> one. From
+        my side you get a ready kernel, but let's start with the kernel call:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cu
+
+namespace cuda_impl {
+  void matmul(Tensor& res, const Tensor& left, const Tensor& right, const bool transposeLeft, const bool transposeRight) {
+    constexpr int MATMUL_TILESIZE = 32; // choose 16 (threadsPerBlock=256) or 32 (threadsPerBlock=1024)
+    constexpr dim3 threadsPerBlock(MATMUL_TILESIZE, MATMUL_TILESIZE);
+    
+    // sizes of the 2D matrices respectively
+    const tensorSize_t leftSize = left.getDims().get(-1) * left.getDims().get(-2); 
+    const tensorSize_t rightSize = right.getDims().get(-1) * right.getDims().get(-2);
+    const tensorSize_t resSize = res.getDims().get(-2) * res.getDims().get(-1);
+
+    const tensorSize_t nMultiplications = res.getSize() / resSize;
+
+    // x = horizontal, y = vertical
+    const int blocksX = (res.getDims().get(-1) + MATMUL_TILESIZE - 1) / MATMUL_TILESIZE;
+    const int blocksY = (res.getDims().get(-2) + MATMUL_TILESIZE - 1) / MATMUL_TILESIZE;
+    dim3 numBlocks(blocksX, blocksY, nMultiplications);
+
+    if(!(transposeLeft || transposeRight)) {
+      matMul2DKernel<MATMUL_TILESIZE * MATMUL_TILESIZE, false, false><<<numBlocks, threadsPerBlock>>>(
+                                                      res.getData(), left.getData(), right.getData(), 
+                                                      left.getDims().get(-2), left.getDims().get(-1), 
+                                                      right.getDims().get(-2), right.getDims().get(-1), 
+                                                      res.getDims().get(-2), res.getDims().get(-1),
+                                                      leftSize, rightSize, resSize);
+    }
+    // .. call the other template overloads
+
+    cudaErrchk(cudaDeviceSynchronize());
+  }
+}</code></pre>
+
+      <p>
+        At first we choose the size of a tile. We make the tiles quadratic for now, and sizes are either 16 or 32. I chose 32, since that 
+        is the warpsize, enhancing throughput on first glance. We will see later if it was a good choice. We make the threads be indexed 
+        two-dimensional. nMultiplications encodes how many 2D-matrices we compute later on, and we call $\left (\left \lceil \frac{nCols_{res}}{tilesize} 
+        \right \rceil, \left \lceil \frac{nRows_{res}}{tilesize} \right \rceil, nMultiplications \right)$ blocks. Each of these blocks 
+        has $(tilesize, tilesize)$ threads, and each thread computes one element of the result by sliding the tile across the two matrices.
+        This is shown in the kernel below.
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cu
+
+namespace {
+  template<int tileSize, bool transposeLeft, bool transposeRight>
+  __global__ void matMul2DKernel(ftype* const res, 
+                                 const ftype* const left, const ftype* const right,
+                                 const tensorDim_t leftRows, const tensorDim_t leftCols, 
+                                 const tensorDim_t rightRows, const tensorDim_t rightCols,
+                                 const tensorDim_t resRows, const tensorDim_t resCols,
+                                 const tensorSize_t leftSize, const tensorSize_t rightSize, const tensorSize_t resSize)
+  {
+    __shared__ ftype smemA[tileSize];
+    __shared__ ftype smemB[tileSize];
+
+    const tensorSize_t K = transposeLeft ? leftRows : leftCols;
+    const tensorSize_t N = transposeRight ? rightRows : rightCols;
+
+    const tensorSize_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    const tensorSize_t j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    const tensorSize_t leftOffset = blockIdx.z * leftSize;
+    const tensorSize_t rightOffset = blockIdx.z * rightSize;
+    const tensorSize_t resOffset = blockIdx.z * resSize;
+
+    ftype cij = 0;
+    for (tensorSize_t k = 0; k < K; k += blockDim.x) {
+      // load tile into smem
+      const tensorSize_t leftIdx = transposeLeft ? (k + threadIdx.x) * leftCols + i : i * leftCols + k + threadIdx.x;
+      const tensorSize_t rightIdx = transposeRight ? j * rightCols + (k + threadIdx.y) : (k + threadIdx.y) * rightCols + j;
+
+      smemA[threadIdx.y * blockDim.x + threadIdx.x] = (i < resRows && (k + threadIdx.x) < K) ? left[leftOffset + leftIdx] : 0.0f;
+      smemB[threadIdx.y * blockDim.x + threadIdx.x] = ((k + threadIdx.y) < K && j < resCols) ? right[rightOffset + rightIdx] : 0.0f;
+      __syncthreads();
+
+      for (int l = 0; l < blockDim.x; l++) {
+        cij += smemA[threadIdx.y * blockDim.x + l] * smemB[l * blockDim.x + threadIdx.x];
+      }
+      __syncthreads();
+    }
+
+    if (i < resRows && j < resCols) {
+      res[resOffset + i * N + j] = cij;
+    }
+  }
+}</code></pre>
+
+      <p>
+        Now it pays off having read the previous iterations we performed on the matmul kernel, since now everything coalesces into 
+        this one, along with the tiles residing in shared memory. Kernels initially determine which element they are computing, which 
+        2D-matrix they are in, and resolve the template overload. We then enter a loop iterating over blockDim.x. This works works because 
+        the blockDim.x corresbonds with the tilesize. We could have put this into the loop, making it compile time expression and saving 
+        a little overhead. 
+      </p>
+
+      <p>
+        Inside the loop we first load the elements into shared memory. We need to be careful here to not cross the boundaries of the outer 
+        matrices. Values above the boundary get zero padded, one operation. If we moved the boundary checks into the inner loop that follows we 
+        would cast this one boundary check into blockDim.x boundary checks, hence the zero-padding is another micro-optimization. The inner loop 
+        then simply sums over the respective elements in shared memory, making this the actual matmul. I note here that these are coalesced 
+        accesses. Fetching from smemA is a broadcast-read, since all threads of a warp access the same memory location. And the fetches from 
+        smemB access through threadIdx.x, making neighboring threads access neighboring cells, one memory bank at a time, since we neatly organized
+        everything in 32 32-bit floating points.
       </p>
 
     </div>
