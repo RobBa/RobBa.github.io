@@ -60,7 +60,19 @@ mathjax: true
             <li>
               <a href="#cuda-opt-6">Opt. 6 - Tiled matmul kernel</a>
             </li>
+            <li>
+              <a href="#cuda-opt-7">Opt. 7 - Remove unnecessary device syncs</a>
+            </li>
+            <li>
+              <a href="#cuda-opt-8">Opt. 8 - Use modern warp shuffle intrinsics in reduction kernels</a>
+            </li>
           </ul>
+        </li>
+        <li>
+          <a href="#wrap-up-and-outlook">Comparison with cuBLAS and outlook</a>
+        </li>
+        <li>
+          <a href="#summary">Summary</a>
         </li>
       </ul>
     </div>
@@ -498,7 +510,7 @@ namespace cuda_impl { // in cuda_impl because it is shared
       <p>
         Essentially, when representing numbers we distinguish, roughly, two kinds of number representations: integer
         values and floating point numbers (FPs). Normally we learn the integer representation first, since that is the
-        easier one - binary representation, conversion between decimal, octal, hexadecimal, and binary format, addition
+        easier one: binary representation, conversion between decimal, octal, hexadecimal, and binary format, addition
         and subtraction in the respective number systems, and signed representation, nowadays the 2's complement (enabling
         us to push both addition and subtraction through an adder, hence saving silicon). Pretty straight forward once you
         get the idea.
@@ -530,7 +542,7 @@ namespace cuda_impl { // in cuda_impl because it is shared
         is now called the <a href="https://ieeexplore.ieee.org/document/8766229/" target="_blank">IEEE-754 standard</a>. It is a
         standard that generally puts up the scaffolding for how FPs are computed nowadays, which is why if you work on code that
         is a little closer to hardware, you've probably seen the name many times already. It starts out with how to represent
-        numbers - see the figure below. In addition, it also provides rules for how to round, how to control rounding errors,
+        numbers, see the figure below. In addition, it also provides rules for how to round, how to control rounding errors,
         and exception handling. The two special FP types you have probably seen already, NaN and Infinity, have their root in
         this standard. The standard also defines a positive and negative zero FP representation, indicating whether we
         approached zero from the positive or the negative side.
@@ -1341,7 +1353,7 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
 
     total_loss = 0.0
     n_batches = 0
-    max_batches = math.ceil(n / batch_size) &#35; not used - my bad
+    max_batches = math.ceil(n / batch_size) &#35; not used, my bad
     for start in range(0, n, batch_size):
         end = min(start + batch_size, n)
         xb = x_shuf.slice(start, end)
@@ -1748,7 +1760,7 @@ class Dimension final {
             This design does two things for us:
             <ol>
               <li>We can create transposed views on tensors without moving data unnecessarily.</li>
-              <li>Some operations might not need the tensor to be contiguous to run efficiently - hence this design opens up future optimization vectors.</li>
+              <li>Some operations might not need the tensor to be contiguous to run efficiently. Hence this design opens up future optimization vectors.</li>
             </ol> 
           </p>
 
@@ -2310,20 +2322,20 @@ BM_MatMul_CUDA/64/256/128           15.2 us         15.2 us        46025 GFLOP/s
 BM_MatMul_CUDA/64/128/10            11.0 us         11.0 us        63601 GFLOP/s=14.8537/s</pre>
 
         <p>
-          Now there's good and bad news in here. The good news is that perhaps our fix indeed did do something. 
-          After all the improved kernels are slightly better across most inputs. Morover, the larger the batch 
-          dimension, that is the larger the number of loops the pre-fix version iterates over, the larger the 
+          Now there's good and bad news in here. The good news is that perhaps our fix indeed did do something.
+          After all the improved kernels are slightly better across most inputs. Moreover, the larger the batch
+          dimension, that is the larger the number of loops the pre-fix version iterates over, the larger the
           improvement. The bad news is that the fix is in terms of around 20 microseconds even for a batch-size
-          of 1024, which is far beyond what our actual MNIST benchmark has. The fix thus only every gets really 
+          of 1024, which is far beyond what our actual MNIST benchmark has. The fix thus only ever gets really
           visible on extremely large inputs and only matters to those who want every last drop of performance.
         </p>
 
         <p>
-          Good to know, we wonder if we could have spent our time better than this. But I personally like this 
-          version much better, as the code itself is just more elegant. And why not, maybe those microseconds 
-          will matter at some point. And as a small bit of extra information, the degradation in performance we 
-          measured on the benchmark is likely noise rather than a genuine regression backward. The next fix however 
-          is going to change a lot for our kernel. 
+          Good to know, we wonder if we could have spent our time better than this. But I personally like this
+          version much better, as the code itself is just more elegant. And why not, maybe those microseconds
+          will matter at some point. And as a small bit of extra information, the degradation in performance we
+          measured on the benchmark is likely noise rather than a genuine regression. The next fix however
+          is going to change a lot for our kernel.
         </p>
 
       </div>
@@ -2338,7 +2350,7 @@ BM_MatMul_CUDA/64/128/10            11.0 us         11.0 us        63601 GFLOP/s
 
       <p>
         Because we just ran NSys to get the NSight visualization we do not need to do that again. We also do not need to, since we know
-        that the matuMul2DKernel absorbs all of our computational efforts. We can thus go directly into NCU and get a direct profile of 
+        that the matMul2DKernel absorbs all of our computational efforts. We can thus go directly into NCU and get a direct profile of 
         our kernel. We call <code>ncu --set full -o [output-file] python3 [benchmark-file]</code>. Looking into the analysis and the 
         recommendations we find from NCU we find two things: 1. It recommends us to tune our kernel again, specifically the launch grid 
         configurations, and 2. it has a problem with our memory access pattern.
@@ -2403,7 +2415,7 @@ namespace cuda_impl {
     dim3 numBlocks(blocksX, blocksY, nMultiplications);
 
     if(!(transposeLeft || transposeRight)) {
-      matMul2DKernel<MATMUL_TILESIZE * MATMUL_TILESIZE, false, false><<<numBlocks, threadsPerBlock>>>(
+      matMul2DKernel&lt;MATMUL_TILESIZE * MATMUL_TILESIZE, false, false&gt;&lt;&lt;&lt;numBlocks, threadsPerBlock&gt;&gt;&gt;(
                                                       res.getData(), left.getData(), right.getData(), 
                                                       left.getDims().get(-2), left.getDims().get(-1), 
                                                       right.getDims().get(-2), right.getDims().get(-1), 
@@ -2428,7 +2440,7 @@ namespace cuda_impl {
 <pre><code class="language-cpp">// src/backend/data_modeling/cuda/tensor_ops.cu
 
 namespace {
-  template<int tileSize, bool transposeLeft, bool transposeRight>
+  template&lt;int tileSize, bool transposeLeft, bool transposeRight&gt;
   __global__ void matMul2DKernel(ftype* const res, 
                                  const ftype* const left, const ftype* const right,
                                  const tensorDim_t leftRows, const tensorDim_t leftCols, 
@@ -2450,22 +2462,22 @@ namespace {
     const tensorSize_t resOffset = blockIdx.z * resSize;
 
     ftype cij = 0;
-    for (tensorSize_t k = 0; k < K; k += blockDim.x) {
+    for (tensorSize_t k = 0; k &lt; K; k += blockDim.x) {
       // load tile into smem
       const tensorSize_t leftIdx = transposeLeft ? (k + threadIdx.x) * leftCols + i : i * leftCols + k + threadIdx.x;
       const tensorSize_t rightIdx = transposeRight ? j * rightCols + (k + threadIdx.y) : (k + threadIdx.y) * rightCols + j;
 
-      smemA[threadIdx.y * blockDim.x + threadIdx.x] = (i < resRows && (k + threadIdx.x) < K) ? left[leftOffset + leftIdx] : 0.0f;
-      smemB[threadIdx.y * blockDim.x + threadIdx.x] = ((k + threadIdx.y) < K && j < resCols) ? right[rightOffset + rightIdx] : 0.0f;
+      smemA[threadIdx.y * blockDim.x + threadIdx.x] = (i &lt; resRows && (k + threadIdx.x) &lt; K) ? left[leftOffset + leftIdx] : 0.0f;
+      smemB[threadIdx.y * blockDim.x + threadIdx.x] = ((k + threadIdx.y) &lt; K && j &lt; resCols) ? right[rightOffset + rightIdx] : 0.0f;
       __syncthreads();
 
-      for (int l = 0; l < blockDim.x; l++) {
+      for (int l = 0; l &lt; blockDim.x; l++) {
         cij += smemA[threadIdx.y * blockDim.x + l] * smemB[l * blockDim.x + threadIdx.x];
       }
       __syncthreads();
     }
 
-    if (i < resRows && j < resCols) {
+    if (i &lt; resRows && j &lt; resCols) {
       res[resOffset + i * N + j] = cij;
     }
   }
@@ -2474,9 +2486,9 @@ namespace {
       <p>
         Now it pays off having read the previous iterations we performed on the matmul kernel, since now everything coalesces into 
         this one, along with the tiles residing in shared memory. Kernels initially determine which element they are computing, which 
-        2D-matrix they are in, and resolve the template overload. We then enter a loop iterating over blockDim.x. This works works because 
-        the blockDim.x corresbonds with the tilesize. We could have put this into the loop, making it compile time expression and saving 
-        a little overhead. 
+        2D-matrix they are in, and resolve the template overload. We then enter a loop iterating over blockDim.x. This works because
+        blockDim.x corresponds with the tilesize. We could have put this into the loop, making it a compile time expression and saving
+        a little overhead.
       </p>
 
       <p>
@@ -2506,21 +2518,21 @@ namespace {
         <p>
           This will be a rather quick one again. Whenever we called a CUDA kernel, we have followed the pattern 
           laid out by every CUDA tutorial: 1. Compute launch parameters, 2. call kernel, 3. synchronize the device, 
-          and 4. cleanup if necessary. However, on this whole project we never used an alternative stream, meaning 
-          two subsequent CUDA kernel calls will happen in a sequential fashion, even when kernel calls run asynchronous to 
+          and 4. cleanup if necessary. However, on this whole project we never used an alternative stream, meaning
+          two subsequent CUDA kernel calls will happen in a sequential fashion, even when kernel calls run asynchronously to
           the host code.
         </p>
 
         <p>
-          We can therefore remove any unnecessary cudaDeviceSynchronize() call. The host code will run through, 
-          schedule the CUDA code, and block as soon as it reaches a blocking statement, which is in between the trainings, as 
+          We can therefore remove any unnecessary cudaDeviceSynchronize() call. The host code will run through,
+          schedule the CUDA code, and block as soon as it reaches a blocking statement, which is in between training steps, as
           sometimes we copy dimensionality information onto the device, but it would be latest at the end of any training loop,
-          when we capture the loss or the host needs data from the device for its own decision making. 
+          when we capture the loss or the host needs data from the device for its own decision making.
         </p>
 
         <p>
-          The fix is then pretty straight forward. Showing the improvement in a profiler would be harder to capture. We can show 
-          that we spend less time on the synchronize, or spend less time in user space. I chose to do two Nsight profile, which 
+          The fix is then pretty straight forward. Showing the improvement in a profiler would be harder to capture. We can show
+          that we spend less time on the synchronize, or spend less time in user space. I chose to do two Nsight profiles, which
           we can see below. One version before the fix, one version after the fix. I capture the first 10ms of kernel calls in both
           cases, and we can see the kernel calls are denser on the version after the fix.  
         </p>
@@ -2548,7 +2560,7 @@ namespace {
         </figure>
     </div>
 
-    <div id="cuda-opt-7" class="article-text-div">
+    <div id="cuda-opt-8" class="article-text-div">
       <h3 class="heading-spaced">Opt. 8 - Use modern warp shuffle intrinsics in reduction kernels</h3>
 
         {% include pytorch-opt-summary.html 
@@ -2556,7 +2568,7 @@ namespace {
         speedup="1.0x" commit="0e7a0d12323e2a18e4d5e8039094c805cabbc0e9" %}
 
       <p>
-        This last one has been burning for a while, and if it's only for the simple reason that I grew tired of the the deprecated warnings 
+        This last one has been burning for a while, and if it's only for the simple reason that I grew tired of the deprecated warnings
         of the compiler on how we used the warp unrolled reduction pattern in our reduction kernels. That is the pattern we used in our reduction 
         kernels, specifically exemplified by the following kernel, which I copy here again:
       </p>
@@ -2596,9 +2608,9 @@ namespace {
       </p>
 
       <p>
-        However, given that this is such a common pattern NVIDIA stepped in and gave us warp shuffles in later iterations of its 
-        hardware. Warp shuffles are essentially a means for warps to cooperate further by sharing values stored in thread-local 
-        registers with other threads of the warps. There are multiple instructions of how to do that, for instance cross-patter, 
+        However, given that this is such a common pattern NVIDIA stepped in and gave us warp shuffles in later iterations of its
+        hardware. Warp shuffles are essentially a means for threads in a warp to cooperate further by sharing values stored in thread-local
+        registers with other threads of the same warp. There are multiple instructions of how to do that, for instance cross-pattern,
         enabling neighboring threads to share, shuffle ups, where each thread gives its register content to a thread with a higher
         index. We obviously take the inverse route, meaning we shuffle down. I used the shuffle down with synchronization instructions, 
         since we still need to synchronize in between threads for the reduction. The kernel above now looks like what I give below, 
@@ -2608,19 +2620,19 @@ namespace {
 <pre><code class="language-cpp">// src/backend/shared/cuda/common_softmax.cuh
 
 // baked directly into the kernel, bypassing the device kernel completely
-for(int offset = maxoffset; offset > 0; offset >>= 1) {
-  maxVal = cudaMax<ftype>(maxVal, __shfl_down_sync(0xFFFFFFFF, maxVal, offset, stride)); 
+for(int offset = maxoffset; offset &gt; 0; offset &gt;&gt;= 1) {
+  maxVal = cudaMax&lt;ftype&gt;(maxVal, __shfl_down_sync(0xFFFFFFFF, maxVal, offset, stride)); 
 }</code></pre>
 
       <p>
         I went for the looped version here, one can easily unroll that loop by hand, saving even more, or simply use a <code>&#35;pragma unroll</code>
         before the loop to tell the compiler to do it for you. In my implementation referenced by the commit hash I did not unroll the loops,
-        which is where the benchmark number comes from. Just out of curiousity I also created a branch out of the commit to check if the loop unroll
+        which is where the benchmark number comes from. Just out of curiosity I also created a branch out of the commit to check if the loop unroll
         does something, and the number went down from 0.3325s without the loop unrolling to 0.3318s with loop unrolling. Given that our kernels are 
         mostly short and registers are likely free to use the unrolled version is likely the better one in most cases, but the three numbers I got 
         out of this experiment here are in the milliseconds and not very clean numbers. So what actually is noise and what is a genuine improvement 
-        is hard to measure here, unless we isolate our kernels and do some hard benchmarking. I for my part am pretty happy knowing at the very least 
-        it does not tip the needle for now, but we stay canonical and got rid of the compile complaining to us that we're using phone booths and carrier
+        is hard to measure here, unless we isolate our kernels and do some hard benchmarking. I for my part am pretty happy knowing at the very least
+        it does not move the needle for now, but we stay canonical and got rid of the compiler complaining to us that we're using phone booths and carrier
         pigeons. And as a side, I just included the unrolled loops on my main branch.
       </p>
 
@@ -2636,7 +2648,7 @@ for(int offset = maxoffset; offset > 0; offset >>= 1) {
 
       <p>
         That wraps up our optimization journey so far. While there is still a lot that can be done we have to lower the gun at some point and call
-        it a day, or else we will never get to eat our hard-earned dinner today. As a last step, and just out of curiousity, I wanted to check out 
+        it a day, or else we will never get to eat our hard-earned dinner today. As a last step, and just out of curiosity, I wanted to check out 
         how much we can still squeeze out of it. Running NSight again we can see that we still lose the bulk in the matmul kernel, a well known 
         problem by the way. Matrix multiplications are just expensive operations, and given that there are so many involved in every deep learning 
         application including LLMs there is a lot of research out there just optimizing this one single operation. 
@@ -2676,7 +2688,7 @@ BM_MatMul_CUDA/64/256/128           15.3 us         15.3 us        45443 GFLOP/s
 BM_MatMul_CUDA/64/128/10            9.10 us         9.10 us        76300 GFLOP/s=18.0097/s</pre>
 
       <p>
-        Interestingly, on smaller input sizes our custom kernel wins, but gets its booty kicked really quick by cuBLAS on rising input sizes.
+        Interestingly, on smaller input sizes our custom kernel wins, but gets its booty kicked really quickly by cuBLAS on rising input sizes.
         The question is why. Sadly cuBLAS is not open-source, hence we cannot really look into what it does differently. But given 
         that the library call has no immediate kernel calls and hence not really kernel launch parameters we give it chances are that 
         there is some checking going on beneath the hood on input sizes. It will likely also check our hardware and call subsequent 
@@ -2693,16 +2705,16 @@ BM_MatMul_CUDA/64/128/10            9.10 us         9.10 us        76300 GFLOP/s
       </p>
 
       <p>
-        Another interesting direction to look at are mixed precision floating points. In the beginning of this blogpost I talked about floating
+        Another interesting direction to look at is mixed precision floating points. In the beginning of this blogpost I talked about floating
         point numbers and mentioned that recently more floating point types have been introduced to both CUDA and C++. This increases throughput
         by both saving memory, but more importantly, enabling larger memory and compute throughput. For instance, CUDA supports intrinsics where one
-        thread can perform one single operation on two FP-16 operands the same time, similar to what Intel did with AVX. That means that one warp
+        thread can perform one single operation on two FP-16 operands at the same time, similar to what Intel did with AVX. That means that one warp
         could have a throughput of 64 operands per cycle rather than 32 during those operations.
       </p>
 
       <p>
         However, those optimizations will be part of a later blogpost, shall I find the time for it. For now it is as it is, but if you feel motivated
-        to go deeper into the matter feel free to pick up from where I left off, and if you find good optimizations let me know please.
+        to go deeper into the matter feel free to pick up from where I left off, and if you find good optimizations, please let me in as well.
       </p>
 
     </div>
@@ -2713,9 +2725,10 @@ BM_MatMul_CUDA/64/128/10            9.10 us         9.10 us        76300 GFLOP/s
       <p>
         In the previous three blogposts leading up to this one we implemented a deep learning framework akin to PyTorch in C++. In contrast, this 
         part of the series was all about CUDA. We implemented a CUDA backend, ending up with an end-to-end training pipeline in CUDA. We then 
-        used NSys and NCU to profile both our timeline and individual kernels, optimizing our CUDA backend with a speedup of 10x on our whole 
-        training-pipeline as is. To do so we used techniques such as kernel fusion, custom kernels to bypass streamlined memory-copies, a memory pool,
-        and tiled kernels for cache optimal behavior. In the end we compared with cuBLAS, where we still got beaten, we also now know how to 
+        used NSys and NCU to profile both our timeline and individual kernels, optimizing our CUDA backend with a speedup of roughly 11x on our whole
+        training-pipeline as is .
+        To do so we used techniques such as kernel fusion, custom kernels to bypass and streamline memory-copies, a memory pool,
+        and tiled kernels for cache optimal behavior. In the end we compared with cuBLAS, where we still got beaten, but we also now know how to
         continue in order to compete with it.
       </p>
 
