@@ -61,7 +61,7 @@
     margin-bottom: 20px;
 }
 
-/* Enlarge the NSight and NCU screenshots for better legibility */
+/* Hover preview for nsight images */
 @media (hover: hover) {
     .pytorch-nsight {
         position: relative;
@@ -70,9 +70,9 @@
     }
 
     .pytorch-nsight:hover {
-        transform: scale(1.6);
-        z-index: 50;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+        transform: scale(1.03);
+        z-index: 5;
+        box-shadow: 4px 6px 16px var(--color-blog-shadow);
     }
 }
 

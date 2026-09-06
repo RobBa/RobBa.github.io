@@ -172,6 +172,7 @@ footer {
     background-color: var(--color-chrome-bg);
     height: 45px;
     width: 100%;
+    z-index: 9999;
 }
 
 .footer-div {
