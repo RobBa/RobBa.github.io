@@ -32,6 +32,9 @@ mathjax: false
             </li>
           </ul>
         </li>
+        <li>
+          Optimization
+        </li>
       </ul>
     </div>
 
@@ -138,4 +141,221 @@ mathjax: false
 
 
       </details>
+    </div>
+
+    <div id="optimization" class="article-text-div">
+      <h2 class="heading-spaced">Optimization</h2>
+
+      <p>
+        In the following we are going to repeat the pattern we established in <a href="pytorch_demystified_3.html" target="_blank">part 3</a>.
+        That is, we are going to optimize the CPU backend step by step. Each step will be accompanied by a commit hash, times before and after,
+        a profiler output, and an explanation of what happens beneath the hood. 
+      </p>
+
+      <p>
+        As for the benchmark, I am going to learn from my mistakes and 
+        am going to run the benchmarks on the whole epoch, rather than a subset of it until later. That means that this time we are going to 
+        have the same benchmark from beginning to the end. The benchmarking script will be the same as in the previous part as well, 
+        except that this time we are going to not put our tensor onto the GPU. So let's get started with fix 1.
+      </p>
+
+    </div>
+
+    <div id="step-1" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 1 - Use more aggressive compiler optimization</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="58.5491s" after="60.3818s"
+        speedup="0.97x" commit="36fd56de172dd62d53f5bf6ce7a7f2d084a4d7d6" %}
+
+      <p>
+        Before we any optimization, we first run a profiler. I used perf for this purpose, where we can get metrics such as time spend on program, 
+        giving us a call tree, and we can profile for individual metrics. We are going to use the tool extensively, and you will see various 
+        examples of what it is capable of. For now we want to see where our computation time flows. perf gives us the following as to where it 
+        spends most of the execution time:
+      </p>
+
+<pre>+   40.06%    40.06%  python3  [.] Tensor::matMulImpl(Tensor const&, Tensor const&, bool, bool)
++    6.97%     0.00%  python3  [.] 0x8348535554415541
++    6.97%     0.00%  python3  [.] 0x00007a5e1326ebe8
++    6.97%     0.00%  python3  [.] 0x0000000038d1b717
++    3.48%     2.97%  python3  [.] Tensor::tensorValues_t::operator[](unsigned int) const</pre>
+
+      <p>
+        We can further use perf to look into the assembly code, where we get more details of what is happening. We find the following for the inner 
+        loop of the matmul:
+      </p>
+
+<pre>        │490:   mov        %edi,%eax
+        │       mov        %ecx,%r8d 
+        │       add        $0x1,%ecx
+  14.06 │       movss      (%r14,%r8,4),%xmm0
+   1.01 │       mulss      (%rbx,%rax,4),%xmm0
+        │       mov        0x8(%rsp),%eax
+        │       add        %eax,%edi
+  13.83 │       addss      %xmm0,%xmm1
+        │       cmp        %ebp,%ecx
+  12.56 │     ↑ jne        490</pre>
+
+      <p>
+        The most telling sign for now is the ss-suffix, indicating single operand instructions. My machine is an Asus laptop with an Intel i5 210Hx12,
+        and running <code>cat /proc/cpuinfo | grep flags | head -1 | tr ' ' '\n' | grep -i avx</code> in bash reveals that it is AVX and AVX2 capable.
+        Hence the compiler should auto-vectorize the loop using SIMD instructions, but somehow it did not do that.
+      </p>
+
+      <p>
+        Since so far we did not specify an optimization flag it is the
+        most natural solution to first try to use a more aggressive optimization. If you want to follow this step, simply add the line
+        <code>set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")</code> in CMake. While the program executes as expected, that is the optimization did not 
+        introduce errors so far, the improvement is zero to actually a little worse than before. Looking at perf again we find that the compiler 
+        still did not vectorize the loop, meaning the compiler somehow has troubles figuring out that there's gold to be found here. I cannot determine
+        at the moment whether the slower time is noise or a genuine regression, and while I could dig deeper into the matter my time is stent wiser 
+        elsewhere, so let's stick with what we got right now, and in the following steps we will take matmul matters into our own hands.
+      </p>
+
+    </div>
+
+    <div id="optimization" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 2 - Implement tiled matmul</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="60.3818s" after="13.0654s"
+        speedup="4.62x" commit="2fa0fbadbcd2b6f6bbc90a35a832f855d403bd3f" %}
+
+      <p>
+        This one unsurprisingly slaps big time, since we already saw the largest improvements from the CUDA side on this one. 
+        I also note that for brevity I cut this blogpost a bit short, since I mainly repeat myself here if you have seen the previous post.
+        Before we start we just verify what we already have learned there though, so in the following two images showing our perf output.
+      </p>
+
+      <img
+      class="blog-image pytorch-perf"
+      src="./img_4/step_2_1_cycles.png"
+      alt="perf output before step 2, showing the number of cycles spent per instruction.">
+
+      <p>
+        TODO
+      </p>
+
+      <img
+      class="blog-image pytorch-perf"
+      src="./img_4/step_2_1_cache_misses.png"
+      alt="perf output before step 2, showing the cache misses per instruction.">
+
+      <p>
+        TODO
+      </p>
+      
+      <p>
+        To fix the issues, let's look at the matmul we're actually starting out with. 
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.h
+
+template<bool transposeLeft, bool transposeRight>
+void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, const tensorSize_t resOffset, 
+                           const tensorSize_t leftOffset, const tensorSize_t rightOffset) {
+  
+  const auto nRowsLeft = static_cast<tensorSize_t>(left.dims.get(-2));
+  const auto nColsLeft = static_cast<tensorSize_t>(left.dims.get(-1));
+  const auto nColsRight = static_cast<tensorSize_t>(right.dims.get(-1));
+  const auto nRowsRight = static_cast<tensorSize_t>(right.dims.get(-2));
+
+  const tensorSize_t M = transposeLeft ? nColsLeft : nRowsLeft;
+  const tensorSize_t K = transposeLeft ? nRowsLeft : nColsLeft;
+  const tensorSize_t N = transposeRight ? nRowsRight : nColsRight;
+
+  for (tensorSize_t i = 0; i < M; i++) {
+    for (tensorSize_t j = 0; j < N; j++) {
+      ftype sum = 0;
+
+      for (tensorSize_t k = 0; k < K; k++) {
+        tensorSize_t leftIdx = transposeLeft ? leftOffset + k * nColsLeft + i
+                                             : leftOffset + i * nColsLeft + k;
+        
+        tensorSize_t rightIdx = transposeRight ? rightOffset + j * nColsRight + k
+                                               : rightOffset + k * nColsRight + j;
+
+        sum += left.values->data()[leftIdx] * right.values->data()[rightIdx];
+      }
+
+      res.values->data()[resOffset + i * N + j] = sum;
+    }
+  }
+}</code></pre>
+
+      <p>
+        I note here that I already have silently introduced an optimization that happened on the CUDA side, 
+        namely the template overloads. Other than that the kernel should be obvious, since this is the looping and 
+        index arithmetics we already have seen before. In short, it is a plain naive matrix multiplication. In the 
+        following we are going to introduce the following fixes to it: 
+
+        <ol>
+          <li>Use tiles to increase cache locality.</li>
+          <li>Use separate paths for transpositions.</li>
+          <li>Use SIMD instructions to execute the inner matmul more efficiently.</li>
+        </ol>
+      </p>
+
+      <p>
+        Because this time I want to spare you (and me) the indexing hell introduced in CUDA I introduce an extra struct 
+        here, representing the tile we load in. Its definition looks like this.
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/matmul_tile.h
+
+namespace matmul {
+  template<typename T, tensorSize_t TileM, tensorSize_t TileK, tensorSize_t TileN>
+  requires std::is_floating_point_v<T>
+  struct MatmulTile {
+      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array<T, TileM * TileK> left{};
+      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array<T, TileK * TileN> right{};
+      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array<T, TileM * TileN> result{};
+
+      void loadLeft(const T* const src, tensorSize_t row0, tensorSize_t col0, tensorSize_t nRows, tensorSize_t nCols);
+      void loadRight(const T* const src, tensorSize_t row0, tensorSize_t col0, tensorSize_t nRows, tensorSize_t nCols);
+      
+      void loadLeftTransposed(const T* const src, tensorSize_t row0, tensorSize_t col0, tensorSize_t nRows, tensorSize_t nCols);
+      void loadRightTransposed(const T* const src, tensorSize_t row0, tensorSize_t col0, tensorSize_t nRows, tensorSize_t nCols);
+      
+      void clearResult() noexcept {
+        std::fill(result.begin(), result.begin() + TileM * TileN, T{0.0f});
+      }
+      void addResult(T* const dst, tensorSize_t row0, tensorSize_t col0, tensorSize_t nRows, tensorSize_t nCols);
+  };
+}</code></pre>
+
+      <p>
+        The tile is pretty much self-expanatory. I templated the struct so that we can exchange the datatype easily, but also in case we have 
+        need for it somewhere else. I also introduced three template parameters indicating the dimensions of the tiles for both the left and 
+        the right tile, albeit for now I only support quadratic tiles, so this part of the code is a hot candidate for some small refactoring. 
+      </p>
+
+      <p>
+        The tiles are stored as std::array types, increasing run-time through data locality compared with the std::vector data-type. 
+        Interesting is the <code>alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT)</code> instruction. MemoryLayout is a simple lookup-struct where I 
+        hardcoded some information about my memory layout that could be interesting.
+      </p>
+
+<pre><code class="language-cpp">// src/backend/utility/memory_layout.h
+
+struct MemoryLayout final {
+  // aligning memory allows us unsafe/faster memfetches into AVX registers
+  constexpr static unsigned int CPU_TENSOR_ALIGNMENT = 64;
+  
+  // assumption needed e.g. for avoiding false-sharing
+  constexpr static unsigned int CACHE_LINE_BYTES = 64; 
+
+  // L1 cache size in bytes, depends on CPU. E.g. 48 * (1 << 10) == 48 KB
+  constexpr static unsigned int L1_CACHE_BYTES = 48 * (1 << 10);
+
+  // L3 cache size in bytes, depends on CPU. E.g. 12 * (1 << 20) == 12 MB
+  constexpr static unsigned int L3_CACHE_BYTES = 12 * (1 << 20);
+};</code></pre>
+
+      <p>
+        Although they look really cool for now I did not use the information about my cache-sizes. They could come in handy in later optimization 
+        steps, e.g. by checking whether a data structure actually fits into one of these. The CPU_TENSOR_ALIGNMENT is the interesting one now. 
+        TODO
+      </p>
     </div>
