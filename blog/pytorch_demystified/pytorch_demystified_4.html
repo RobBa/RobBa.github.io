@@ -119,7 +119,20 @@ mathjax: false
       </p>
 
       <p>
-        
+        For the last decades CISC architectures have been dominant, especially in PCs dominated by Intel and ARM CPUs. However, with the 
+        advent of smartphones the playing field has shifted a little bit. One determining factor of the quality of smartphones has been 
+        energy efficiency, i.e. how long your phone can last before it needs a recharge. The energy efficiency of RISC architectures dominates
+        here, with virtually every smartphone running RISC chips. The next battleground has become laptops, where energy plays a crucial role 
+        as well. The era has infamously been heralded by Apple phasing out Intel CPUs in favor of in house Apple-M chips. 
+      </p>
+
+      <p>
+        However, RISC CPUs still dominate a large market share, if only for the reason of being established well. Additionally, companies have 
+        responded. For instance, my laptop has an Intel i5 of the Raptorlake generation. In addition to having the usual fast CPU cores, four of 
+        them in total, it also boasts four efficiency cores. Those are CPU-cores running at lower clock-speed, but in return they consume less 
+        power than the fast cores. The core idea here is that processes consuming raw computing power run on the power cores, but more lightweight 
+        processes get executed on the energy cores, say a simple browser or a calculator. So while x86 architectures have lost ground they are far from
+        over, and the playing field keeps on shifting. 
       </p>
 
       </details>
@@ -139,6 +152,44 @@ mathjax: false
         </button>
       </div>
 
+      <p>
+        This is a brief section intended to familiarize you with the basics of x64, so that you can follow the discussions below. If you already
+        know it well you can skip this section. To start off, let us start with what x86 is. If you read the discussion above about RISC-vs-CISC then 
+        you know that it is the architecture mostly run by Intel and AMD today. Unfortunately for us their commitment to backwards compatibility means 
+        for us that we now have to deal with a lot of historical baggage accumulated over decades.
+
+        <h5>Intel notation vs. AT&T notation</h5>
+
+        <p>
+          We start off with the notation. Unfortunately there are two main ways to write x86 assembly code. The first is the <b>AT&T notation</b>. 
+          This style of x86 is marked by a ton a %-symbols, which is mainly how you identify it. It writes intructions in order 
+          <code>instruction source, destination</code>. Registers are prefixed with %, and immediates are prefixed with $. On top of that, it has 
+          instructions suffixed with operand size. <code>b</code> stands for byte, <code>w</code> for word (16-bit), <code>l</code> for long (32-bit),
+          and <code>q</code> for quad (64-bit). For instance, an 
+          <code>addl $10, %eax</code> adds the value of 10 in 32-bit value encoding onto whatever is stored in register eax (registers in more detail later).
+        </p>
+
+        <p>
+          On the contrary, the <b>Intel notation</b> writes instructions as in <code>instruction destination, source</code>, the reverse of what the 
+          AT&T notation does. Immediates and registers have no prefixes. It does also not use the size suffixes given by AT&T. Instead, the operand sizes
+          are inferred by the register name used. Later we will see that backward compatibility also meant that the same registers have been reused by Intel and ARM,
+          making them larger and giving them naming conventions as to how we want to use them. So to sum this up, the same instruction above in Intel notation 
+          would just be a simple <code>move eax, 10</code>.
+        </p>
+
+        <p>
+          There are additional differences in addressing modes, especially indirect addressing mode. But to make things simple we will choose one of the two 
+          in the following. I personally like the Intel notation a little better, since I find it simpler and more intuitive to read. Due to historical reasons 
+          however Linux tools often by default use AT&T notation, unless explicitly told to output Intel. So the assemly code I got out of perf has all been 
+          in AT&T notation, so for the remainder of this blogpost we're gonna roll with AT&T notation. 
+        </p>
+
+        <h5>Operand sizes and registers</h5>
+
+        <p>
+          
+        </p>
+      </p>
 
       </details>
     </div>
