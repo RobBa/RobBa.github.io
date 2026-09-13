@@ -280,15 +280,10 @@ mathjax: false
         <p>
           The late introduced another battlefront on processor design, namely SIMD instructions (see <a href="https://en.wikipedia.org/wiki/Flynn%27s_taxonomy"
           target="_blank">Flynn's taxonomy</a>). Starting with MMX on Intel's side Intel and AMD competed on SSE and later AVX, introducing extra registers to load
-          floating point and integer operands, and a large set of operations supported on these new registers. Starting with simply supporting integer arithmetics they 
-          went to floating point operations such as MAD (multiply and add), dot products and complex arithmetics.
-        </p>
-
-        <p>
-          The registers introduced by the wave of SSE versions are 128-bit wide registers called XMM0, XMM1, ...., XMM15. With the introduction of AVX these were extended 
-          into 256-bit wide registers now called YMM0-YMM15, and would later be extended into 512-bit wide registers consequentially called ZMM0-ZMM15 with AVX-512.
-          The newest generations of Intel CPUs however do not support AVX-512, since Intel moved toward a more energy efficient CPU design. As far as I know however it is 
-          not off the table, just paused and planned to be re-introduced in future chips again.
+          floating point and integer operands. The first registers introduced by the wave of SSE versions are 128-bit wide registers called XMM0, XMM1, ...., XMM15. 
+          With the introduction of AVX these were extended into 256-bit wide registers now called YMM0-YMM15, and would later be extended into 512-bit wide registers 
+          consequentially called ZMM0-ZMM15 with AVX-512. The newest generations of Intel CPUs however do not support AVX-512, since Intel moved toward a more 
+          energy efficient CPU design. As far as I know however it is not off the table, just paused and planned to be re-introduced in future chips again.
         </p>
 
         <div class="pytorch-table-wrap">
@@ -310,8 +305,63 @@ mathjax: false
 
         <p>
           We will later look at x64 assembly code, where we will see that those SIMD registers are being used for single floating points as well. This is due to them being
-          better to use for modern software than the floating point unit itself, which at this point exists solely for backward compatibility. 
+          better to use for modern software than the floating point unit itself, which at this point exists solely for backward compatibility. We can therefore skip its register
+          naming. 
         </p>
+
+        <h5>SIMD instructions</h5>
+
+        <p>
+          With the introduction of SSE and later AVX a new class of intructions was introduced as well. The idea of the SIMD registers is to perform a single operation on multiple 
+          operands the same time, hence increasing computational throughput. To give the registers single operand operations as well operations on these registers either run single 
+          operand or multiple operand. The suffix indicates the type of the instruction: An ss for scalar single-precision, an sd for the double-precision equivalent, and the packed 
+          versions of those named ps and pd, indicating that the instruction works on all loaded operands the same time. A multiplication can hence have the following expression, 
+          depending on what operands it works on: mulss, mulsd, mulps, and mulpd. 
+        </p>
+
+        <p>
+          On top of that these two features introduced a large set of popular and rather complicated instructions that are commonly used in applications benfitting from SIMD instructions.
+          For instance, it has fused fused arithmetic operations like the multiply-and-add (MAD), but also more complex instructions like vector dot products, among others.
+        </p>
+
+        <div class="pytorch-table-wrap">
+        <table class="pytorch-reg-table">
+          <caption>SIMD instruction suffixes: scalar vs. packed, single- vs. double-precision.</caption>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Single-precision</th>
+              <th>Double-precision</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Scalar</td><td>ss</td><td>sd</td></tr>
+            <tr><td>Packed</td><td>ps</td><td>pd</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <p>
+          We will later see in the disassembled programs that the compiler will map our code onto the single-operands instructions a lot, and we will fix it
+          using the packed versions instead.
+        </p>
+
+        <div class="pytorch-table-wrap">
+        <table class="pytorch-reg-table">
+          <caption>Example: the mov instruction across scalar/packed and single/double precision.</caption>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Single-precision</th>
+              <th>Double-precision</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Scalar</td><td>movss</td><td>movsd</td></tr>
+            <tr><td>Packed</td><td>movps</td><td>movpd</td></tr>
+          </tbody>
+        </table>
+        </div>
 
       </details>
     </div>
