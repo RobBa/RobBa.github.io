@@ -184,12 +184,64 @@ mathjax: false
           in AT&T notation, so for the remainder of this blogpost we're gonna roll with AT&T notation. 
         </p>
 
-        <h5>Operand sizes and registers</h5>
+        <h5>Registers</h5>
 
         <p>
-          
+          To understand registers and their naming we have to go back to the 8086, the processor to introduce the x86 architecture. 
+          It came in 16-bit, which is why 16-bit are considered a "word" to this day. It had four general purpose registers, named 
+          A, B, C, and D. You would suffix them either with an H or an L, indicating which byte you'd refer to. So AH would be the 
+          higher byte of A, and AL then the lower byte of course. To access the full 16-bit of the registers you'd suffix it with an X,
+          as in AX, BX, and so on.
         </p>
-      </p>
+
+        <p>  
+          It further had all the classics, importantly the stack pointer SP, the base pointer BP, 
+          the instruction pointer IP, the flags register Flags, and segment registers such as CS for the code segment, DS for the data
+          segment, and SS for the stack segment. 
+        </p>
+
+        <p>
+          The first 32-bit x86 processor was the 80386 (easy to remember: "insert a 3 for 32-bit"). For backward compatibility Intel chose to extend the 
+          previous registes, so that programs compiled for the 16-bit versions could still run. Thus the registers would remain the same, but if you 
+          wanted to use the full 32-bit of the now larger resgisters you'd prefix with an E, as in EAX, EBX, and so on. There was also an ESP and an EBP
+          for the stack and base pointer respectively, among other extended register. However, not each register got an upgrade to 32-bit. For instance 
+          the CS and DS registers remained 16-bit.  
+        </p>
+
+        <p>
+          AMD called in the 64-bit era with the AMD Optron in 2003. This is the point where we start to refer to x86 as x86-64, or just x64 in short. 
+          Apart from extending the previous general purpose registers (GPRs), now named RAX, RBX, RCX, and RDX to refer to their 64-bit versions, it gave x64
+          a whole slew of extra GPRs, named R8, R9, ..., R15. Other registers, among them the stack pointer and the base pointer, got an RSP and RBP upgrade, too.
+          This was important, as it allowed computers to overcome the 4GB RAM bottleneck, as with 32-bit we can index $2^32=4 \cdot 2^30 = 4GB$ of indexable memory.
+          The FLAGS register got an upgrade to both EFLAGS and RFLAGS as well. 
+        </p>
+
+        <p>
+          Apart from the general functions part of a processor x86 and x64 got extra features on top introducing extra registers as well. We don't need to know
+          all of them, for us the most interesting are the floating point registers. In my
+          <a href="pytorch_demystified_3.html#optional-floating-points" target="_blank">previous post</a> I have an optional section where I talk a little about 
+          floating points. Without repeating myself, Intel introduced a floating point unit in the 80s with the Intel 8087. While perfectly suited for software back
+          then its stack based design does not serve modern standards anymore. 
+        </p>
+
+        <p>
+          The late introduced another battlefront on processor design, namely SIMD instructions (see <a href="https://en.wikipedia.org/wiki/Flynn%27s_taxonomy"
+          target="_blank">Flynn's taxonomy</a>). Starting with MMX on Intel's side Intel and AMD competed on SSE and later AVX, introducing extra registers to load
+          floating point and integer operands, and a large set of operations supported on these new registers. Starting with simply supporting integer arithmetics they 
+          went to floating point operations such as MAD (multiply and add), dot products and complex arithmetics.
+        </p>
+
+        <p>
+          The registers introduced by the wave of SSE versions are 128-bit wide registers called XMM0, XMM1, ...., XMM15. With the introduction of AVX these were extended 
+          into 256-bit wide registers now called YMM0-YMM15, and would later be extended into 512-bit wide registers consequentially called ZMM0-ZMM15 with AVX-512.
+          The newest generations of Intel CPUs however do not support AVX-512, since Intel moved toward a more energy efficient CPU design. As far as I know however it is 
+          not off the table, just paused and planned to be re-introduced in future chips again. 
+        </p>
+
+        <p>
+          We will later look at x64 assembly code, where we will see that those SIMD registers are being used for single floating points as well. This is due to them being
+          better to use for modern software than the floating point unit itself, which at this point exists solely for backward compatibility. 
+        </p>
 
       </details>
     </div>
@@ -216,7 +268,7 @@ mathjax: false
       <h3 class="heading-spaced">Opt. 1 - Use more aggressive compiler optimization</h3>
 
       {% include pytorch-opt-summary.html 
-        before="58.5491s" after="60.3818s"
+        before="58.55s" after="60.38s"
         speedup="0.97x" commit="36fd56de172dd62d53f5bf6ce7a7f2d084a4d7d6" %}
 
       <p>
@@ -270,7 +322,7 @@ mathjax: false
       <h3 class="heading-spaced">Opt. 2 - Implement tiled matmul</h3>
 
       {% include pytorch-opt-summary.html 
-        before="60.3818s" after="13.0654s"
+        before="60.38s" after="13.07s"
         speedup="4.62x" commit="2fa0fbadbcd2b6f6bbc90a35a832f855d403bd3f" %}
 
       <p>
