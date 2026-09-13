@@ -213,8 +213,61 @@ mathjax: false
           Apart from extending the previous general purpose registers (GPRs), now named RAX, RBX, RCX, and RDX to refer to their 64-bit versions, it gave x64
           a whole slew of extra GPRs, named R8, R9, ..., R15. Other registers, among them the stack pointer and the base pointer, got an RSP and RBP upgrade, too.
           This was important, as it allowed computers to overcome the 4GB RAM bottleneck, as with 32-bit we can index $2^32=4 \cdot 2^30 = 4GB$ of indexable memory.
-          The FLAGS register got an upgrade to both EFLAGS and RFLAGS as well. 
+          The FLAGS register got an upgrade to both EFLAGS and RFLAGS as well.
         </p>
+
+        <div class="pytorch-table-wrap">
+        <table class="pytorch-reg-table">
+          <caption>General purpose registers (GPRs) across bit widths.</caption>
+          <thead>
+            <tr>
+              <th>Register</th>
+              <th>64-bit</th>
+              <th>32-bit</th>
+              <th>16-bit</th>
+              <th>8-bit (high)</th>
+              <th>8-bit (low)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>A</td><td>RAX</td><td>EAX</td><td>AX</td><td>AH</td><td>AL</td></tr>
+            <tr><td>B</td><td>RBX</td><td>EBX</td><td>BX</td><td>BH</td><td>BL</td></tr>
+            <tr><td>C</td><td>RCX</td><td>ECX</td><td>CX</td><td>CH</td><td>CL</td></tr>
+            <tr><td>D</td><td>RDX</td><td>EDX</td><td>DX</td><td>DH</td><td>DL</td></tr>
+            <tr><td>R8</td><td>R8</td><td>R8D</td><td>R8W</td><td>&mdash;</td><td>R8B</td></tr>
+            <tr><td>R9</td><td>R9</td><td>R9D</td><td>R9W</td><td>&mdash;</td><td>R9B</td></tr>
+            <tr><td>R10</td><td>R10</td><td>R10D</td><td>R10W</td><td>&mdash;</td><td>R10B</td></tr>
+            <tr><td>R11</td><td>R11</td><td>R11D</td><td>R11W</td><td>&mdash;</td><td>R11B</td></tr>
+            <tr><td>R12</td><td>R12</td><td>R12D</td><td>R12W</td><td>&mdash;</td><td>R12B</td></tr>
+            <tr><td>R13</td><td>R13</td><td>R13D</td><td>R13W</td><td>&mdash;</td><td>R13B</td></tr>
+            <tr><td>R14</td><td>R14</td><td>R14D</td><td>R14W</td><td>&mdash;</td><td>R14B</td></tr>
+            <tr><td>R15</td><td>R15</td><td>R15D</td><td>R15W</td><td>&mdash;</td><td>R15B</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <div class="pytorch-table-wrap">
+        <table class="pytorch-reg-table">
+          <caption>Other general purpose and special purpose registers.</caption>
+          <thead>
+            <tr>
+              <th>Register</th>
+              <th>64-bit</th>
+              <th>32-bit</th>
+              <th>16-bit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Stack pointer</td><td>RSP</td><td>ESP</td><td>SP</td></tr>
+            <tr><td>Base pointer</td><td>RBP</td><td>EBP</td><td>BP</td></tr>
+            <tr><td>Instruction pointer</td><td>RIP</td><td>EIP</td><td>IP</td></tr>
+            <tr><td>Flags</td><td>RFLAGS</td><td>EFLAGS</td><td>FLAGS</td></tr>
+            <tr><td>Code segment</td><td>&mdash;</td><td>&mdash;</td><td>CS</td></tr>
+            <tr><td>Data segment</td><td>&mdash;</td><td>&mdash;</td><td>DS</td></tr>
+            <tr><td>Stack segment</td><td>&mdash;</td><td>&mdash;</td><td>SS</td></tr>
+          </tbody>
+        </table>
+        </div>
 
         <p>
           Apart from the general functions part of a processor x86 and x64 got extra features on top introducing extra registers as well. We don't need to know
@@ -235,8 +288,25 @@ mathjax: false
           The registers introduced by the wave of SSE versions are 128-bit wide registers called XMM0, XMM1, ...., XMM15. With the introduction of AVX these were extended 
           into 256-bit wide registers now called YMM0-YMM15, and would later be extended into 512-bit wide registers consequentially called ZMM0-ZMM15 with AVX-512.
           The newest generations of Intel CPUs however do not support AVX-512, since Intel moved toward a more energy efficient CPU design. As far as I know however it is 
-          not off the table, just paused and planned to be re-introduced in future chips again. 
+          not off the table, just paused and planned to be re-introduced in future chips again.
         </p>
+
+        <div class="pytorch-table-wrap">
+        <table class="pytorch-reg-table">
+          <caption>SIMD register naming by width.</caption>
+          <thead>
+            <tr>
+              <th>Naming</th>
+              <th>Bit-width</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>XMM0&ndash;XMM15</td><td>128-bit</td></tr>
+            <tr><td>YMM0&ndash;YMM15</td><td>256-bit</td></tr>
+            <tr><td>ZMM0&ndash;ZMM15</td><td>512-bit</td></tr>
+          </tbody>
+        </table>
+        </div>
 
         <p>
           We will later look at x64 assembly code, where we will see that those SIMD registers are being used for single floating points as well. This is due to them being

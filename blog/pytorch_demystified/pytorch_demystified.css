@@ -142,6 +142,44 @@ h4.heading-spaced {
     font-weight: 600;
 }
 
+/* start tables */
+.pytorch-table-wrap {
+    overflow-x: auto;
+    margin: 20px 0;
+}
+
+.pytorch-reg-table {
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
+    border-collapse: collapse;
+    font-size: 0.95em;
+}
+
+.pytorch-reg-table caption {
+    caption-side: top;
+    font-style: italic;
+    color: var(--color-font-figure);
+    margin-bottom: 8px;
+}
+
+.pytorch-reg-table th,
+.pytorch-reg-table td {
+    border: 1px solid var(--color-article-date);
+    padding: 6px 12px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.pytorch-reg-table th {
+    background-color: var(--color-blog-odd);
+}
+
+.pytorch-reg-table tbody tr:nth-child(even) td {
+    background-color: var(--color-blog-even);
+}
+/* end tables */
+
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     .pytorch-step-row {
         flex-direction: column;
