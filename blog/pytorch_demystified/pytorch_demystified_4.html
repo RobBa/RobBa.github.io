@@ -522,29 +522,8 @@ mathjax: false
       <p>
         This one unsurprisingly slaps big time, since we already saw the largest improvements from the CUDA side on this one. 
         I also note that for brevity I cut this blogpost a bit short, since I mainly repeat myself here if you have seen the previous post.
-        Before we start we just verify what we already have learned there though, so in the following two images showing our perf output.
-      </p>
-
-      <img
-      class="blog-image pytorch-perf"
-      src="./img_4/step_2_cycles.png"
-      alt="perf output before step 2, showing the number of cycles spent per instruction.">
-
-      <p>
-        TODO
-      </p>
-
-      <img
-      class="blog-image pytorch-perf"
-      src="./img_4/step_2_cache_misses.png"
-      alt="perf output before step 2, showing the cache misses per instruction.">
-
-      <p>
-        TODO
-      </p>
-      
-      <p>
-        To fix the issues, let's look at the matmul we're actually starting out with. 
+        Before we start we just verify what we already have learned there though we will run perf on the benchmark. Because that will leave us 
+        with annotated assembly code at first I show you the function we are interested in:
       </p>
 
 <pre><code class="language-cpp">// src/backend/data_modeling/tensor.h
@@ -580,6 +559,46 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
     }
   }
 }</code></pre>
+
+      <p>
+        Now let us look at the perf outout. We start profiling the number of cycles spent per instruction:
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/step_2_cycles.png"
+        alt="perf output before step 2, showing the number of cycles spent per instruction.">
+        <figcaption>
+          perf output before step 2, showing the number of cycles spent per instruction.
+        </figcaption>
+      </figure>
+
+      <p>
+        This is rather telling. We can see that the compiler performed instruction scheduling optimizations 
+        for us. We can see at the top that it is first loading the two operands of the matmul into the registers. 
+        To hide the latency from the memory fetches it goes back to the outer loop and increments the loop's counter
+        by one, since it already resides in a register. 
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/step_2_cache_misses.png"
+        alt="perf output before step 2, showing the cache misses per instruction.">
+        <figcaption>
+          perf output before step 2, showing the cache misses per instruction.
+        </figcaption>
+      </figure>
+
+
+      <p>
+        TODO
+      </p>
+      
+      <p>
+        To fix the issues, let's look at the matmul we're actually starting out with. 
+      </p>
 
       <p>
         I note here that I already have silently introduced an optimization that happened on the CUDA side, 

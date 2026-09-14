@@ -1,5 +1,11 @@
 /* -------------- Pytorch demystified 4: Optimizing the CPU backend ---------------- */
 
+/* sub-headings inside the x86 primer */
+h5 {
+    text-align: center;
+    padding-top: 20px;
+}
+
 #pytorch-step-4,
 #pytorch-step-4-dark {
     width: 75%;
