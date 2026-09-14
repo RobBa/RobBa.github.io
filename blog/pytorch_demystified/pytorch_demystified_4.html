@@ -92,13 +92,19 @@ mathjax: false
 
       <p>
         For all those who want a refresher on x64 or who haven't had contact yet, this is for you. I assume you are familiar with assembly 
-        code. If you do not know what x86 is, in brief words, back in the days when computers started out there were two philosophies 
-        as to how to design CPUs, known as RISC (Reduced Instruction Set arChitecture) and CISC (Complex Instruction Set arChitecture). 
+        code. If you do not know what x86 is, in brief words, back in the days when computers started out instructions had been fairly simple.
+        However, naturally engineers feel inclined to optimize, especially on the CPU level, and this resulted in the addition of more 
+        instructions, including composite ones, in the ISA and hence on the chip. This development led to two main philosophies as to how 
+        to design CPUs, known as RISC (Reduced Instruction Set Computer) and CISC (Complex Instruction Set Computer). To understand them better
+        we have to take a little detour.
+      </p>
+
+<!--       <p>
         The difference, in my own faul words, is that RISC kept things simple. Instructions are reduced the very ones necessary to perform 
         the desired operations. CISC on the other hand has more complex instructions. One instruction might fetch data from memory, add an 
         operand on top, and save the data at a target address. Without digging the whole rabbit hole as what has happened since then, I 
         still find it interesting to see why that was, and mark the trade-offs clearly.
-      </p>
+      </p> -->
 
       <p>
          Let's go a little back in time: Phones had actual buttons to be pressed when dialing a number, 
@@ -119,7 +125,7 @@ mathjax: false
       </p>
 
       <p>
-        For the last decades CISC architectures have been dominant, especially in PCs dominated by Intel and ARM CPUs. However, with the 
+        For the last decades CISC architectures have been dominant, especially in PCs dominated by Intel and AMD CPUs. However, with the
         advent of smartphones the playing field has shifted a little bit. One determining factor of the quality of smartphones has been 
         energy efficiency, i.e. how long your phone can last before it needs a recharge. The energy efficiency of RISC architectures dominates
         here, with virtually every smartphone running RISC chips. The next battleground has become laptops, where energy plays a crucial role 
@@ -127,7 +133,7 @@ mathjax: false
       </p>
 
       <p>
-        However, RISC CPUs still dominate a large market share, if only for the reason of being established well. Additionally, companies have 
+        However, CISC CPUs still dominate a large market share, if only for the reason of being established well. Additionally, companies have
         responded. For instance, my laptop has an Intel i5 of the Raptorlake generation. In addition to having the usual fast CPU cores, four of 
         them in total, it also boasts four efficiency cores. Those are CPU-cores running at lower clock-speed, but in return they consume less 
         power than the fast cores. The core idea here is that processes consuming raw computing power run on the power cores, but more lightweight 
@@ -153,10 +159,10 @@ mathjax: false
       </div>
 
       <p>
-        This is a brief section intended to familiarize you with the basics of x64, so that you can follow the discussions below. If you already
-        know it well you can skip this section. To start off, let us start with what x86 is. If you read the discussion above about RISC-vs-CISC then 
-        you know that it is the architecture mostly run by Intel and AMD today. Unfortunately for us their commitment to backwards compatibility means 
-        for us that we now have to deal with a lot of historical baggage accumulated over decades.
+        This is a brief section intended to familiarize you with the basics of x64 assembly language, so that you can follow the discussions below. 
+        If you already know it well you can skip this section. To start off, let us start with what x86 is. If you read the discussion above about 
+        RISC-vs-CISC then you know that it is the architecture mostly run by Intel and AMD today. Unfortunately for us their commitment to backwards 
+        compatibility means for us that we now have to deal with a lot of historical baggage accumulated over decades.
 
         <h5>Intel notation vs. AT&T notation</h5>
 
@@ -174,15 +180,36 @@ mathjax: false
           AT&T notation does. Immediates and registers have no prefixes. It does also not use the size suffixes given by AT&T. Instead, the operand sizes
           are inferred by the register name used. Later we will see that backward compatibility also meant that the same registers have been reused by Intel and ARM,
           making them larger and giving them naming conventions as to how we want to use them. So to sum this up, the same instruction above in Intel notation 
-          would just be a simple <code>move eax, 10</code>.
+          would just be a simple <code>add eax, 10</code>.
         </p>
 
         <p>
           There are additional differences in addressing modes, especially indirect addressing mode. But to make things simple we will choose one of the two 
-          in the following. I personally like the Intel notation a little better, since I find it simpler and more intuitive to read. Due to historical reasons 
-          however Linux tools often by default use AT&T notation, unless explicitly told to output Intel. So the assemly code I got out of perf has all been 
-          in AT&T notation, so for the remainder of this blogpost we're gonna roll with AT&T notation. 
+          in the following, and we will look closer into addressing modes later. I personally like the Intel notation a little better, since I find it simpler 
+          and more intuitive to read. Due to historical reasons however Linux tools often by default use AT&T notation, unless explicitly told to output Intel. 
+          So the assemly code I got out of perf has all been in AT&T notation, so for the remainder of this blogpost we're gonna roll with AT&T notation.
         </p>
+
+        <div class="pytorch-table-wrap">
+        <table class="pytorch-reg-table">
+          <caption>Intel vs. AT&amp;T assembly syntax at a glance.</caption>
+          <thead>
+            <tr>
+              <th></th>
+              <th>AT&amp;T</th>
+              <th>Intel</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Operand order</td><td>source, destination</td><td>destination, source</td></tr>
+            <tr><td>Register prefix</td><td>%</td><td>&mdash;</td></tr>
+            <tr><td>Immediate prefix</td><td>$</td><td>&mdash;</td></tr>
+            <tr><td>Operand size</td><td>instruction suffix (b/w/l/q)</td><td>inferred from register name</td></tr>
+            <tr><td>Addressing mode</td><td>disp(base,index,scale)</td><td>[base+index*scale+disp]</td></tr>
+            <tr><td>Example</td><td>addl $10, %eax</td><td>add eax, 10</td></tr>
+          </tbody>
+        </table>
+        </div>
 
         <h5>Registers</h5>
 
@@ -195,7 +222,7 @@ mathjax: false
         </p>
 
         <p>  
-          It further had all the classics, importantly the stack pointer SP, the base pointer BP, 
+          It further had all the classics, importantly the stack pointer SP, the base pointer BP, both also classified as general purpose,
           the instruction pointer IP, the flags register Flags, and segment registers such as CS for the code segment, DS for the data
           segment, and SS for the stack segment. 
         </p>
@@ -308,6 +335,53 @@ mathjax: false
           better to use for modern software than the floating point unit itself, which at this point exists solely for backward compatibility. We can therefore skip its register
           naming. 
         </p>
+
+        <h5>Data transfer and addressing modes</h5>
+
+        <p>
+          Of course in a breakdown of the most important concepts of an ISA addressing modes cannot be left out. Before that we're gonna take a quick look at data transfer operations.
+          Of course the basic operation there is the mov-operation. Copying an operand from one register to another happens through this command. Since we are in AT&T syntax we get the 
+          additional burden of writing out the width if it cannot be inferred. Remember that a word in x64 is 16-bit, hence movb is 8-bit, and movw is 16-bit. Going larger, movl is a 
+          long move at 32-bit, movq is a quad move with 64-bit. 
+        </p>
+        
+        <p>
+          When inferable this can be omitted, as we will see very often. For instance, <code>mov %ebx, %eax</code> is a 32-bit wide move
+          operation from ebx into eax. Similarly, we can perform indirect addressing, copying the lowest 16-bit of whatever the stack pointer points to via 
+          <code>mov (%rsp), %ax</code>. The 32-bit equivalent would look like this: <code>mov (%rsp), %eax</code>.
+        </p>
+
+        <p>
+          Apart from that, the mov-operation comes in a few extra flavors: movzx zero-extends our operand, and movsx does a sign-extend on it.
+        </p>
+
+        <p>
+          As for addressing modes, it is probably best to simply let them express through a table. Because I do find Intel notation much more legible than AT&T I left out the verbal 
+          explanation, and simply have name, Intel notation, and then the AT&T notation we will be using. The table follows:
+        </p>
+
+        <div class="pytorch-table-wrap">
+        <table class="pytorch-reg-table">
+          <caption>x86-64 addressing modes, Intel vs. AT&amp;T syntax.</caption>
+          <thead>
+            <tr>
+              <th>Addressing mode</th>
+              <th>Intel notation</th>
+              <th>AT&amp;T notation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Register</td><td>mov eax, ebx</td><td>mov %ebx, %eax</td></tr>
+            <tr><td>Immediate</td><td>mov eax, 10</td><td>mov $10, %eax</td></tr>
+            <tr><td>Direct (absolute)</td><td>mov eax, [0x1000]</td><td>mov 0x1000, %eax</td></tr>
+            <tr><td>Indirect</td><td>mov eax, [rbx]</td><td>mov (%rbx), %eax</td></tr>
+            <tr><td>Base + displacement</td><td>mov eax, [rbx+8]</td><td>mov 8(%rbx), %eax</td></tr>
+            <tr><td>Base + index</td><td>mov eax, [rbx+rcx]</td><td>mov (%rbx,%rcx), %eax</td></tr>
+            <tr><td>Base + index*scale + displacement</td><td>mov eax, [rbx+rcx*4+8]</td><td>mov 8(%rbx,%rcx,4), %eax</td></tr>
+            <tr><td>RIP-relative (x64)</td><td>mov eax, [rip+0x10]</td><td>mov 0x10(%rip), %eax</td></tr>
+          </tbody>
+        </table>
+        </div>
 
         <h5>SIMD instructions</h5>
 
