@@ -33,7 +33,18 @@ mathjax: false
           </ul>
         </li>
         <li>
-          Optimization
+          <a href="#optimization">Optimization</a>
+          <ul>
+            <li>
+              <a href="#step-1">Opt. 1 - Use more aggressive compiler optimization</a>
+            </li>
+            <li>
+              <a href="#step-2">Opt. 2 - Implement tiled matmul</a>
+            </li>
+            <li>
+              <a href="#step-3">Opt. 3 - Manually vectorize the matmul through AVX</a>
+            </li>
+          </ul>
         </li>
       </ul>
     </div>
@@ -116,11 +127,11 @@ mathjax: false
       </p>
 
       <p>
-        On the contrary RISC uses less instructions, but each instruction is necessary and serves a clear purpose. Advantages of this
+        On the contrary RISC uses fewer instructions, but each instruction is necessary and serves a clear purpose. Advantages of this
         architecture are more ways to optimize nowadays for compilers, since they can shift independent instructions around. That is,
         instructions are not necessarily executed in the order you wrote your program in if the compiler determines it found a better
         ordering. Another advantage is that the final CPU itself has less need for instruction decoding, and is thus likely to be simpler
-        and energy efficient (less wires to maintain). RISC architectures are known from ARM (Advanced RISC Machines) and the open-source
+        and energy efficient (fewer wires to maintain). RISC architectures are known from ARM (Advanced RISC Machines) and the open-source
         RISC-V (say RISC-five) instruction set architecture.
       </p>
 
@@ -129,12 +140,12 @@ mathjax: false
         advent of smartphones the playing field has shifted a little bit. One determining factor of the quality of smartphones has been 
         energy efficiency, i.e. how long your phone can last before it needs a recharge. The energy efficiency of RISC architectures dominates
         here, with virtually every smartphone running RISC chips. The next battleground has become laptops, where energy plays a crucial role 
-        as well. The era has infamously been heralded by Apple phasing out Intel CPUs in favor of in house Apple-M chips. 
+        as well. The era has infamously been heralded by Apple phasing out Intel CPUs in favor of in-house Apple-M chips.
       </p>
 
       <p>
         However, CISC CPUs still dominate a large market share, if only for the reason of being established well. Additionally, companies have
-        responded. For instance, my laptop has an Intel i5 of the Raptorlake generation. In addition to having the usual fast CPU cores, four of 
+        responded. For instance, my laptop has an Intel i5 of the Raptor Lake generation. In addition to having the usual fast CPU cores, four of
         them in total, it also boasts four efficiency cores. Those are CPU-cores running at lower clock-speed, but in return they consume less 
         power than the fast cores. The core idea here is that processes consuming raw computing power run on the power cores, but more lightweight 
         processes get executed on the energy cores, say a simple browser or a calculator. So while x86 architectures have lost ground they are far from
@@ -163,12 +174,13 @@ mathjax: false
         If you already know it well you can skip this section. To start off, let us start with what x86 is. If you read the discussion above about 
         RISC-vs-CISC then you know that it is the architecture mostly run by Intel and AMD today. Unfortunately for us their commitment to backwards 
         compatibility means for us that we now have to deal with a lot of historical baggage accumulated over decades.
+      </p>
 
         <h5>Intel notation vs. AT&T notation</h5>
 
         <p>
           We start off with the notation. Unfortunately there are two main ways to write x86 assembly code. The first is the <b>AT&T notation</b>. 
-          This style of x86 is marked by a ton a %-symbols, which is mainly how you identify it. It writes intructions in order 
+          This style of x86 is marked by a ton of %-symbols, which is mainly how you identify it. It writes instructions in order
           <code>instruction source, destination</code>. Registers are prefixed with %, and immediates are prefixed with $. On top of that, it has 
           instructions suffixed with operand size. <code>b</code> stands for byte, <code>w</code> for word (16-bit), <code>l</code> for long (32-bit),
           and <code>q</code> for quad (64-bit). For instance, an 
@@ -178,7 +190,7 @@ mathjax: false
         <p>
           On the contrary, the <b>Intel notation</b> writes instructions as in <code>instruction destination, source</code>, the reverse of what the 
           AT&T notation does. Immediates and registers have no prefixes. It does also not use the size suffixes given by AT&T. Instead, the operand sizes
-          are inferred by the register name used. Later we will see that backward compatibility also meant that the same registers have been reused by Intel and ARM,
+          are inferred by the register name used. Later we will see that backward compatibility also meant that the same registers have been reused by Intel and AMD,
           making them larger and giving them naming conventions as to how we want to use them. So to sum this up, the same instruction above in Intel notation 
           would just be a simple <code>add eax, 10</code>.
         </p>
@@ -187,7 +199,7 @@ mathjax: false
           There are additional differences in addressing modes, especially indirect addressing mode. But to make things simple we will choose one of the two 
           in the following, and we will look closer into addressing modes later. I personally like the Intel notation a little better, since I find it simpler 
           and more intuitive to read. Due to historical reasons however Linux tools often by default use AT&T notation, unless explicitly told to output Intel. 
-          So the assemly code I got out of perf has all been in AT&T notation, so for the remainder of this blogpost we're gonna roll with AT&T notation.
+          So the assembly code I got out of perf has all been in AT&T notation, so for the remainder of this blogpost we're gonna roll with AT&T notation.
         </p>
 
         <div class="pytorch-table-wrap">
@@ -229,14 +241,14 @@ mathjax: false
 
         <p>
           The first 32-bit x86 processor was the 80386 (easy to remember: "insert a 3 for 32-bit"). For backward compatibility Intel chose to extend the 
-          previous registes, so that programs compiled for the 16-bit versions could still run. Thus the registers would remain the same, but if you 
-          wanted to use the full 32-bit of the now larger resgisters you'd prefix with an E, as in EAX, EBX, and so on. There was also an ESP and an EBP
-          for the stack and base pointer respectively, among other extended register. However, not each register got an upgrade to 32-bit. For instance 
+          previous registers, so that programs compiled for the 16-bit versions could still run. Thus the registers would remain the same, but if you
+          wanted to use the full 32-bit of the now larger registers you'd prefix with an E, as in EAX, EBX, and so on. There was also an ESP and an EBP
+          for the stack and base pointer respectively, among other extended registers. However, not each register got an upgrade to 32-bit. For instance
           the CS and DS registers remained 16-bit.  
         </p>
 
         <p>
-          AMD called in the 64-bit era with the AMD Optron in 2003. This is the point where we start to refer to x86 as x86-64, or just x64 in short. 
+          AMD called in the 64-bit era with the AMD Opteron in 2003. This is the point where we start to refer to x86 as x86-64, or just x64 in short.
           Apart from extending the previous general purpose registers (GPRs), now named RAX, RBX, RCX, and RDX to refer to their 64-bit versions, it gave x64
           a whole slew of extra GPRs, named R8, R9, ..., R15. Other registers, among them the stack pointer and the base pointer, got an RSP and RBP upgrade, too.
           This was important, as it allowed computers to overcome the 4GB RAM bottleneck, as with 32-bit we can index $2^32=4 \cdot 2^30 = 4GB$ of indexable memory.
@@ -305,11 +317,11 @@ mathjax: false
         </p>
 
         <p>
-          The late introduced another battlefront on processor design, namely SIMD instructions (see <a href="https://en.wikipedia.org/wiki/Flynn%27s_taxonomy"
+          Later developments introduced another battlefront on processor design, namely SIMD instructions (see <a href="https://en.wikipedia.org/wiki/Flynn%27s_taxonomy"
           target="_blank">Flynn's taxonomy</a>). Starting with MMX on Intel's side Intel and AMD competed on SSE and later AVX, introducing extra registers to load
-          floating point and integer operands. The first registers introduced by the wave of SSE versions are 128-bit wide registers called XMM0, XMM1, ...., XMM15. 
-          With the introduction of AVX these were extended into 256-bit wide registers now called YMM0-YMM15, and would later be extended into 512-bit wide registers 
-          consequentially called ZMM0-ZMM15 with AVX-512. The newest generations of Intel CPUs however do not support AVX-512, since Intel moved toward a more 
+          floating point and integer operands. The first registers introduced by the wave of SSE versions are 128-bit wide registers called XMM0, XMM1, ..., XMM15.
+          With the introduction of AVX these were extended into 256-bit wide registers now called YMM0-YMM15, and would later be extended into 512-bit wide registers
+          consequently called ZMM0-ZMM15 with AVX-512. The newest generations of Intel CPUs however do not support AVX-512, since Intel moved toward a more
           energy efficient CPU design. As far as I know however it is not off the table, just paused and planned to be re-introduced in future chips again.
         </p>
 
@@ -386,16 +398,16 @@ mathjax: false
         <h5>SIMD instructions</h5>
 
         <p>
-          With the introduction of SSE and later AVX a new class of intructions was introduced as well. The idea of the SIMD registers is to perform a single operation on multiple 
-          operands the same time, hence increasing computational throughput. To give the registers single operand operations as well operations on these registers either run single 
-          operand or multiple operand. The suffix indicates the type of the instruction: An ss for scalar single-precision, an sd for the double-precision equivalent, and the packed 
-          versions of those named ps and pd, indicating that the instruction works on all loaded operands the same time. A multiplication can hence have the following expression, 
+          With the introduction of SSE and later AVX a new class of instructions was introduced as well. The idea of the SIMD registers is to perform a single operation on multiple
+          operands the same time, hence increasing computational throughput. Operations on these registers either run on a single operand or on multiple operands at once.
+          The suffix indicates the type of the instruction: An ss for scalar single-precision, an sd for the double-precision equivalent, and the packed
+          versions of those named ps and pd, indicating that the instruction works on all loaded operands at the same time. A multiplication can hence have the following expression,
           depending on what operands it works on: mulss, mulsd, mulps, and mulpd. 
         </p>
 
         <p>
-          On top of that these two features introduced a large set of popular and rather complicated instructions that are commonly used in applications benfitting from SIMD instructions.
-          For instance, it has fused fused arithmetic operations like the multiply-and-add (MAD), but also more complex instructions like vector dot products, among others.
+          On top of that these two features introduced a large set of popular and rather complicated instructions that are commonly used in applications benefiting from SIMD instructions.
+          For instance, it has fused arithmetic operations like the multiply-and-add (MAD), but also more complex instructions like vector dot products, among others.
         </p>
 
         <div class="pytorch-table-wrap">
@@ -450,10 +462,10 @@ mathjax: false
       </p>
 
       <p>
-        As for the benchmark, I am going to learn from my mistakes and 
-        am going to run the benchmarks on the whole epoch, rather than a subset of it until later. That means that this time we are going to 
-        have the same benchmark from beginning to the end. The benchmarking script will be the same as in the previous part as well, 
-        except that this time we are going to not put our tensor onto the GPU. So let's get started with fix 1.
+        As for the benchmark, I am going to learn from my mistakes and
+        am going to run the benchmarks on the whole epoch from the start, rather than starting with a subset of it and switching later. That means that this time we are going to
+        have the same benchmark from beginning to the end. The benchmarking script will be the same as in the previous part as well,
+        except that this time we are not going to put our tensor onto the GPU. So let's get started with fix 1.
       </p>
 
     </div>
@@ -466,7 +478,7 @@ mathjax: false
         speedup="0.97x" commit="36fd56de172dd62d53f5bf6ce7a7f2d084a4d7d6" %}
 
       <p>
-        Before we any optimization, we first run a profiler. I used perf for this purpose, where we can get metrics such as time spend on program, 
+        Before we do any optimization, we first run a profiler. I used perf for this purpose, where we can get metrics such as time spent on the program,
         giving us a call tree, and we can profile for individual metrics. We are going to use the tool extensively, and you will see various 
         examples of what it is capable of. For now we want to see where our computation time flows. perf gives us the following as to where it 
         spends most of the execution time:
@@ -506,13 +518,13 @@ mathjax: false
         <code>set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")</code> in CMake. While the program executes as expected, that is the optimization did not 
         introduce errors so far, the improvement is zero to actually a little worse than before. Looking at perf again we find that the compiler 
         still did not vectorize the loop, meaning the compiler somehow has troubles figuring out that there's gold to be found here. I cannot determine
-        at the moment whether the slower time is noise or a genuine regression, and while I could dig deeper into the matter my time is stent wiser 
+        at the moment whether the slower time is noise or a genuine regression, and while I could dig deeper into the matter my time is spent wiser
         elsewhere, so let's stick with what we got right now, and in the following steps we will take matmul matters into our own hands.
       </p>
 
     </div>
 
-    <div id="optimization" class="article-text-div">
+    <div id="step-2" class="article-text-div">
       <h3 class="heading-spaced">Opt. 2 - Implement tiled matmul</h3>
 
       {% include pytorch-opt-summary.html 
@@ -528,43 +540,43 @@ mathjax: false
 
 <pre><code class="language-cpp">// src/backend/data_modeling/tensor.h
 
-template<bool transposeLeft, bool transposeRight>
+template&lt;bool transposeLeft, bool transposeRight&gt;
 void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, const tensorSize_t resOffset, 
                            const tensorSize_t leftOffset, const tensorSize_t rightOffset) {
   
-  const auto nRowsLeft = static_cast<tensorSize_t>(left.dims.get(-2));
-  const auto nColsLeft = static_cast<tensorSize_t>(left.dims.get(-1));
-  const auto nColsRight = static_cast<tensorSize_t>(right.dims.get(-1));
-  const auto nRowsRight = static_cast<tensorSize_t>(right.dims.get(-2));
+  const auto nRowsLeft = static_cast&lt;tensorSize_t&gt;(left.dims.get(-2));
+  const auto nColsLeft = static_cast&lt;tensorSize_t&gt;(left.dims.get(-1));
+  const auto nColsRight = static_cast&lt;tensorSize_t&gt;(right.dims.get(-1));
+  const auto nRowsRight = static_cast&lt;tensorSize_t&gt;(right.dims.get(-2));
 
   const tensorSize_t M = transposeLeft ? nColsLeft : nRowsLeft;
   const tensorSize_t K = transposeLeft ? nRowsLeft : nColsLeft;
   const tensorSize_t N = transposeRight ? nRowsRight : nColsRight;
 
-  for (tensorSize_t i = 0; i < M; i++) {
-    for (tensorSize_t j = 0; j < N; j++) {
+  for (tensorSize_t i = 0; i &lt; M; i++) {
+    for (tensorSize_t j = 0; j &lt; N; j++) {
       ftype sum = 0;
 
-      for (tensorSize_t k = 0; k < K; k++) {
+      for (tensorSize_t k = 0; k &lt; K; k++) {
         tensorSize_t leftIdx = transposeLeft ? leftOffset + k * nColsLeft + i
                                              : leftOffset + i * nColsLeft + k;
         
         tensorSize_t rightIdx = transposeRight ? rightOffset + j * nColsRight + k
                                                : rightOffset + k * nColsRight + j;
 
-        sum += left.values->data()[leftIdx] * right.values->data()[rightIdx];
+        sum += left.values-&gt;data()[leftIdx] * right.values-&gt;data()[rightIdx];
       }
 
-      res.values->data()[resOffset + i * N + j] = sum;
+      res.values-&gt;data()[resOffset + i * N + j] = sum;
     }
   }
 }</code></pre>
 
       <p>
-        I note here that I already have silently introduced an optimization that happened on the CUDA side, 
+        I note here that I have already silently introduced an optimization that happened on the CUDA side,
         namely the template overloads. Other than that the kernel should be obvious, since this is the looping and 
         index arithmetics we already have seen before. In short, it is a plain naive matrix multiplication. 
-        So let us look at the perf outout. We start profiling the number of cycles spent per instruction:
+        So let us look at the perf output. We start profiling the number of cycles spent per instruction:
       </p>
 
       <figure>
@@ -594,8 +606,8 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
       </p>
 
       <p>
-        When it comes to the annotation, what pops out is the weird numbers. The addss takes a lot of time, and so does 
-        the mulss, but the mov-operations are expensive, but not as much. This is likely contributed to <a 
+        When it comes to the annotation, what pops out is the weird numbers. The addss takes a lot of time, and so does
+        the mulss, but the mov-operations are expensive too, though not as much. This is likely contributed to <a
         href="https://easyperf.net/blog/2018/08/29/Understanding-performance-events-skid" target="_blank">skid</a>, where the 
         latency of instructions goes a few instructions further down the line. We can confirm this by tracking better metrics, 
         going down the <a href="https://www.intel.com/content/www/us/en/developer/articles/technical/timed-process-event-based-sampling-tpebs.html"
@@ -624,12 +636,12 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
 <pre><code class="language-cpp">// src/backend/data_modeling/matmul_tile.h
 
 namespace matmul {
-  template<typename T, tensorSize_t TileM, tensorSize_t TileK, tensorSize_t TileN>
-  requires std::is_floating_point_v<T>
+  template&lt;typename T, tensorSize_t TileM, tensorSize_t TileK, tensorSize_t TileN&gt;
+  requires std::is_floating_point_v&lt;T&gt;
   struct MatmulTile {
-      std::array<T, TileM * TileK> left{};
-      std::array<T, TileK * TileN> right{};
-      std::array<T, TileM * TileN> result{};
+      std::array&lt;T, TileM * TileK&gt; left{};
+      std::array&lt;T, TileK * TileN&gt; right{};
+      std::array&lt;T, TileM * TileN&gt; result{};
 
       void loadLeft(const T* const src, tensorSize_t row0, tensorSize_t col0, tensorSize_t nRows, tensorSize_t nCols);
       void loadRight(const T* const src, tensorSize_t row0, tensorSize_t col0, tensorSize_t nRows, tensorSize_t nCols);
@@ -645,13 +657,13 @@ namespace matmul {
 }</code></pre>
 
       <p>
-        The tile is pretty much self-expanatory. I templated the struct so that we can exchange the datatype easily, but also in case we have 
+        The tile is pretty much self-explanatory. I templated the struct so that we can exchange the datatype easily, but also in case we have
         need for it somewhere else. I also introduced three template parameters indicating the dimensions of the tiles for both the left and 
         the right tile, albeit for now I only support quadratic tiles, so this part of the code is a hot candidate for some small refactoring. 
       </p>
 
       <p>
-        The tiles are stored as std::array types, increasing run-time through data locality compared with the std::vector data-type. Because we will
+        The tiles are stored as std::array types, reducing run-time through better data locality compared with the std::vector data-type. Because we will
         always need a left tile, a right tile, and a result tile to write the results into we can write out the three arrays. The clearResult zeros out 
         the result tile, and the addResult adds the content of the result tile into a target tensor into the given dimensions. The load-methods are also
         very self-explanatory. With that we can take a look at what our refactored matrix multiplication looks like now:
@@ -662,14 +674,14 @@ namespace matmul {
 void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& right, const tensorSize_t resOffset,
                                const tensorSize_t leftOffset, const tensorSize_t rightOffset) {
   // physical, not logically as in the transposition
-  const auto nRowsLeft = static_cast<tensorSize_t>(left.dims.get(-2));
-  const auto nColsLeft = static_cast<tensorSize_t>(left.dims.get(-1));
-  const auto nColsRight = static_cast<tensorSize_t>(right.dims.get(-1));
-  const auto nRowsRight = static_cast<tensorSize_t>(right.dims.get(-2));
+  const auto nRowsLeft = static_cast&lt;tensorSize_t&gt;(left.dims.get(-2));
+  const auto nColsLeft = static_cast&lt;tensorSize_t&gt;(left.dims.get(-1));
+  const auto nColsRight = static_cast&lt;tensorSize_t&gt;(right.dims.get(-1));
+  const auto nRowsRight = static_cast&lt;tensorSize_t&gt;(right.dims.get(-2));
 
   // tune in accordance with cache-line size
   constexpr tensorSize_t TILESIZE = (MemoryLayout::CACHE_LINE_BYTES / sizeof(ftype)) * 4;
-  using tile_t = matmul::MatmulTile<ftype, TILESIZE, TILESIZE, TILESIZE>;
+  using tile_t = matmul::MatmulTile&lt;ftype, TILESIZE, TILESIZE, TILESIZE&gt;;
   tile_t tiles;
 
   res.reset(0.0f);
@@ -679,18 +691,18 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
   };
 
   if constexpr (!transposeLeft && !transposeRight) {
-    for(tensorSize_t i = 0; i < nRowsLeft; i += TILESIZE) {
-      for(tensorSize_t j = 0; j < nColsRight; j += TILESIZE) {
+    for(tensorSize_t i = 0; i &lt; nRowsLeft; i += TILESIZE) {
+      for(tensorSize_t j = 0; j &lt; nColsRight; j += TILESIZE) {
         tiles.clearResult();
 
-        for(tensorSize_t k0 = 0; k0 < nColsLeft; k0 += TILESIZE) {
-          tiles.loadLeft(left.values->data(), i, k0, nRowsLeft, nColsLeft);
-          tiles.loadRight(right.values->data(), k0, j, nRowsRight, nColsRight);
+        for(tensorSize_t k0 = 0; k0 &lt; nColsLeft; k0 += TILESIZE) {
+          tiles.loadLeft(left.values-&gt;data(), i, k0, nRowsLeft, nColsLeft);
+          tiles.loadRight(right.values-&gt;data(), k0, j, nRowsRight, nColsRight);
 
           matmulTiles(tiles);
         }
 
-        tiles.addResult(res.values->data() + resOffset, i, j, nRowsLeft, nColsRight);
+        tiles.addResult(res.values-&gt;data() + resOffset, i, j, nRowsLeft, nColsRight);
       }
     }
   }
@@ -702,13 +714,13 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
 
       <p>
         At first we initialize a tile. We tune it in accordance with a cache-line, which I encoded through CACHE_LINE_BYTES, which is 
-        a constexpr-number of 64 on my machine. To avoid repetitive work I wrapped the matrix multiplication in a lamba, since it is the 
+        a constexpr-number of 64 on my machine. To avoid repetitive work I wrapped the matrix multiplication in a lambda, since it is the
         same for all four cases, multiplying the two tiles into the resulting tile. Lastly we add it on top of the resulting matrix.
       </p>
 
     </div>
 
-    <div id="optimization" class="article-text-div">
+    <div id="step-3" class="article-text-div">
       <h3 class="heading-spaced">Opt. 3 - Manually vectorize the matmul through AVX</h3>
 
       {% include pytorch-opt-summary.html 
@@ -724,11 +736,11 @@ struct MemoryLayout final {
   // assumption needed e.g. for avoiding false-sharing
   constexpr static unsigned int CACHE_LINE_BYTES = 64; 
 
-  // L1 cache size in bytes, depends on CPU. E.g. 48 * (1 << 10) == 48 KB
-  constexpr static unsigned int L1_CACHE_BYTES = 48 * (1 << 10);
+  // L1 cache size in bytes, depends on CPU. E.g. 48 * (1 &lt;&lt; 10) == 48 KB
+  constexpr static unsigned int L1_CACHE_BYTES = 48 * (1 &lt;&lt; 10);
 
-  // L3 cache size in bytes, depends on CPU. E.g. 12 * (1 << 20) == 12 MB
-  constexpr static unsigned int L3_CACHE_BYTES = 12 * (1 << 20);
+  // L3 cache size in bytes, depends on CPU. E.g. 12 * (1 &lt;&lt; 20) == 12 MB
+  constexpr static unsigned int L3_CACHE_BYTES = 12 * (1 &lt;&lt; 20);
 };</code></pre>
 
       <p>
