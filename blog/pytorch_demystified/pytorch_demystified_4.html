@@ -477,7 +477,7 @@ mathjax: false
       <h3 class="heading-spaced">Opt. 1 - Use more aggressive compiler optimization</h3>
 
       {% include pytorch-opt-summary.html 
-        before="41.4530s" after="35.4813s"
+        before="41.45s" after="35.48s"
         speedup="1.20x" commit="36fd56de172dd62d53f5bf6ce7a7f2d084a4d7d6" %}
 
       <p>
@@ -528,7 +528,7 @@ mathjax: false
       <h3 class="heading-spaced">Opt. 2 - Test better access pattern and inline functions</h3>
 
       {% include pytorch-opt-summary.html 
-        before="35.4813s" after="28.0962s"
+        before="35.48s" after="28.10s"
         speedup="1.26x" commit="ec17463cf7e568efe7d99a0be64a4d5e52d08efe" %}
 
 
@@ -813,14 +813,42 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
       <h3 class="heading-spaced">Opt. 3 - Implement tiled matmul</h3>
 
       {% include pytorch-opt-summary.html 
-        before="28.0962s" after="8.4388s"
-        speedup="-" commit="2fa0fbadbcd2b6f6bbc90a35a832f855d403bd3f" %}
+        before="28.10s" after="8.44s"
+        speedup="3.33x" commit="2fa0fbadbcd2b6f6bbc90a35a832f855d403bd3f" %}
 
       <p>
-        This one unsurprisingly slaps big time, since we already saw the largest improvements from the CUDA side on this one. 
+        This one unsurprisingly cut slack big time, since we already saw the largest improvements from the CUDA side on this one. 
         I also note that for brevity I cut this blogpost a bit short, since I mainly repeat myself here if you have seen the previous post.
-        Before we start we just verify what we already have learned there though we will run perf on the benchmark. Because that will leave us 
-        with annotated assembly code at first I show you the function we are interested in:
+        Before we start we just verify what we already have learned there though we will run perf on the benchmark. In the following we see 
+        the contribution of matmul and it's assembly, annotated with cycles:
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/before_step3_1.png"
+        alt="matmul contribution before tiled matmul.">
+        <figcaption>
+          perf output on cycles. Matmul clearly stands out as the main contributor to runtime.
+        </figcaption>
+      </figure>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/before_step3_2.png"
+        alt="matmul before tiled matmul disassembled.">
+        <figcaption>
+          perf output for disassembled inner matmul loop. We still see many cycles spent in arithmetic operations, same reasoning as earlier.
+        </figcaption>
+      </figure>
+
+      <p>
+        We can see that matmul is still the main contributor to run-time, and we can still see the same pattern as before. The arithmetic operations
+        get the bulk of cycles, which is likely the wait on operand loads. We can get a hint on this in the last perf outputs of the previous section,
+        where we spend little time on tma_retiring, but lots on tma_frontend and tma_backend. The tma_backend number is what we aim to reduce here. 
+        I admit that here additional measurements would be better for a more concise diagnostic, but my fingers burned for the tiled matmul, which would
+        be subject to another analysis cycle anyway, so let's start with it. 
       </p>
 
       <p>
@@ -882,7 +910,18 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
   res.reset(0.0f);
 
   auto matmulTiles = [TILESIZE] (tile_t& tiles) {
-    // multiply the left and right tile here
+    for(tensorSize_t n = 0; n < TILESIZE; n++) { // rows left
+    const tensorSize_t leftTileRowOffset = n * TILESIZE;
+
+    for(tensorSize_t m = 0; m < TILESIZE; m++) { // cols left
+      const tensorSize_t rightTileRowOffset = m * TILESIZE;
+
+        const ftype leftVal = tiles.left[leftTileRowOffset + m];
+        for(tensorSize_t kk = 0; kk < TILESIZE; kk++) {
+          tiles.result[leftTileRowOffset + kk] += leftVal * tiles.right[rightTileRowOffset + kk];
+        }
+      }
+    }
   };
 
   if constexpr (!transposeLeft && !transposeRight) {
@@ -913,14 +952,45 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
         same for all four cases, multiplying the two tiles into the resulting tile. Lastly we add it on top of the resulting matrix.
       </p>
 
+      <p>
+        The result is very obvious, with the best improvement we logged so far in this post. However, we are not done with it. Looking at the 
+        aftereffects of our implementation, given by the two perf outputs below, we do see that the compiler still did not do us the favor of
+        autovectorizing the loops. The following fix will get us to do this manually.
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/after_step3_1.png"
+        alt="matmul contribution after tiled matmul.">
+        <figcaption>
+          perf output on cycles. Matmul has been drastically reduced .
+        </figcaption>
+      </figure>
+
     </div>
 
     <div id="step-4" class="article-text-div">
       <h3 class="heading-spaced">Opt. 4 - Manually vectorize the matmul through AVX</h3>
 
       {% include pytorch-opt-summary.html 
-        before="-" after="-"
-        speedup="-" commit="-" %}
+        before="8.44s" after="6.30s"
+        speedup="1.34x" commit="e7aa40d72847aafc8dedf07fda593334d3dc4f70" %}
+
+      <p>
+        As indicated, the compiler once again did not help us in auto-vectorizing the loop. The following output shows us 
+        the single operand usage the compiler does for us, and that we plan to improve on.
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/after_step3_2.png"
+        alt="matmul after tiled matmul disassembled.">
+        <figcaption>
+          perf output for disassembled inner matmul loop. The operations are still single operand operations.
+        </figcaption>
+      </figure>
 
       <pre><code class="language-cpp">// src/backend/utility/memory_layout.h
 
