@@ -39,10 +39,13 @@ mathjax: false
               <a href="#step-1">Opt. 1 - Use more aggressive compiler optimization</a>
             </li>
             <li>
-              <a href="#step-2">Opt. 2 - Implement tiled matmul</a>
+              <a href="#step-2">Opt. 2 - Better access pattern and inline functions</a>
             </li>
             <li>
-              <a href="#step-3">Opt. 3 - Manually vectorize the matmul through AVX</a>
+              <a href="#step-3">Opt. 3 - Implement tiled matmul</a>
+            </li>
+            <li>
+              <a href="#step-4">Opt. 4 - Manually vectorize the matmul through AVX</a>
             </li>
           </ul>
         </li>
@@ -474,8 +477,8 @@ mathjax: false
       <h3 class="heading-spaced">Opt. 1 - Use more aggressive compiler optimization</h3>
 
       {% include pytorch-opt-summary.html 
-        before="58.55s" after="60.38s"
-        speedup="0.97x" commit="36fd56de172dd62d53f5bf6ce7a7f2d084a4d7d6" %}
+        before="41.4530s" after="35.4813s"
+        speedup="1.20x" commit="36fd56de172dd62d53f5bf6ce7a7f2d084a4d7d6" %}
 
       <p>
         Before we do any optimization, we first run a profiler. I used perf for this purpose, where we can get metrics such as time spent on the program,
@@ -516,27 +519,19 @@ mathjax: false
         Since so far we did not specify an optimization flag it is the
         most natural solution to first try to use a more aggressive optimization. If you want to follow this step, simply add the line
         <code>set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")</code> in CMake. While the program executes as expected, that is the optimization did not 
-        introduce errors so far, the improvement is zero to actually a little worse than before. Looking at perf again we find that the compiler 
-        still did not vectorize the loop, meaning the compiler somehow has troubles figuring out that there's gold to be found here. I cannot determine
-        at the moment whether the slower time is noise or a genuine regression, and while I could dig deeper into the matter my time is spent wiser
-        elsewhere, so let's stick with what we got right now, and in the following steps we will take matmul matters into our own hands.
-      </p>
+        introduce errors so far, the improvement is also not that strong. As we will see in the next section the compiler still has not figured out how 
+        to optimize the inner loop yet, so the optimizations happened somewhere in less impactful parts of the program.
 
     </div>
 
     <div id="step-2" class="article-text-div">
-      <h3 class="heading-spaced">Opt. 2 - Implement tiled matmul</h3>
+      <h3 class="heading-spaced">Opt. 2 - Test better access pattern and inline functions</h3>
 
       {% include pytorch-opt-summary.html 
-        before="60.38s" after="13.07s"
-        speedup="4.62x" commit="2fa0fbadbcd2b6f6bbc90a35a832f855d403bd3f" %}
+        before="35.4813s" after="28.0962s"
+        speedup="1.26x" commit="ec17463cf7e568efe7d99a0be64a4d5e52d08efe" %}
 
-      <p>
-        This one unsurprisingly slaps big time, since we already saw the largest improvements from the CUDA side on this one. 
-        I also note that for brevity I cut this blogpost a bit short, since I mainly repeat myself here if you have seen the previous post.
-        Before we start we just verify what we already have learned there though we will run perf on the benchmark. Because that will leave us 
-        with annotated assembly code at first I show you the function we are interested in:
-      </p>
+
 
 <pre><code class="language-cpp">// src/backend/data_modeling/tensor.h
 
@@ -625,10 +620,247 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
         </figcaption>
       </figure>
 
+      <h4>Test better access pattern</h4>
 
       <p>
         This confirms what we suspected, namely that we do have a large number of cache misses in these lines.
-        To fix that we are going to add the tiled approach in the following.
+        To fix that we are going to add the tiled approach later. However, before we start we could score a quick win that we will undo, but 
+        sometimes our curiousity gets the better of us. So I decided to write out the loops specifically, but with a better memory access pattern. 
+        I therefore created this little beast here:  
+      </p>
+
+<pre><code>// src/backend/data_modeling/tensor.h
+
+template<bool transposeLeft, bool transposeRight>
+void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& right, const tensorSize_t resOffset,
+                           const tensorSize_t leftOffset, const tensorSize_t rightOffset) {
+  // physical, not logically as in the transposition
+  const auto nRowsLeft = static_cast<tensorSize_t>(left.dims.get(-2));
+  const auto nColsLeft = static_cast<tensorSize_t>(left.dims.get(-1));
+  const auto nColsRight = static_cast<tensorSize_t>(right.dims.get(-1));
+  const auto nRowsRight = static_cast<tensorSize_t>(right.dims.get(-2));
+
+  if constexpr (!transposeLeft && !transposeRight) {
+    for (tensorSize_t i = 0; i < nRowsLeft; i++) {
+      const tensorSize_t leftOffset = i * nColsLeft;
+      const tensorSize_t resOffset = i * nColsRight;
+
+      {
+        // tensors not zero initialized, therefore need one dry run pre-filling
+        const auto leftVal = left.values->data()[leftOffset];
+        for(tensorSize_t j = 0; j < nColsRight; j++) {
+          res.values->data()[resOffset + j] = leftVal * right.values->data()[j];
+        }
+      }
+
+      // compute the entire column of the left matrix
+      for (tensorSize_t k = 1; k < nRowsRight; k++) {
+        const tensorSize_t rightOffset = k * nColsRight;
+
+        const ftype leftVal = left.values->data()[leftOffset + k];
+        for(tensorSize_t j = 0; j < nColsRight; j++) {
+          res.values->data()[resOffset + j] += leftVal * right.values->data()[rightOffset + j];
+        }
+      }
+    }
+  }
+  // do the other overloads here also
+}</code></pre>
+
+      <p>
+        The idea is really simple: If none of the two matrices is transposed, use a better access pattern on the right matrix. For 
+        the transposed cases do the same by explicitly writing out the loops. No fancy techniques, just a minor fix. The code for this 
+        fix resides in commit hash <b>bc4878e119c377cf57c44eb5008200396811a12c</b>.
+        In theory the fix should speed things up by increasing cache-hit rates. Testing it out 
+        on our benchmark gives us however a terrible number, namely around 118s on our benchmark. This fix does not really matter, since 
+        we eventually will swap to the tiled matmul approach anyway, but it is still worth looking into what happened.
+      </p>
+
+      <h4>Inline getter- and setter-functions</h4>
+
+      <p>
+        Running <code>perf stat</code> on the benchmark on the matmul specifically, that I introduced in the previous post in an optional section, 
+        shows us this:
+      </p>
+
+<pre>---------------------------------------------------------------------------------------
+Benchmark                             Time             CPU   Iterations UserCounters...
+---------------------------------------------------------------------------------------
+BM_MatMul_CPU/64/64/64              521 us          521 us         1346 GFLOP/s=1.00686/s
+BM_MatMul_CPU/256/256/256         30242 us        30143 us           23 GFLOP/s=1.11317/s
+BM_MatMul_CPU/512/512/512        240924 us       239886 us            3 GFLOP/s=1.11901/s
+BM_MatMul_CPU/1024/1024/1024    1899346 us      1896614 us            1 GFLOP/s=1.13227/s
+BM_MatMul_CPU/64/784/256          23110 us        23081 us           30 GFLOP/s=1.11306/s
+BM_MatMul_CPU/64/256/128           4008 us         4003 us          175 GFLOP/s=1.04782/s
+BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=0.693071/s
+
+ Performance counter stats for './bm_matmul --benchmark_filter=BM_MatMul_CPU/':
+
+    30,493,695,954      cpu_core/cycles/                                                      
+   172,518,480,863      cpu_core/instructions/           #    5.66  insn per cycle            
+        11,217,468      cpu_core/cache-misses/                                                
+    69,372,480,963      cpu_core/L1-dcache-loads/                                             
+        27,245,452      cpu_core/L1-dcache-load-misses/  #    0.04% of all L1-dcache accesses 
+         1,986,866      cpu_core/LLC-loads/                                                   
+           676,631      cpu_core/LLC-load-misses/        #   34.06% of all LL-cache accesses  
+
+       8.144915641 seconds time elapsed
+
+       7.771304000 seconds user
+       0.343924000 seconds sys</pre>
+
+      <p>
+       The surprising part about this is that the albeit L1-cache misses are low at around 0.04% roughly, 
+       the program did really bad. So something else must be going on. We take a look at the assembly code and 
+       find this:  
+      </p>
+
+<pre>    0.04 :   6dde2:  mov    %r14,%rdi
+   22.88 :   6dde5:  call   6d230 <Tensor::operator[](unsigned int) const> // tensor.h:320
+         : 593   ftype* data() noexcept { return values; }
+    0.02 :   6ddea:  mov    0x8(%rsp),%rax
+         : 595   res.values->data()[resOffset + j] += leftVal * right[rightOffset + j];
+    0.00 :   6ddef:  lea    (%rbx,%r15,1),%edx
+    0.01 :   6ddf3:  mulss  0x10(%rsp),%xmm0
+         : 598   for(tensorSize_t j = 0; j < nColsRight; j++) {
+   24.15 :   6ddf9:  add    $0x1,%ebx // tensor.h:319
+         : 600   ftype* data() noexcept { return values; }</pre>
+
+      <p>
+        The interesting part is the second line from above, showing us that the indexing operator on the tensor could not be inlined.
+        Hence, the fix here is to inline the getter- and setter-method for the tensor. You can find the initial fix in commit hash
+        <b>ec17463cf7e568efe7d99a0be64a4d5e52d08efe</b>. In this commit I moved the getter- and setters out of the .cpp-file into 
+        the header, giving the compiler the chance to inline those functions where it deems it a good choice. And the results speak 
+        for themselves, with a resulting benchmark time of around 27.5s.
+      </p>
+
+      <h4>Second wave: Blanket inline on small and trivial functions</h4>
+
+      <p>
+        I did go a little beyond what was needed and did more of a blanket inline in commit <b>ec17463cf7e568efe7d99a0be64a4d5e52d08efe</b>, 
+        where I identified small functions and moved their implementation
+        directly into the header. This gives the compiler the chance to embed them directly into where they are called. Running the code again 
+        with the functions inlined we get the following: 28.7427s.
+      </p>
+
+      <p>
+        Now this is a little odd, given that runtime increased a little, roughly one second on the whole script. Re-running both versions reveals to 
+        me that this does not seem to be a one-off, but rather a consistent degradation. Running <code>perf stat</code> on both versions we see the 
+        following:
+      </p>
+
+<pre>----------------------------- Before blanket inline -------------------------------------------
+
+             3,227      context-switches                 #     36.9 cs/sec  cs_per_second     
+                72      cpu-migrations                   #      0.8 migrations/sec  migrations_per_second
+           275,448      page-faults                      #   3145.4 faults/sec  page_faults_per_second
+         87,571.18 msec task-clock                       #      1.0 CPUs  CPUs_utilized       
+     1,019,622,019      cpu_core/branch-misses/          #      0.5 %  branch_miss_rate         (99.91%)
+   201,850,834,587      cpu_core/branches/               #   2305.0 M/sec  branch_frequency     (99.91%)
+   330,154,574,984      cpu_core/cpu-cycles/             #      3.8 GHz  cycles_frequency       (99.91%)
+ 1,487,266,837,172      cpu_core/instructions/           #      4.5 instructions  insn_per_cycle  (99.91%)
+       734,370,877      cpu_atom/branch-misses/          #      5.2 %  branch_miss_rate         (0.05%)
+    14,400,274,078      cpu_atom/branches/               #    164.4 M/sec  branch_frequency     (0.05%)
+   146,160,335,676      cpu_atom/cpu-cycles/             #      1.7 GHz  cycles_frequency       (0.05%)
+   120,656,497,377      cpu_atom/instructions/           #      0.8 instructions  insn_per_cycle  (0.05%)
+             TopdownL1 (cpu_core)                        #     11.1 %  tma_bad_speculation    
+                                                         #     13.1 %  tma_frontend_bound       (99.91%)
+                                                         #     20.5 %  tma_backend_bound      
+                                                         #     55.3 %  tma_retiring             (99.91%)
+             TopdownL1 (cpu_atom)                        #     24.3 %  tma_backend_bound        (0.07%)
+                                                         #     28.2 %  tma_frontend_bound       (0.07%)
+                                                         #     32.4 %  tma_bad_speculation    
+                                                         #     15.1 %  tma_retiring             (0.07%)
+
+      87.694506713 seconds time elapsed
+
+      86.842151000 seconds user
+       0.965280000 seconds sys
+
+----------------------------- After blanket inline -------------------------------------------
+
+             4,787      context-switches                 #     54.1 cs/sec  cs_per_second     
+               551      cpu-migrations                   #      6.2 migrations/sec  migrations_per_second
+         1,863,767      page-faults                      #  21066.6 faults/sec  page_faults_per_second
+         88,470.37 msec task-clock                       #      1.0 CPUs  CPUs_utilized       
+     1,019,280,252      cpu_core/branch-misses/          #      0.5 %  branch_miss_rate         (99.73%)
+   187,143,732,419      cpu_core/branches/               #   2115.3 M/sec  branch_frequency     (99.73%)
+   333,425,632,071      cpu_core/cpu-cycles/             #      3.8 GHz  cycles_frequency       (99.73%)
+ 1,454,330,444,853      cpu_core/instructions/           #      4.4 instructions  insn_per_cycle  (99.73%)
+       477,893,125      cpu_atom/branch-misses/          #      0.9 %  branch_miss_rate         (0.12%)
+    49,044,155,379      cpu_atom/branches/               #    554.4 M/sec  branch_frequency     (0.13%)
+   173,186,896,303      cpu_atom/cpu-cycles/             #      2.0 GHz  cycles_frequency       (0.14%)
+   306,418,852,932      cpu_atom/instructions/           #      1.9 instructions  insn_per_cycle  (0.16%)
+             TopdownL1 (cpu_core)                        #     10.6 %  tma_bad_speculation    
+                                                         #     12.6 %  tma_frontend_bound       (99.73%)
+                                                         #     20.1 %  tma_backend_bound      
+                                                         #     56.7 %  tma_retiring             (99.73%)
+             TopdownL1 (cpu_atom)                        #     18.6 %  tma_backend_bound        (0.17%)
+                                                         #     23.9 %  tma_frontend_bound       (0.16%)
+                                                         #      8.1 %  tma_bad_speculation    
+                                                         #     49.5 %  tma_retiring             (0.14%)
+
+      88.743563091 seconds time elapsed
+
+      85.812211000 seconds user
+       3.045536000 seconds sys
+</pre>
+
+      <p>
+        A little unexpected, after the larger inline we did the program genuinely spends less time in user space, 
+        but has increased time in system space, with more context switches and more CPU migrations. Work on P-cores
+        (cpu_core) has decreased, and work on E-cores (cpu_atom) has increased. We also see more 
+        page faults. Checking the file sizes reveals the bigger picture as seen below:
+      </p>
+
+<div class="pytorch-table-wrap">
+<table class="pytorch-reg-table">
+  <caption>Binary sizes before and after the blanket inline.</caption>
+  <thead>
+    <tr>
+      <th>File</th>
+      <th>Before inlining other methods</th>
+      <th>After inlining other methods</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>_core.so</td><td>3.8M</td><td>4.8M</td></tr>
+    <tr><td>_nn.so</td><td>3.5M</td><td>3.8M</td></tr>
+    <tr><td>_sys.so</td><td>256K</td><td>256K</td></tr>
+    <tr><td>_train.so</td><td>2.3M</td><td>2.5M</td></tr>
+    <tr><td>libBackendCore.so</td><td>13M</td><td>17M</td></tr>
+  </tbody>
+</table>
+</div>
+
+      <p>
+        This is a classic case of inlining too aggressively in the end. Our inlining has increased code size dramatically, leading to 
+        more page faults due to more code needing to be moved into working memory. This interrupts the kernel and the scheduler, giving 
+        the scheduler opportunity to shift the workload in between cores, and hence also the opportunity to shift it onto E-cores. 
+      </p>
+
+      <p>
+        Because the difference is small we can leave it as it is now, I might revert those changes back to their state before the second, more
+        blanket inline, and doing inlining more punctual in the future. For now we roll on with it.
+      </p>
+
+    </div>
+
+    <div id="step-3" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 3 - Implement tiled matmul</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="28.0962s" after="8.4388s"
+        speedup="-" commit="2fa0fbadbcd2b6f6bbc90a35a832f855d403bd3f" %}
+
+      <p>
+        This one unsurprisingly slaps big time, since we already saw the largest improvements from the CUDA side on this one. 
+        I also note that for brevity I cut this blogpost a bit short, since I mainly repeat myself here if you have seen the previous post.
+        Before we start we just verify what we already have learned there though we will run perf on the benchmark. Because that will leave us 
+        with annotated assembly code at first I show you the function we are interested in:
+      </p>
+
+      <p>
         Because this time I want to spare you (and me) the indexing hell introduced in CUDA I introduce an extra struct 
         here, representing the tile we load in. Its definition looks like this.
       </p>
@@ -720,12 +952,12 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
 
     </div>
 
-    <div id="step-3" class="article-text-div">
-      <h3 class="heading-spaced">Opt. 3 - Manually vectorize the matmul through AVX</h3>
+    <div id="step-4" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 4 - Manually vectorize the matmul through AVX</h3>
 
       {% include pytorch-opt-summary.html 
-        before="60.38s" after="13.07s"
-        speedup="4.62x" commit="2fa0fbadbcd2b6f6bbc90a35a832f855d403bd3f" %}
+        before="-" after="-"
+        speedup="-" commit="-" %}
 
       <pre><code class="language-cpp">// src/backend/utility/memory_layout.h
 
@@ -736,11 +968,6 @@ struct MemoryLayout final {
   // assumption needed e.g. for avoiding false-sharing
   constexpr static unsigned int CACHE_LINE_BYTES = 64; 
 
-  // L1 cache size in bytes, depends on CPU. E.g. 48 * (1 &lt;&lt; 10) == 48 KB
-  constexpr static unsigned int L1_CACHE_BYTES = 48 * (1 &lt;&lt; 10);
-
-  // L3 cache size in bytes, depends on CPU. E.g. 12 * (1 &lt;&lt; 20) == 12 MB
-  constexpr static unsigned int L3_CACHE_BYTES = 12 * (1 &lt;&lt; 20);
 };</code></pre>
 
       <p>
