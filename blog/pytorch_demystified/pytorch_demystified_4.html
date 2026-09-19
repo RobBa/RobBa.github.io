@@ -749,62 +749,25 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
         following:
       </p>
 
-<pre>----------------------------- Before blanket inline -------------------------------------------
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/step_2_before_inlining.png"
+        alt="perf stat output before inline.">
+        <figcaption>
+          perf stat output before the blanket inline.
+        </figcaption>
+      </figure>
 
-             3,227      context-switches                 #     36.9 cs/sec  cs_per_second     
-                72      cpu-migrations                   #      0.8 migrations/sec  migrations_per_second
-           275,448      page-faults                      #   3145.4 faults/sec  page_faults_per_second
-         87,571.18 msec task-clock                       #      1.0 CPUs  CPUs_utilized       
-     1,019,622,019      cpu_core/branch-misses/          #      0.5 %  branch_miss_rate         (99.91%)
-   201,850,834,587      cpu_core/branches/               #   2305.0 M/sec  branch_frequency     (99.91%)
-   330,154,574,984      cpu_core/cpu-cycles/             #      3.8 GHz  cycles_frequency       (99.91%)
- 1,487,266,837,172      cpu_core/instructions/           #      4.5 instructions  insn_per_cycle  (99.91%)
-       734,370,877      cpu_atom/branch-misses/          #      5.2 %  branch_miss_rate         (0.05%)
-    14,400,274,078      cpu_atom/branches/               #    164.4 M/sec  branch_frequency     (0.05%)
-   146,160,335,676      cpu_atom/cpu-cycles/             #      1.7 GHz  cycles_frequency       (0.05%)
-   120,656,497,377      cpu_atom/instructions/           #      0.8 instructions  insn_per_cycle  (0.05%)
-             TopdownL1 (cpu_core)                        #     11.1 %  tma_bad_speculation    
-                                                         #     13.1 %  tma_frontend_bound       (99.91%)
-                                                         #     20.5 %  tma_backend_bound      
-                                                         #     55.3 %  tma_retiring             (99.91%)
-             TopdownL1 (cpu_atom)                        #     24.3 %  tma_backend_bound        (0.07%)
-                                                         #     28.2 %  tma_frontend_bound       (0.07%)
-                                                         #     32.4 %  tma_bad_speculation    
-                                                         #     15.1 %  tma_retiring             (0.07%)
-
-      87.694506713 seconds time elapsed
-
-      86.842151000 seconds user
-       0.965280000 seconds sys
-
------------------------------ After blanket inline -------------------------------------------
-
-             4,787      context-switches                 #     54.1 cs/sec  cs_per_second     
-               551      cpu-migrations                   #      6.2 migrations/sec  migrations_per_second
-         1,863,767      page-faults                      #  21066.6 faults/sec  page_faults_per_second
-         88,470.37 msec task-clock                       #      1.0 CPUs  CPUs_utilized       
-     1,019,280,252      cpu_core/branch-misses/          #      0.5 %  branch_miss_rate         (99.73%)
-   187,143,732,419      cpu_core/branches/               #   2115.3 M/sec  branch_frequency     (99.73%)
-   333,425,632,071      cpu_core/cpu-cycles/             #      3.8 GHz  cycles_frequency       (99.73%)
- 1,454,330,444,853      cpu_core/instructions/           #      4.4 instructions  insn_per_cycle  (99.73%)
-       477,893,125      cpu_atom/branch-misses/          #      0.9 %  branch_miss_rate         (0.12%)
-    49,044,155,379      cpu_atom/branches/               #    554.4 M/sec  branch_frequency     (0.13%)
-   173,186,896,303      cpu_atom/cpu-cycles/             #      2.0 GHz  cycles_frequency       (0.14%)
-   306,418,852,932      cpu_atom/instructions/           #      1.9 instructions  insn_per_cycle  (0.16%)
-             TopdownL1 (cpu_core)                        #     10.6 %  tma_bad_speculation    
-                                                         #     12.6 %  tma_frontend_bound       (99.73%)
-                                                         #     20.1 %  tma_backend_bound      
-                                                         #     56.7 %  tma_retiring             (99.73%)
-             TopdownL1 (cpu_atom)                        #     18.6 %  tma_backend_bound        (0.17%)
-                                                         #     23.9 %  tma_frontend_bound       (0.16%)
-                                                         #      8.1 %  tma_bad_speculation    
-                                                         #     49.5 %  tma_retiring             (0.14%)
-
-      88.743563091 seconds time elapsed
-
-      85.812211000 seconds user
-       3.045536000 seconds sys
-</pre>
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/step_2_after_inlining.png"
+        alt="perf stat output after inline.">
+        <figcaption>
+          perf stat output after the blanket inline.
+        </figcaption>
+      </figure>
 
       <p>
         A little unexpected, after the larger inline we did the program genuinely spends less time in user space, 
