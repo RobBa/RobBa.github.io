@@ -1191,24 +1191,53 @@ auto matmulTiles = [TILESIZE] (tile_t& tiles) {
 
 <pre><code class="language-cpp">// src/backend/utility/avx_info.h
 
-  // here's some wrapper function around this check
+namespace utility {
+  struct AvxInfo final {
+    private:
+      inline static bool avxAvailable = false;
 
-    if (!__builtin_cpu_supports("avx2")) [[unlikely]] {
-      std::cerr <<
-        "Binary compiled with USE_AVX2 but the CPU does not support AVX2. " <<
-        "To use AVX reconfigure with -DAVX_VERSION=AVX (or SCALAR) and rebuild." << std::endl;
-      return false;
-    }
+    public:
+      AvxInfo() = delete;
+      ~AvxInfo() noexcept = delete;
 
-  // wrap up function for other cases...
-</code></pre>
+      static bool getAvxAvailable() noexcept {
+        return avxAvailable;
+      }
+
+      static void verifyAvxSupport() {
+      #if defined(USE_AVX512)
+        if (!__builtin_cpu_supports("avx512f")) [[unlikely]] {
+          std::cerr <<
+            "Binary compiled with USE_AVX512 but the CPU does not support AVX-512. " << 
+            "To use AVX reconfigure with -DAVX_VERSION=AVX2 (or AVX or SCALAR) and rebuild." << std::endl;
+        }
+        else [[likely]] {
+          avxAvailable = true;
+        }
+
+        // check for other AVX versions...
+      #endif
+      }
+  };
+}</code></pre>
 
       <p>
         We can then guard against run-time exceptions using a static variable around our matmul-call like this:
       </p>
 
-<pre><code class="language-cpp">
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
 
+Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool transposeLeft, const bool transposeRight) {
+  // broadcasting
+  auto resDims = left.dims.nDims() > right.dims.nDims() ? left.dims.toVector() : right.dims.toVector();
+  resDims[resDims.size() - 2] = transposeLeft  ? left.dims.get(-1)  : left.dims.get(-2); // rows
+  resDims[resDims.size() - 1] = transposeRight ? right.dims.get(-2) : right.dims.get(-1); // cols
+
+  Tensor res(resDims, left.values->getDevice(), false);
+
+  switch(left.values->getDevice()){
+    case Device::CPU:
+    {
   // some code leading to this call...
     #if defined(USE_AVX512) || defined(USE_AVX2) || defined(USE_AVX)
       static const bool avxVerified = utility::AvxInfo::getAvxAvailable();
@@ -1217,8 +1246,7 @@ auto matmulTiles = [TILESIZE] (tile_t& tiles) {
           if(!(transposeLeft || transposeRight)) {
             matMul2DCpuAvx<false, false>(res, left, right, resOffset, leftOffset, rightOffset);
           }
-          
-          // other template overloads
+          // other template overloads...
         }
       }
     else [[unlikely]] {
@@ -1228,12 +1256,14 @@ auto matmulTiles = [TILESIZE] (tile_t& tiles) {
         if(!(transposeLeft || transposeRight)) {
           matMul2DCpuScalar<false, false>(res, left, right, resOffset, leftOffset, rightOffset);
         }
-
-        // other template overloads
+        // other template overloads...
       }
     }
 
-    // wrap up function</code></pre>
+    // wrap up function...
+    }
+  }
+}</code></pre>
 
     <p>
       And that concludes our AVX implementation. In my library I check at compile time what AVX versions are available and compile with the 
