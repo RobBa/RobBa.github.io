@@ -1093,7 +1093,7 @@ _mm256_load_ps (float const *__P)
         To start off, we first have to align our operands. We can do this through a slight modification in our tile-data structure. 
       </p>
 
-<pre>// src/backend/data_modeling/matmul_tile.h
+<pre><code class="language-cpp">// src/backend/data_modeling/matmul_tile.h
 
 namespace matmul {
   template<typename T, tensorSize_t TileM, tensorSize_t TileK, tensorSize_t TileN>
@@ -1105,7 +1105,7 @@ namespace matmul {
 
       // same as before...
   };
-}</pre>
+}</code></pre>
 
       <p>
         The quantity CPU_TENSOR_ALIGNMENT is defined by the following: <code>constexpr static unsigned int CPU_TENSOR_ALIGNMENT = 64;</code>.
