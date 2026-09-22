@@ -964,7 +964,7 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
         src="./img_4/after_step3_1.png"
         alt="matmul contribution after tiled matmul.">
         <figcaption>
-          perf output on cycles. Matmul has been drastically reduced .
+          perf output on cycles. Matmul has been drastically reduced in CPU cycles.
         </figcaption>
       </figure>
 
@@ -979,7 +979,7 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
 
       <p>
         As indicated, the compiler once again did not help us in auto-vectorizing the loop. The following output shows us 
-        the single operand usage the compiler does for us, and that we plan to improve on.
+        the single operand usage the compiler emits, and that we plan to fix in the following.
       </p>
 
       <figure>
@@ -992,21 +992,284 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
         </figcaption>
       </figure>
 
-      <pre><code class="language-cpp">// src/backend/utility/memory_layout.h
+      <p>
+        On x64 chips we can use AVX to do so. Chances are you use such a machine, with a small chance of it being a Mac, which 
+        has its own proprietary hardware acceleration instructions. In the following I show the AVX variant.
+      </p>
 
-struct MemoryLayout final {
-  // aligning memory allows us unsafe/faster memfetches into AVX registers
-  constexpr static unsigned int CPU_TENSOR_ALIGNMENT = 64;
-  
-  // assumption needed e.g. for avoiding false-sharing
-  constexpr static unsigned int CACHE_LINE_BYTES = 64; 
+      <details class="pytorch-optional" id="optional-avx-review">
+      <summary class="pytorch-optional-summary">
+        <h4>Optional: Quick review on AVX</h4>
+      </summary>
 
-};</code></pre>
+      <div class="pytorch-optional-collapse-bar">
+        <button type="button" class="pytorch-optional-collapse-btn"
+          onclick="var s=document.getElementById('optional-avx-review'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
+
+      <h5>Basics and instruction format</h5>
 
       <p>
-        Although they look really cool for now I did not use the information about my cache-sizes. They could come in handy in later optimization 
-        steps, e.g. by checking whether a data structure actually fits into one of these. The CPU_TENSOR_ALIGNMENT is the interesting one now. 
-        TODO
+        I assume you are familiar with AVX at this point, or at least the rough outline. Here I will only briefly describe what we need to 
+        look out for if we want to use it in our code. As described in the optional section <a href="#optional-x86-primer">above</a>, AVX 
+        introduced a set of new registers, starting with XMM0-XMM15, and extending that to the Y- and Z-variants. With that came a set of 
+        instructions, with the ss-suffix for single operands, and the ps-suffix for the packed operands.
       </p>
+
+      <p>
+        What I still owe you is what this looks like in C++. To start off, we have to include the header <i>immintrin.h</i>. This one 
+        gives us access to the AVX functions. To make AVX accessible in our code we also have to tell the compiler that we want to use AVX. 
+        What the flag looks like is compiler dependent. In case of GCC is is for instance -mavx2 for AVX2. 
+      </p>
+
+      <p>
+        Once this is done we get access to the AVX functions defined in the header we just included. Instructions are usually of the form
+        _mm[bitwidth]_[instruction]. For instance, in AVX and AVX2 we use the YMMX registers, which are 256-bit wide. Data types follow this 
+        convention with _m[bitwidth]. A load into an YMMX register would be for instance <code>_m256 var = _mm256_load_ps(somePtr);</code>. 
+        The AVX library already serves the overloads on the arguments. For instance, if the pointer is of floating point type we have 
+      </p>
+
+<pre><code class="language-cpp">// /usr/lib/gcc/x86_64-linux-gnu/15/include/avxintrin.h
+
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__))
+_mm256_load_ps (float const *__P)
+{
+  return *(__m256 *)__P;
+}</code></pre>
+
+      <h5>Memory alignment</h5>
+
+      <p>
+        The last thing worth noting is memory alignment. AVX is implemented to fetch all memory in parallel. So say we load a 256-bit wide operand.
+        Then there are two cases now:
+
+        <ul>
+          <li>Operand is aligned</li>
+          <li>Operand is not aligned</li>
+        </ul>
+
+        In general AVX provides two memory loads for that: Aligned (default) and unaligned (e.g. _mm256_loadu_ps. Pay attention to the u after load).
+        The unaligned version should always work, but can be slower in reality. I have heard that nowadays on modern CPUs the penalty between aligned
+        and unaligned is non-existant anymore, but I cannot vouch for that. However, I do know that whenever possible it is better to align memory. 
+        The graphic below shows the general idea.
+      </p>
+
+      <figure class="fig-light">
+        <img
+        id="pytorch-avx-load"
+        class="blog-image"
+        src="./img_4/avx-load.png"
+        alt="Load into AVX registers exemplified">
+        <figcaption>
+          Contrasting aligned and unaligned loads and stores into AVX registers.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-avx-load-dark"
+        class="blog-image"
+        src="./img_4/avx-load-dark.png"
+        alt="Load into AVX registers exemplified">
+        <figcaption>
+          Contrasting aligned and unaligned loads and stores into AVX registers.
+        </figcaption>
+      </figure>
+
+      <p>
+        What we can see is that when memory is unaligned, which is latest a physical demand when we load from cache lines, then 
+        AVX is forced to perform two loads over one. However, with aligned memory we can simply load the operand all at once. 
+      </p>
+
+      <p>
+        The alignment differs between AVX versions. While AVX and AVX2 requires a 32-byte alignment, AVX512 requires a 64-byte alignment. 
+        For reference, if you happen to use SSE instructions (unlikely, but possible), you'll want to align by 16-byte.
+      </p>
+
+      </details>
+
+      <p>
+        To start off, we first have to align our operands. We can do this through a slight modification in our tile-data structure. 
+      </p>
+
+<pre>// src/backend/data_modeling/matmul_tile.h
+
+namespace matmul {
+  template<typename T, tensorSize_t TileM, tensorSize_t TileK, tensorSize_t TileN>
+  requires std::is_floating_point_v<T>
+  struct MatmulTile {
+      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array<T, TileM * TileK> left{};
+      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array<T, TileK * TileN> right{};
+      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array<T, TileM * TileN> result{};
+
+      // same as before...
+  };
+}</pre>
+
+      <p>
+        The quantity CPU_TENSOR_ALIGNMENT is defined by the following: <code>constexpr static unsigned int CPU_TENSOR_ALIGNMENT = 64;</code>.
+        Here I picked 64-bytes to enable AVX512, but 32 for AVX2 will suffice for us. To assist the fetches into cache memory we also modify 
+        our memory pool slightly by using aligend allocs rather than the casual malloc calls:
+      </p>
+
+<pre><code>// src/backend/shared/memory_pool.h
+
+namespace mempool_impl {
+  // ...
+
+  template<typename T>
+  T* MemoryPool<T>::request(const Device d, const tensorSize_t n) {
+    switch(d) {
+      case Device::CPU:
+      {
+        auto& list = freeLists[n];
+        if(!list.empty()) {
+          T* ptr = list.back();
+          list.pop_back();
+
+          assert(ptr != nullptr);
+          ASSERT_HOST_PTR(ptr);
+
+          return ptr;
+        }
+
+        // aligned_alloc requires size to be an integral multiple of alignment
+        const tensorSize_t alignedByteSize =
+          ((n * sizeof(T) + MemoryLayout::CPU_TENSOR_ALIGNMENT - 1) / MemoryLayout::CPU_TENSOR_ALIGNMENT)
+          * MemoryLayout::CPU_TENSOR_ALIGNMENT;
+
+        T* ptr = std::is_same_v<T, ftype> ?
+                 static_cast<T*>(std::aligned_alloc(MemoryLayout::CPU_TENSOR_ALIGNMENT, alignedByteSize)) :
+                 static_cast<T*>(std::malloc(n * sizeof(T)));
+
+        // same as before...
+      }
+    }
+  }
+}</code></pre>
+
+      <p>
+        We can then replace our matmul implementation by the AVX version. We enclosed the matmul in a lambda earlier, so all 
+        we have to do is to rewrite the matmul itself. Using AVX instructions it looks like this now:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.h
+
+auto matmulTiles = [TILESIZE] (tile_t& tiles) {
+  for(tensorSize_t n = 0; n < TILESIZE; n++) { // rows left
+
+  const tensorSize_t leftTileRowOffset = n * TILESIZE;
+    for(tensorSize_t m = 0; m < TILESIZE; m++) { // cols left
+
+      const tensorSize_t rightTileRowOffset = m * TILESIZE;
+      const ftype leftVal = tiles.left[leftTileRowOffset + m];
+      const __m256 leftValVec = _mm256_set1_ps(leftVal); // broadcasted load
+
+      for(tensorSize_t kk = 0; kk < TILESIZE; kk += 8) {
+        __m256 rightVec  = _mm256_load_ps(&tiles.right[rightTileRowOffset + kk]);
+        __m256 resultVec = _mm256_load_ps(&tiles.result[leftTileRowOffset + kk]);
+
+      #if defined(USE_AVX2)
+        resultVec = _mm256_fmadd_ps(leftValVec, rightVec, resultVec);
+      #elif defined(USE_AVX)
+        // AVX does not have fmadd
+        __m256 mulVec = _mm256_mul_ps(leftValVec, rightVec);
+        resultVec = _mm256_add_ps(resultVec, mulVec);
+      #endif
+
+        _mm256_store_ps(&tiles.result[leftTileRowOffset + kk], resultVec);
+      }
+    }
+  }
+};</code></pre>
+
+    <p>
+      One last thing to add is that there is hearsay that sometimes the compiler detects AVX on the system and happily compiles, but 
+      incompatibilities can crash the program at run-time. We can guard against this using a run-time check looking like this: 
+    </p>
+
+<pre><code class="language-cpp">// src/backend/utility/avx_info.h
+
+  // here's some wrapper function around this check
+
+    if (!__builtin_cpu_supports("avx2")) [[unlikely]] {
+      std::cerr <<
+        "Binary compiled with USE_AVX2 but the CPU does not support AVX2. " <<
+        "To use AVX reconfigure with -DAVX_VERSION=AVX (or SCALAR) and rebuild." << std::endl;
+      return false;
+    }
+
+  // wrap up function for other cases...
+</code></pre>
+
+      <p>
+        We can then guard against run-time exceptions using a static variable around our matmul-call like this:
+      </p>
+
+<pre><code class="language-cpp">
+
+  // some code leading to this call...
+    #if defined(USE_AVX512) || defined(USE_AVX2) || defined(USE_AVX)
+      static const bool avxVerified = utility::AvxInfo::getAvxAvailable();
+      if(avxVerified) [[likely]] {
+        while(leftOffset < left.getSize()){
+          if(!(transposeLeft || transposeRight)) {
+            matMul2DCpuAvx<false, false>(res, left, right, resOffset, leftOffset, rightOffset);
+          }
+          
+          // other template overloads
+        }
+      }
+    else [[unlikely]] {
+    #endif
+
+      while(leftOffset < left.getSize()){
+        if(!(transposeLeft || transposeRight)) {
+          matMul2DCpuScalar<false, false>(res, left, right, resOffset, leftOffset, rightOffset);
+        }
+
+        // other template overloads
+      }
+    }
+
+    // wrap up function</code></pre>
+
+    <p>
+      And that concludes our AVX implementation. In my library I check at compile time what AVX versions are available and compile with the 
+      highest available version. if desired the version can be set manually by calling <code>cmake -DAVX_VERSION=AVX2 ..</code>. Other options
+      are AVX, AVX512, and SCALAR for the non-AVX version.
+    </p>
+
+    </div>
+
+    
+
+    <div id="step-5" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 5 - Bypass PLT for library internal calls</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="6.30s" after="6.13s"
+        speedup="1.03x" commit="785f803084b672e0415582cc1004dba2a61a92fe" %}
+
+      <p>
+        We are now in a domain where our optimization efforts yield diminishing returns, in accordance with Amdahl's law. However, we are not 
+        done with optimizing our backend yet. Once again running perf we do see the following:
+      </p>
+
+      <p>
+        The interesting one here is the call through the Procedure-Linkage-Table, 
+      </p>
+
+      <details class="pytorch-optional" id="optional-avx-review">
+      <summary class="pytorch-optional-summary">
+        <h4>Optional: Global-Offset-Table (GOT) and Procedure-Linkage-Table (PLT)</h4>
+      </summary>
+
+      <p>
+        This is a quick breakdown of the two data structures we are dealing with in this subchapter.
+      </p>
+
+      </details>
 
     </div>
