@@ -964,7 +964,7 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
         src="./img_4/after_step3_1.png"
         alt="matmul contribution after tiled matmul.">
         <figcaption>
-          perf output on cycles. Matmul has been drastically reduced in CPU cycles.
+          perf output on cycles. Matmul has been reduced in CPU cycles.
         </figcaption>
       </figure>
 
@@ -1271,9 +1271,13 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
       are AVX, AVX512, and SCALAR for the non-AVX version.
     </p>
 
-    </div>
+    <p>
+      For those who are interested in the compiled parts of this and who might want to try out a few compilers or flags, I used <b>Godbolt</b> 
+      to play around with this. You can follow the link <a href="https://godbolt.org/z/Eesbh6Y1r" target="_blank">https://godbolt.org/z/Eesbh6Y1r</a>
+      to get the source code and the initial compiled versions that I get in my current toolchain. Have fun!
+    </p>
 
-    
+    </div>
 
     <div id="step-5" class="article-text-div">
       <h3 class="heading-spaced">Opt. 5 - Bypass PLT for library internal calls</h3>
@@ -1287,6 +1291,8 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
         done with optimizing our backend yet. Once again running perf we do see the following:
       </p>
 
+      TODO
+
       <p>
         The interesting one here is the call through the Procedure-Linkage-Table, 
       </p>
@@ -1297,8 +1303,18 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
       </summary>
 
       <p>
-        This is a quick breakdown of the two data structures we are dealing with in this subchapter.
+        This is a quick breakdown of the two data structures we are dealing with in this subchapter. In <a href="pytorch_demystified_1.html" 
+        target="_blank">part 1</a> of this blogpost series we gave our library position independent code. In a very brief optional section
+        I promised you that we would be revisiting that part of the library in a later post, and that fateful moment has finally arrived.
       </p>
+
+      <p>
+        In essence, back then we concluded that we have to use dynamic linking into our library from Python, since the main process surrounding 
+        everything is the Python interpreter itself. That means that at startup time of the program calls into our library do not have an address
+        yet, as opposed to statically linked programs. The following figure shows briefly what that looks like in the latter case:
+      </p>
+
+      TODO
 
       </details>
 
