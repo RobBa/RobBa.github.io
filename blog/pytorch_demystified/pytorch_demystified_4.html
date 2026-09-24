@@ -585,7 +585,7 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
       <figure>
         <img
         class="blog-image pytorch-perf"
-        src="./img_4/step_2_cycles.png"
+        src="./img_4/profiling/step_2_cycles.png"
         alt="perf output before step 2, showing the number of cycles spent per instruction.">
         <figcaption>
           perf output before step 2, showing the number of cycles spent per instruction.
@@ -621,7 +621,7 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
       <figure>
         <img
         class="blog-image pytorch-perf"
-        src="./img_4/step_2_cache_misses.png"
+        src="./img_4/profiling/step_2_cache_misses.png"
         alt="perf output before step 2, showing the cache misses per instruction.">
         <figcaption>
           perf output before step 2, showing the cache misses per instruction.
@@ -760,7 +760,7 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
       <figure>
         <img
         class="blog-image pytorch-perf"
-        src="./img_4/step_2_before_inlining.png"
+        src="./img_4/profiling/step_2_before_inlining.png"
         alt="perf stat output before inline.">
         <figcaption>
           perf stat output before the blanket inline.
@@ -770,7 +770,7 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
       <figure>
         <img
         class="blog-image pytorch-perf"
-        src="./img_4/step_2_after_inlining.png"
+        src="./img_4/profiling/step_2_after_inlining.png"
         alt="perf stat output after inline.">
         <figcaption>
           perf stat output after the blanket inline.
@@ -834,7 +834,7 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
       <figure>
         <img
         class="blog-image pytorch-perf"
-        src="./img_4/before_step3_1.png"
+        src="./img_4/profiling/before_step3_1.png"
         alt="matmul contribution before tiled matmul.">
         <figcaption>
           perf output on cycles. Matmul clearly stands out as the main contributor to runtime.
@@ -844,7 +844,7 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
       <figure>
         <img
         class="blog-image pytorch-perf"
-        src="./img_4/before_step3_2.png"
+        src="./img_4/profiling/before_step3_2.png"
         alt="matmul before tiled matmul disassembled.">
         <figcaption>
           perf output for disassembled inner matmul loop. We still see many cycles spent in arithmetic operations, same reasoning as earlier.
@@ -969,7 +969,7 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
       <figure>
         <img
         class="blog-image pytorch-perf"
-        src="./img_4/after_step3_1.png"
+        src="./img_4/profiling/after_step3_1.png"
         alt="matmul contribution after tiled matmul.">
         <figcaption>
           perf output on cycles. Matmul has been reduced in CPU cycles.
@@ -993,7 +993,7 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
       <figure>
         <img
         class="blog-image pytorch-perf"
-        src="./img_4/after_step3_2.png"
+        src="./img_4/profiling/after_step3_2.png"
         alt="matmul after tiled matmul disassembled.">
         <figcaption>
           perf output for disassembled inner matmul loop. The operations are still single operand operations.
@@ -1259,6 +1259,20 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
 }</code></pre>
 
     <p>
+      Checking the assembly code after the fix we do find that now indeed the backend uses the AVX instructions.
+    </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/after_step_4.png"
+        alt="perf output after step 4.">
+        <figcaption>
+          perf annotated output after step 4. We can see that it now uses the packed instructions in the inner matmul loop.
+        </figcaption>
+      </figure>
+
+    <p>
       And that concludes our AVX implementation. In my library I check at compile time what AVX versions are available and compile with the 
       highest available version. if desired the version can be set manually by calling <code>cmake -DAVX_VERSION=AVX2 ..</code>. Other options
       are AVX, AVX512, and SCALAR for the non-AVX version.
@@ -1276,8 +1290,8 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
       <h3 class="heading-spaced">Opt. 5 - Bypass PLT for library internal calls</h3>
 
       {% include pytorch-opt-summary.html 
-        before="6.13s" after="-"
-        speedup="1.03x" branch="dev/cpu_optimization_fixed" commit="9326d5fbe66a9f521c2c0e81c449546a722951a3" %}
+        before="6.13s" after="5.84s"
+        speedup="1.05" branch="dev/cpu_optimization_fixed" commit="8256457a020721aa9314497d7e74252fdb3d60a3" %}
 
       <p>
         We are now in a domain where our optimization efforts yield diminishing returns, in accordance with Amdahl's law. However, we are not 
@@ -1287,15 +1301,36 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
       <figure>
         <img
         class="blog-image pytorch-perf"
-        src="./img_4/before_step_5.png"
+        src="./img_4/profiling/before_step_5.png"
         alt="perf output before step 5.">
         <figcaption>
-          perf output before fix 5. The matmul operation is not our most burning function this time around.
+          perf output before fix 5..
         </figcaption>
       </figure>
 
       <p>
-        The interesting one here is the call through the Procedure-Linkage-Table, 
+        We do see that we reduced the matmul a whole lot from the overall picture. It seems that the []-operator at the top is the main slug now, 
+        but if you add the three instantiated template overloads of the matmul together it's still the top operation, with a run-time fraction of 
+        more than 20%. We take a brief look if we get some hints on whether we can do better to yield this output:
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/before_step_5_2.png"
+        alt="perf output before step 5-2.">
+        <figcaption>
+          perf annotated output before fix 5.
+        </figcaption>
+      </figure>
+
+      <p>
+        The interesting one here is the call through the Procedure-Linkage-Table, which is indicated by the @plt at the end of the line after the 
+        highlighted one in the screenshot above (I personally find white letters on a black background easier to read than black letters on a yellow
+        background). This points us to a general problem with how we compile, and this fix is not constraint to the matmul itself, but rather to the whole
+        backend. Understanding this fix requires an knowledge of the Global-Offset-Table (GOT) and the Procedure-Linkage-Table. For those who want to follow
+        this entry and do not know what these are about I have an optional section next. Anyone who knows them or who does not care about the details in this 
+        section is free to skip past the optional section. 
       </p>
 
       <details class="pytorch-optional" id="optional-avx-review">
@@ -1304,9 +1339,10 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
       </summary>
 
       <p>
-        This is a quick breakdown of the two data structures we are dealing with in this subchapter. In <a href="pytorch_demystified_1.html" 
-        target="_blank">part 1</a> of this blogpost series we gave our library position independent code. In a very brief optional section
-        I promised you that we would be revisiting that part of the library in a later post, and that fateful moment has finally arrived.
+        This is a quick breakdown of the two hidden yet extremely important data structures we are dealing with in this subchapter. 
+        In <a href="pytorch_demystified_1.html" target="_blank">part 1</a> of this blogpost series we gave our library position independent 
+        code. In a very brief optional section toward the end I promised you that we would be revisiting that part of the library in a later 
+        post, and that fateful moment has finally arrived.
       </p>
 
       <p>
@@ -1315,8 +1351,39 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
         yet, as opposed to statically linked programs. The following figure shows briefly what that looks like in the latter case:
       </p>
 
-      TODO
-
+      <figure class="fig-light">
+        <img
+        id="pytorch-static-linking"
+        class="blog-image"
+        src="./img_4/avx-load.png"
+        alt="Load into AVX registers exemplified">
+        <figcaption>
+          Contrasting aligned and unaligned loads and stores into AVX registers.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-static-linking-dark"
+        class="blog-image"
+        src="./img_4/"
+        alt="Load into AVX registers exemplified">
+        <figcaption>
+          Contrasting aligned and unaligned loads and stores into AVX registers.
+        </figcaption>
+      </figure>
       </details>
+
+    </div>
+
+    <div id="step-6" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 6 - Remove safety checks from often called functions</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="5.84s" after="5.53s"
+        speedup="1.06" branch="dev/cpu_optimization_fixed" commit="c8529031d984aa9aef970bd9b02151682e878423" %}
+
+        <p>
+          This fix is gonna be a very brief and quick one. 
+        </p>
 
     </div>
