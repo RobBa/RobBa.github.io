@@ -974,7 +974,7 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
       <h3 class="heading-spaced">Opt. 4 - Manually vectorize the matmul through AVX</h3>
 
       {% include pytorch-opt-summary.html 
-        before="8.44s" after="6.30s"
+        before="8.44s" after="6.13s"
         speedup="1.34x" commit="e7aa40d72847aafc8dedf07fda593334d3dc4f70" %}
 
       <p>
@@ -1283,15 +1283,23 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
       <h3 class="heading-spaced">Opt. 5 - Bypass PLT for library internal calls</h3>
 
       {% include pytorch-opt-summary.html 
-        before="6.30s" after="6.13s"
-        speedup="1.03x" commit="785f803084b672e0415582cc1004dba2a61a92fe" %}
+        before="6.13s" after="-"
+        speedup="1.03x" commit="" %}
 
       <p>
         We are now in a domain where our optimization efforts yield diminishing returns, in accordance with Amdahl's law. However, we are not 
         done with optimizing our backend yet. Once again running perf we do see the following:
       </p>
 
-      TODO
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/before_step_5.png"
+        alt="perf output before step 5.">
+        <figcaption>
+          perf output before fix 5. The matmul operation is not our most burning function this time around.
+        </figcaption>
+      </figure>
 
       <p>
         The interesting one here is the call through the Procedure-Linkage-Table, 
