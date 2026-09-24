@@ -468,7 +468,15 @@ mathjax: false
         As for the benchmark, I am going to learn from my mistakes and
         am going to run the benchmarks on the whole epoch from the start, rather than starting with a subset of it and switching later. That means that this time we are going to
         have the same benchmark from beginning to the end. The benchmarking script will be the same as in the previous part as well,
-        except that this time we are not going to put our tensor onto the GPU. So let's get started with fix 1.
+        except that this time we are not going to put our tensor onto the GPU.
+      </p>
+
+      <p>
+        As a short disclaimer beforehand: I did my best to walk into this whole process with a clean slate, so that each fix's contribution falls 
+        solely onto the optimization steps I describe here. However, no larger piece is software is perfect, and I happened to stumble upon pieces 
+        of code that either needed refactoring or debugging. These changes can contribute to the benchmarked times in both ways, upwards and downwards.
+        I am confident that the difference in time is mostly due to my optimizations, but if you want to dig deeper I have documented each step I take 
+        in the git commit history, so that you can look every change by yourself and test it out. And with that said let's get started with fix 1.
       </p>
 
     </div>
@@ -478,7 +486,7 @@ mathjax: false
 
       {% include pytorch-opt-summary.html 
         before="41.45s" after="35.48s"
-        speedup="1.20x" commit="36fd56de172dd62d53f5bf6ce7a7f2d084a4d7d6" %}
+        speedup="1.20x" branch="main" commit="36fd56de172dd62d53f5bf6ce7a7f2d084a4d7d6" %}
 
       <p>
         Before we do any optimization, we first run a profiler. I used perf for this purpose, where we can get metrics such as time spent on the program,
@@ -529,7 +537,7 @@ mathjax: false
 
       {% include pytorch-opt-summary.html 
         before="35.48s" after="28.10s"
-        speedup="1.26x" commit="ec17463cf7e568efe7d99a0be64a4d5e52d08efe" %}
+        speedup="1.26x" branch="main" commit="ec17463cf7e568efe7d99a0be64a4d5e52d08efe" %}
 
 
 
@@ -814,7 +822,7 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
 
       {% include pytorch-opt-summary.html 
         before="28.10s" after="8.44s"
-        speedup="3.33x" commit="2fa0fbadbcd2b6f6bbc90a35a832f855d403bd3f" %}
+        speedup="3.33x" branch="main" commit="2fa0fbadbcd2b6f6bbc90a35a832f855d403bd3f" %}
 
       <p>
         This one unsurprisingly cut slack big time, since we already saw the largest improvements from the CUDA side on this one. 
@@ -975,10 +983,10 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
 
       {% include pytorch-opt-summary.html 
         before="8.44s" after="6.13s"
-        speedup="1.34x" commit="e7aa40d72847aafc8dedf07fda593334d3dc4f70" %}
+        speedup="1.38x" branch="dev/cpu_optimization_fixed" commit="7b176657f6c071a2097792991973020200583829" %}
 
       <p>
-        As indicated, the compiler once again did not help us in auto-vectorizing the loop. The following output shows us 
+        As indicated in the previous step the compiler once again did not help us in auto-vectorizing the loop. The following output shows us 
         the single operand usage the compiler emits, and that we plan to fix in the following.
       </p>
 
@@ -1189,36 +1197,21 @@ auto matmulTiles = [TILESIZE] (tile_t& tiles) {
       incompatibilities can crash the program at run-time. We can guard against this using a run-time check looking like this: 
     </p>
 
-<pre><code class="language-cpp">// src/backend/utility/avx_info.h
+<pre><code class="language-cpp">// src/backend/utility/avx_info.cpp
 
-namespace utility {
-  struct AvxInfo final {
-    private:
-      inline static bool avxAvailable = false;
+void utility::AvxInfo::verifyAvxSupport() {
+  #if defined(USE_AVX512)
+    if (!__builtin_cpu_supports("avx512f")) [[unlikely]] {
+      std::cerr <<
+        "Binary compiled with USE_AVX512 but the CPU does not support AVX-512. " << 
+        "To use AVX reconfigure with -DAVX_VERSION=AVX2 (or AVX or SCALAR) and rebuild." << std::endl;
+    }
+    else [[likely]] {
+      avxAvailable = true;
+    }
 
-    public:
-      AvxInfo() = delete;
-      ~AvxInfo() noexcept = delete;
-
-      static bool getAvxAvailable() noexcept {
-        return avxAvailable;
-      }
-
-      static void verifyAvxSupport() {
-      #if defined(USE_AVX512)
-        if (!__builtin_cpu_supports("avx512f")) [[unlikely]] {
-          std::cerr <<
-            "Binary compiled with USE_AVX512 but the CPU does not support AVX-512. " << 
-            "To use AVX reconfigure with -DAVX_VERSION=AVX2 (or AVX or SCALAR) and rebuild." << std::endl;
-        }
-        else [[likely]] {
-          avxAvailable = true;
-        }
-
-        // check for other AVX versions...
-      #endif
-      }
-  };
+    // check for other AVX versions...
+  #endif
 }</code></pre>
 
       <p>
@@ -1284,7 +1277,7 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
 
       {% include pytorch-opt-summary.html 
         before="6.13s" after="-"
-        speedup="1.03x" commit="" %}
+        speedup="1.03x" branch="dev/cpu_optimization_fixed" commit="9326d5fbe66a9f521c2c0e81c449546a722951a3" %}
 
       <p>
         We are now in a domain where our optimization efforts yield diminishing returns, in accordance with Amdahl's law. However, we are not 

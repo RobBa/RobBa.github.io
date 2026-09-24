@@ -1390,7 +1390,7 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
 
       {% include pytorch-opt-summary.html 
         before="27.3880s" after="0.5023s" 
-        speedup="54.53x" commit="a979eaf1c4f148c296cf13cd166bd2a6896d772b" %}
+        speedup="54.53x" branch="main" commit="a979eaf1c4f148c296cf13cd166bd2a6896d772b" %}
 
       <p>
         This example is benchmarked on a small example, because it was so slow to run. We will move on from that very quickly and 
@@ -1434,7 +1434,7 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
 
       {% include pytorch-opt-summary.html 
         before="0.7337s" after="0.1635s" 
-        speedup="4.49x" commit="a68493d2faa74f2cf2cb1ee8b302f6b784126595" %}
+        speedup="4.49x" branch="main" commit="a68493d2faa74f2cf2cb1ee8b302f6b784126595" %}
 
       <p>
         For everyone looking at the before-after numbers and wondering about the contradiction with the optimization step before, 
@@ -1669,7 +1669,7 @@ namespace cuda_impl {
 
       {% include pytorch-opt-summary.html 
         before="0.1635s" after="0.0704s" 
-        speedup="2.32x" commit="82ee6524d55606a1a188d7e9a3b452d8d1d0d677" %}
+        speedup="2.32x" branch="main" commit="82ee6524d55606a1a188d7e9a3b452d8d1d0d677" %}
 
         <p>
           As per usual, we start by profiling through NSys. The following timeline shows that we finally moved into kernel space:
@@ -1879,7 +1879,7 @@ vector&lt;shared_ptr&lt;Tensor&gt;&gt; MatMulNode::backward(const Tensor& upstre
 
       {% include pytorch-opt-summary.html 
         before="0.9672s" after="0.8147s" 
-        speedup="1.19x" commit="61c4dd534831df8853b3bc7bd40026b91943ab44" %}
+        speedup="1.19x" branch="main" commit="61c4dd534831df8853b3bc7bd40026b91943ab44" %}
          
       
         <p>
@@ -2130,7 +2130,7 @@ void Tensor::tensorValues_t::resize(const tensorSize_t size) {
 
       {% include pytorch-opt-summary.html 
         before="0.8147s" after="0.8159s"
-        speedup="1.0x" commit="1802666341d94d1727d870dcad772b23ba30b6d5" %}
+        speedup="1.0x" branch="main" commit="1802666341d94d1727d870dcad772b23ba30b6d5" %}
 
         <p>
           This one is very interesting. Technically it should have improved things, but on the practical 
@@ -2345,7 +2345,7 @@ BM_MatMul_CUDA/64/128/10            11.0 us         11.0 us        63601 GFLOP/s
 
       {% include pytorch-opt-summary.html 
         before="0.8159s" after="0.5883s"
-        speedup="1.39x" commit="5864fac242482783a92ca7599a54c6de5cbbf248" %}
+        speedup="1.39x" branch="main" commit="5864fac242482783a92ca7599a54c6de5cbbf248" %}
 
 
       <p>
@@ -2513,7 +2513,7 @@ namespace {
 
         {% include pytorch-opt-summary.html 
         before="0.5883s" after="0.3317s"
-        speedup="1.77x" commit="265ca1a9e1c861a4a977dfdb5f4df1ae1e3922e1" %}
+        speedup="1.77x" branch="main" commit="265ca1a9e1c861a4a977dfdb5f4df1ae1e3922e1" %}
 
         <p>
           This will be a rather quick one again. Whenever we called a CUDA kernel, we have followed the pattern 
@@ -2565,7 +2565,7 @@ namespace {
 
         {% include pytorch-opt-summary.html 
         before="0.3317s" after="0.3318s"
-        speedup="1.0x" commit="0e7a0d12323e2a18e4d5e8039094c805cabbc0e9" %}
+        speedup="1.0x" branch="main" commit="0e7a0d12323e2a18e4d5e8039094c805cabbc0e9" %}
 
       <p>
         This last one has been burning for a while, and if it's only for the simple reason that I grew tired of the deprecated warnings
@@ -2644,7 +2644,7 @@ for(int offset = maxoffset; offset &gt; 0; offset &gt;&gt;= 1) {
 
       {% include pytorch-opt-summary.html 
         before="-" after="-"
-        speedup="-" commit="e02cab46912ec360051bb3d8e2f7b44a5fc2336d" %}
+        speedup="-" branch="main" commit="e02cab46912ec360051bb3d8e2f7b44a5fc2336d" %}
 
       <p>
         That wraps up our optimization journey so far. While there is still a lot that can be done we have to lower the gun at some point and call

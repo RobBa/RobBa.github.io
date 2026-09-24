@@ -12,6 +12,10 @@
     <span class="pytorch-opt-stat-value">{{ include.speedup }}</span>
   </div>
   <div class="pytorch-opt-stat">
+    <span class="pytorch-opt-stat-label">Branch</span>
+    <span class="pytorch-opt-stat-value"><code>{{ include.branch }}</code></span>
+  </div>
+  <div class="pytorch-opt-stat">
     <span class="pytorch-opt-stat-label">Commit</span>
     <span class="pytorch-opt-stat-value"><code title="{{ include.commit }}">{{ include.commit | slice: 0, 7 }}</code></span>
   </div>
