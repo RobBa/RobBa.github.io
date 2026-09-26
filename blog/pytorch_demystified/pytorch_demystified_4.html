@@ -39,13 +39,25 @@ mathjax: false
               <a href="#step-1">Opt. 1 - Use more aggressive compiler optimization</a>
             </li>
             <li>
-              <a href="#step-2">Opt. 2 - Better access pattern and inline functions</a>
+              <a href="#step-2">Opt. 2 - Test better access pattern and inline functions</a>
             </li>
             <li>
               <a href="#step-3">Opt. 3 - Implement tiled matmul</a>
             </li>
             <li>
               <a href="#step-4">Opt. 4 - Manually vectorize the matmul through AVX</a>
+            </li>
+            <li>
+              <a href="#step-5">Opt. 5 - Bypass PLT for library internal calls</a>
+            </li>
+            <li>
+              <a href="#step-6">Opt. 6 - Remove safety checks from often called functions</a>
+            </li>
+            <li>
+              <a href="#step-7">Opt. 7 - Remove redundant device checks</a>
+            </li>
+            <li>
+              <a href="#step-8">Opt. 8 - Fix memory leak across units</a>
             </li>
           </ul>
         </li>
@@ -473,10 +485,10 @@ mathjax: false
 
       <p>
         As a short disclaimer beforehand: I did my best to walk into this whole process with a clean slate, so that each fix's contribution falls 
-        solely onto the optimization steps I describe here. However, no larger piece is software is perfect, and I happened to stumble upon pieces 
+        solely onto the optimization steps I describe here. However, no larger piece of software is perfect, and I happened to stumble upon pieces
         of code that either needed refactoring or debugging. These changes can contribute to the benchmarked times in both ways, upwards and downwards.
-        I am confident that the difference in time is mostly due to my optimizations, but if you want to dig deeper I have documented each step I take 
-        in the git commit history, so that you can look every change by yourself and test it out. And with that said let's get started with fix 1.
+        I am confident that the difference in time is mostly due to my optimizations, but if you want to dig deeper I have documented each step I take
+        in the git commit history, so that you can look at every change by yourself and test it out. And with that said let's get started with fix 1.
       </p>
 
     </div>
@@ -524,11 +536,12 @@ mathjax: false
       </p>
 
       <p>
-        Since so far we did not specify an optimization flag it is the
+        Since so far we did not specify an optimization flag, it is the
         most natural solution to first try to use a more aggressive optimization. If you want to follow this step, simply add the line
-        <code>set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")</code> in CMake. While the program executes as expected, that is the optimization did not 
-        introduce errors so far, the improvement is also not that strong. As we will see in the next section the compiler still has not figured out how 
+        <code>set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")</code> in CMake. While the program executes as expected, that is the optimization did not
+        introduce errors so far, the improvement is also not that strong. As we will see in the next section the compiler still has not figured out how
         to optimize the inner loop yet, so the optimizations happened somewhere in less impactful parts of the program.
+      </p>
 
     </div>
 
@@ -633,41 +646,41 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
       <p>
         This confirms what we suspected, namely that we do have a large number of cache misses in these lines.
         To fix that we are going to add the tiled approach later. However, before we start we could score a quick win that we will undo, but 
-        sometimes our curiousity gets the better of us. So I decided to write out the loops specifically, but with a better memory access pattern. 
+        sometimes our curiosity gets the better of us. So I decided to write out the loops specifically, but with a better memory access pattern.
         I therefore created this little beast here:  
       </p>
 
 <pre><code>// src/backend/data_modeling/tensor.h
 
-template<bool transposeLeft, bool transposeRight>
+template&lt;bool transposeLeft, bool transposeRight&gt;
 void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& right, const tensorSize_t resOffset,
                            const tensorSize_t leftOffset, const tensorSize_t rightOffset) {
   // physical, not logically as in the transposition
-  const auto nRowsLeft = static_cast<tensorSize_t>(left.dims.get(-2));
-  const auto nColsLeft = static_cast<tensorSize_t>(left.dims.get(-1));
-  const auto nColsRight = static_cast<tensorSize_t>(right.dims.get(-1));
-  const auto nRowsRight = static_cast<tensorSize_t>(right.dims.get(-2));
+  const auto nRowsLeft = static_cast&lt;tensorSize_t&gt;(left.dims.get(-2));
+  const auto nColsLeft = static_cast&lt;tensorSize_t&gt;(left.dims.get(-1));
+  const auto nColsRight = static_cast&lt;tensorSize_t&gt;(right.dims.get(-1));
+  const auto nRowsRight = static_cast&lt;tensorSize_t&gt;(right.dims.get(-2));
 
   if constexpr (!transposeLeft && !transposeRight) {
-    for (tensorSize_t i = 0; i < nRowsLeft; i++) {
+    for (tensorSize_t i = 0; i &lt; nRowsLeft; i++) {
       const tensorSize_t leftOffset = i * nColsLeft;
       const tensorSize_t resOffset = i * nColsRight;
 
       {
         // tensors not zero initialized, therefore need one dry run pre-filling
-        const auto leftVal = left.values->data()[leftOffset];
-        for(tensorSize_t j = 0; j < nColsRight; j++) {
-          res.values->data()[resOffset + j] = leftVal * right.values->data()[j];
+        const auto leftVal = left.values-&gt;data()[leftOffset];
+        for(tensorSize_t j = 0; j &lt; nColsRight; j++) {
+          res.values-&gt;data()[resOffset + j] = leftVal * right.values-&gt;data()[j];
         }
       }
 
       // compute the entire column of the left matrix
-      for (tensorSize_t k = 1; k < nRowsRight; k++) {
+      for (tensorSize_t k = 1; k &lt; nRowsRight; k++) {
         const tensorSize_t rightOffset = k * nColsRight;
 
-        const ftype leftVal = left.values->data()[leftOffset + k];
-        for(tensorSize_t j = 0; j < nColsRight; j++) {
-          res.values->data()[resOffset + j] += leftVal * right.values->data()[rightOffset + j];
+        const ftype leftVal = left.values-&gt;data()[leftOffset + k];
+        for(tensorSize_t j = 0; j &lt; nColsRight; j++) {
+          res.values-&gt;data()[resOffset + j] += leftVal * right.values-&gt;data()[rightOffset + j];
         }
       }
     }
@@ -718,19 +731,19 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
        0.343924000 seconds sys</pre>
 
       <p>
-       The surprising part about this is that the albeit L1-cache misses are low at around 0.04% roughly, 
-       the program did really bad. So something else must be going on. We take a look at the assembly code and 
+       The surprising part about this is that even though L1-cache misses are low at around 0.04% roughly,
+       the program did really badly. So something else must be going on. We take a look at the assembly code and
        find this:  
       </p>
 
 <pre>    0.04 :   6dde2:  mov    %r14,%rdi
-   22.88 :   6dde5:  call   6d230 <Tensor::operator[](unsigned int) const> // tensor.h:320
+   22.88 :   6dde5:  call   6d230 &lt;Tensor::operator[](unsigned int) const&gt; // tensor.h:320
          : 593   ftype* data() noexcept { return values; }
     0.02 :   6ddea:  mov    0x8(%rsp),%rax
-         : 595   res.values->data()[resOffset + j] += leftVal * right[rightOffset + j];
+         : 595   res.values-&gt;data()[resOffset + j] += leftVal * right[rightOffset + j];
     0.00 :   6ddef:  lea    (%rbx,%r15,1),%edx
     0.01 :   6ddf3:  mulss  0x10(%rsp),%xmm0
-         : 598   for(tensorSize_t j = 0; j < nColsRight; j++) {
+         : 598   for(tensorSize_t j = 0; j &lt; nColsRight; j++) {
    24.15 :   6ddf9:  add    $0x1,%ebx // tensor.h:319
          : 600   ftype* data() noexcept { return values; }</pre>
 
@@ -825,7 +838,7 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
         speedup="3.33x" branch="main" commit="2fa0fbadbcd2b6f6bbc90a35a832f855d403bd3f" %}
 
       <p>
-        This one unsurprisingly cut slack big time, since we already saw the largest improvements from the CUDA side on this one. 
+        This one unsurprisingly slaps big time, since we already saw the largest improvements from the CUDA side on this one.
         I also note that for brevity I cut this blogpost a bit short, since I mainly repeat myself here if you have seen the previous post.
         Before we start we just verify what we already have learned there though we will run perf on the benchmark. In the following we see 
         the contribution of matmul and it's assembly, annotated with cycles:
@@ -918,14 +931,14 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
   res.reset(0.0f);
 
   auto matmulTiles = [TILESIZE] (tile_t& tiles) {
-    for(tensorSize_t n = 0; n < TILESIZE; n++) { // rows left
+    for(tensorSize_t n = 0; n &lt; TILESIZE; n++) { // rows left
     const tensorSize_t leftTileRowOffset = n * TILESIZE;
 
-    for(tensorSize_t m = 0; m < TILESIZE; m++) { // cols left
+    for(tensorSize_t m = 0; m &lt; TILESIZE; m++) { // cols left
       const tensorSize_t rightTileRowOffset = m * TILESIZE;
 
         const ftype leftVal = tiles.left[leftTileRowOffset + m];
-        for(tensorSize_t kk = 0; kk < TILESIZE; kk++) {
+        for(tensorSize_t kk = 0; kk &lt; TILESIZE; kk++) {
           tiles.result[leftTileRowOffset + kk] += leftVal * tiles.right[rightTileRowOffset + kk];
         }
       }
@@ -1029,13 +1042,13 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
       <p>
         What I still owe you is what this looks like in C++. To start off, we have to include the header <i>immintrin.h</i>. This one 
         gives us access to the AVX functions. To make AVX accessible in our code we also have to tell the compiler that we want to use AVX. 
-        What the flag looks like is compiler dependent. In case of GCC is is for instance -mavx2 for AVX2. 
+        What the flag looks like is compiler dependent. In the case of GCC it is for instance -mavx2 for AVX2.
       </p>
 
       <p>
         Once this is done we get access to the AVX functions defined in the header we just included. Instructions are usually of the form
         _mm[bitwidth]_[instruction]. For instance, in AVX and AVX2 we use the YMMX registers, which are 256-bit wide. Data types follow this 
-        convention with _m[bitwidth]. A load into an YMMX register would be for instance <code>_m256 var = _mm256_load_ps(somePtr);</code>. 
+        convention with _m[bitwidth]. A load into a YMMX register would be for instance <code>_m256 var = _mm256_load_ps(somePtr);</code>.
         The AVX library already serves the overloads on the arguments. For instance, if the pointer is of floating point type we have 
       </p>
 
@@ -1060,7 +1073,7 @@ _mm256_load_ps (float const *__P)
 
         In general AVX provides two memory loads for that: Aligned (default) and unaligned (e.g. _mm256_loadu_ps. Pay attention to the u after load).
         The unaligned version should always work, but can be slower in reality. I have heard that nowadays on modern CPUs the penalty between aligned
-        and unaligned is non-existant anymore, but I cannot vouch for that. However, I do know that whenever possible it is better to align memory. 
+        and unaligned is non-existent anymore, but I cannot vouch for that. However, I do know that whenever possible it is better to align memory. 
         The graphic below shows the general idea.
       </p>
 
@@ -1104,12 +1117,12 @@ _mm256_load_ps (float const *__P)
 <pre><code class="language-cpp">// src/backend/data_modeling/matmul_tile.h
 
 namespace matmul {
-  template<typename T, tensorSize_t TileM, tensorSize_t TileK, tensorSize_t TileN>
-  requires std::is_floating_point_v<T>
+  template&lt;typename T, tensorSize_t TileM, tensorSize_t TileK, tensorSize_t TileN&gt;
+  requires std::is_floating_point_v&lt;T&gt;
   struct MatmulTile {
-      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array<T, TileM * TileK> left{};
-      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array<T, TileK * TileN> right{};
-      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array<T, TileM * TileN> result{};
+      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array&lt;T, TileM * TileK&gt; left{};
+      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array&lt;T, TileK * TileN&gt; right{};
+      alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array&lt;T, TileM * TileN&gt; result{};
 
       // same as before...
   };
@@ -1118,7 +1131,7 @@ namespace matmul {
       <p>
         The quantity CPU_TENSOR_ALIGNMENT is defined by the following: <code>constexpr static unsigned int CPU_TENSOR_ALIGNMENT = 64;</code>.
         Here I picked 64-bytes to enable AVX512, but 32 for AVX2 will suffice for us. To assist the fetches into cache memory we also modify 
-        our memory pool slightly by using aligend allocs rather than the casual malloc calls:
+        our memory pool slightly by using aligned allocs rather than the casual malloc calls:
       </p>
 
 <pre><code>// src/backend/shared/memory_pool.h
@@ -1126,8 +1139,8 @@ namespace matmul {
 namespace mempool_impl {
   // ...
 
-  template<typename T>
-  T* MemoryPool<T>::request(const Device d, const tensorSize_t n) {
+  template&lt;typename T&gt;
+  T* MemoryPool&lt;T&gt;::request(const Device d, const tensorSize_t n) {
     switch(d) {
       case Device::CPU:
       {
@@ -1147,9 +1160,9 @@ namespace mempool_impl {
           ((n * sizeof(T) + MemoryLayout::CPU_TENSOR_ALIGNMENT - 1) / MemoryLayout::CPU_TENSOR_ALIGNMENT)
           * MemoryLayout::CPU_TENSOR_ALIGNMENT;
 
-        T* ptr = std::is_same_v<T, ftype> ?
-                 static_cast<T*>(std::aligned_alloc(MemoryLayout::CPU_TENSOR_ALIGNMENT, alignedByteSize)) :
-                 static_cast<T*>(std::malloc(n * sizeof(T)));
+        T* ptr = std::is_same_v&lt;T, ftype&gt; ?
+                 static_cast&lt;T*&gt;(std::aligned_alloc(MemoryLayout::CPU_TENSOR_ALIGNMENT, alignedByteSize)) :
+                 static_cast&lt;T*&gt;(std::malloc(n * sizeof(T)));
 
         // same as before...
       }
@@ -1165,16 +1178,16 @@ namespace mempool_impl {
 <pre><code class="language-cpp">// src/backend/data_modeling/tensor.h
 
 auto matmulTiles = [TILESIZE] (tile_t& tiles) {
-  for(tensorSize_t n = 0; n < TILESIZE; n++) { // rows left
+  for(tensorSize_t n = 0; n &lt; TILESIZE; n++) { // rows left
 
   const tensorSize_t leftTileRowOffset = n * TILESIZE;
-    for(tensorSize_t m = 0; m < TILESIZE; m++) { // cols left
+    for(tensorSize_t m = 0; m &lt; TILESIZE; m++) { // cols left
 
       const tensorSize_t rightTileRowOffset = m * TILESIZE;
       const ftype leftVal = tiles.left[leftTileRowOffset + m];
       const __m256 leftValVec = _mm256_set1_ps(leftVal); // broadcasted load
 
-      for(tensorSize_t kk = 0; kk < TILESIZE; kk += 8) {
+      for(tensorSize_t kk = 0; kk &lt; TILESIZE; kk += 8) {
         __m256 rightVec  = _mm256_load_ps(&tiles.right[rightTileRowOffset + kk]);
         __m256 resultVec = _mm256_load_ps(&tiles.result[leftTileRowOffset + kk]);
 
@@ -1202,9 +1215,9 @@ auto matmulTiles = [TILESIZE] (tile_t& tiles) {
 void utility::AvxInfo::verifyAvxSupport() {
   #if defined(USE_AVX512)
     if (!__builtin_cpu_supports("avx512f")) [[unlikely]] {
-      std::cerr <<
-        "Binary compiled with USE_AVX512 but the CPU does not support AVX-512. " << 
-        "To use AVX reconfigure with -DAVX_VERSION=AVX2 (or AVX or SCALAR) and rebuild." << std::endl;
+      std::cerr &lt;&lt;
+        "Binary compiled with USE_AVX512 but the CPU does not support AVX-512. " &lt;&lt; 
+        "To use AVX reconfigure with -DAVX_VERSION=AVX2 (or AVX or SCALAR) and rebuild." &lt;&lt; std::endl;
     }
     else [[likely]] {
       avxAvailable = true;
@@ -1222,22 +1235,22 @@ void utility::AvxInfo::verifyAvxSupport() {
 
 Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool transposeLeft, const bool transposeRight) {
   // broadcasting
-  auto resDims = left.dims.nDims() > right.dims.nDims() ? left.dims.toVector() : right.dims.toVector();
+  auto resDims = left.dims.nDims() &gt; right.dims.nDims() ? left.dims.toVector() : right.dims.toVector();
   resDims[resDims.size() - 2] = transposeLeft  ? left.dims.get(-1)  : left.dims.get(-2); // rows
   resDims[resDims.size() - 1] = transposeRight ? right.dims.get(-2) : right.dims.get(-1); // cols
 
-  Tensor res(resDims, left.values->getDevice(), false);
+  Tensor res(resDims, left.values-&gt;getDevice(), false);
 
-  switch(left.values->getDevice()){
+  switch(left.values-&gt;getDevice()){
     case Device::CPU:
     {
   // some code leading to this call...
     #if defined(USE_AVX512) || defined(USE_AVX2) || defined(USE_AVX)
       static const bool avxVerified = utility::AvxInfo::getAvxAvailable();
       if(avxVerified) [[likely]] {
-        while(leftOffset < left.getSize()){
+        while(leftOffset &lt; left.getSize()){
           if(!(transposeLeft || transposeRight)) {
-            matMul2DCpuAvx<false, false>(res, left, right, resOffset, leftOffset, rightOffset);
+            matMul2DCpuAvx&lt;false, false&gt;(res, left, right, resOffset, leftOffset, rightOffset);
           }
           // other template overloads...
         }
@@ -1245,9 +1258,9 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
     else [[unlikely]] {
     #endif
 
-      while(leftOffset < left.getSize()){
+      while(leftOffset &lt; left.getSize()){
         if(!(transposeLeft || transposeRight)) {
-          matMul2DCpuScalar<false, false>(res, left, right, resOffset, leftOffset, rightOffset);
+          matMul2DCpuScalar&lt;false, false&gt;(res, left, right, resOffset, leftOffset, rightOffset);
         }
         // other template overloads...
       }
@@ -1291,7 +1304,7 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
 
       {% include pytorch-opt-summary.html 
         before="6.13s" after="5.84s"
-        speedup="1.05" branch="dev/cpu_optimization_fixed" commit="8256457a020721aa9314497d7e74252fdb3d60a3" %}
+        speedup="1.05x" branch="dev/cpu_optimization_fixed" commit="8256457a020721aa9314497d7e74252fdb3d60a3" %}
 
       <p>
         We are now in a domain where our optimization efforts yield diminishing returns, in accordance with Amdahl's law. However, we are not 
@@ -1327,23 +1340,30 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
       <p>
         The interesting one here is the call through the Procedure-Linkage-Table, which is indicated by the @plt at the end of the line after the 
         highlighted one in the screenshot above (I personally find white letters on a black background easier to read than black letters on a yellow
-        background). This points us to a general problem with how we compile, and this fix is not constraint to the matmul itself, but rather to the whole
+        background). This points us to a general problem with how we compile, and this fix is not constrained to the matmul itself, but rather to the whole
         backend.
       </p>
 
       <p>
-        Understanding this fix requires an knowledge of the Global-Offset-Table (GOT) and the Procedure-Linkage-Table. For those who want to follow
+        Understanding this fix requires knowledge of the Global-Offset-Table (GOT) and the Procedure-Linkage-Table. For those who want to follow
         this entry and do not know what these are about I have an optional section next. Anyone who knows them or who does not care about the details in this 
         section is free to skip past the optional section.
       </p>
 
-      <details class="pytorch-optional" id="optional-avx-review">
+      <details class="pytorch-optional" id="optional-got-plt">
       <summary class="pytorch-optional-summary">
         <h4>Optional: Global-Offset-Table (GOT) and Procedure-Linkage-Table (PLT)</h4>
       </summary>
 
+      <div class="pytorch-optional-collapse-bar">
+        <button type="button" class="pytorch-optional-collapse-btn"
+          onclick="var s=document.getElementById('optional-got-plt'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
+
       <p>
-        This is a quick breakdown of the two hidden yet extremely important data structures we are dealing with in this subchapter. 
+        This is a quick breakdown of the two hidden yet extremely important data structures we are dealing with in this subchapter.
         In <a href="pytorch_demystified_1.html" target="_blank">part 1</a> of this blogpost series we gave our library position independent 
         code. In a very brief optional section toward the end I promised you that we would be revisiting that part of the library in a later 
         post, and that fateful moment has finally arrived.
@@ -1383,7 +1403,7 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
 
       <p>
         It gets more interesting when we use dynamic linking. In that case the program shares an address space with the binary we just linked 
-        in (the library), but the addresses are not know as run-time. The question now is how does this work, and the answer is rather 
+        in (the library), but the addresses are not known at run-time. The question now is how does this work, and the answer is rather 
         mundane, yet worth knowing in jargon. The following image shows the principle, and then I walk you through step-by-step.
       </p>
 
@@ -1419,7 +1439,7 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
 
       <p>
         The whole mechanism results in a chain of indirections the first time the function is called. But then every subsequent call 
-        gets resolved by three indirections: First into the PLT, then into the GOT, pointing to the function itself.The main idea behind 
+        gets resolved by three indirections: First into the PLT, then into the GOT, pointing to the function itself. The main idea behind 
         this is lazy binding. We only load memory addresses of calls that we need. We could theoretically bypass the PLT, calling into the 
         GOT directly, but that would mean we could not distinguish the first call from the follow up calls, forcing us to fill the GOT at 
         program start-up, which can be very costly and inducing overhead on functions we actually do not use on first call.
@@ -1461,10 +1481,10 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
 
       {% include pytorch-opt-summary.html 
         before="5.84s" after="5.53s"
-        speedup="1.06" branch="dev/cpu_optimization_fixed" commit="c8529031d984aa9aef970bd9b02151682e878423" %}
+        speedup="1.06x" branch="dev/cpu_optimization_fixed" commit="c8529031d984aa9aef970bd9b02151682e878423" %}
 
       <p>
-        This fix is gonna be a very brief and quick one. As we saw in our previous step, accessing the tensor's values now chewes up a lot of our 
+        This fix is gonna be a very brief and quick one. As we saw in our previous step, accessing the tensor's values now chews up a lot of our 
         cycles. For reference the output here again:
       </p>
 
@@ -1485,7 +1505,7 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
 <pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
 
 ftype Tensor::tensorValues_t::operator[](const tensorSize_t idx) const {
-  if(idx >= size)
+  if(idx &gt;= size)
     throw std::out_of_range("Out of range for tensor");
 
   // ...
@@ -1493,7 +1513,7 @@ ftype Tensor::tensorValues_t::operator[](const tensorSize_t idx) const {
 
       <p>
         Once a network has proven itself there is however no reason for those boundary checks, and given a well-defined network they 
-        will not occur in any case. Instead those are more more for debugging purposes for us as the backend devs. Hence we can simply 
+        will not occur in any case. Instead those are more for debugging purposes for us as the backend devs. Hence we can simply 
         guard those checks by 
       </p>
 
@@ -1501,7 +1521,7 @@ ftype Tensor::tensorValues_t::operator[](const tensorSize_t idx) const {
 
 ftype Tensor::tensorValues_t::operator[](const tensorSize_t idx) const {
 #ifndef NDEBUG
-  if(idx >= size)
+  if(idx &gt;= size)
     throw std::out_of_range("Out of range for tensor");
 #endif
 
@@ -1546,7 +1566,7 @@ ftype Tensor::tensorValues_t::operator[](const tensorSize_t idx) const {
 
 ftype Tensor::tensorValues_t::operator[](const tensorSize_t idx) const {
 #ifndef NDEBUG
-  if(idx >= size)
+  if(idx &gt;= size)
     throw std::out_of_range("Out of range for tensor");
 #endif
 
@@ -1585,8 +1605,8 @@ ftype Tensor::tensorValues_t::operator[](const tensorSize_t idx) const {
 
 <pre><code class="language-cpp">// src/backend/computational_graph/activation_functions/relu_node.cpp
 
-for(tensorSize_t i = 0; i < upstreamGrad.getSize(); i++){
-  res->set((*parent)[i] > zero ? upstreamGrad[i] : zero, i); // uses non-optimal []-operator
+for(tensorSize_t i = 0; i &lt; upstreamGrad.getSize(); i++){
+  res-&gt;set((*parent)[i] &gt; zero ? upstreamGrad[i] : zero, i); // uses non-optimal []-operator
 }
 </code></pre>
 
@@ -1596,8 +1616,8 @@ for(tensorSize_t i = 0; i < upstreamGrad.getSize(); i++){
 
 <pre><code class="language-cpp">// src/backend/computational_graph/activation_functions/relu_node.cpp
 
-for(tensorSize_t i = 0; i < upstreamGrad.getSize(); i++){
-  res->data()[i] = parent->data()[i] > zero ? upstreamGrad.data()[i] : zero; // uses raw pointer directly
+for(tensorSize_t i = 0; i &lt; upstreamGrad.getSize(); i++){
+  res-&gt;data()[i] = parent-&gt;data()[i] &gt; zero ? upstreamGrad.data()[i] : zero; // uses raw pointer directly
 }
 </code></pre>
 
@@ -1618,7 +1638,7 @@ for(tensorSize_t i = 0; i < upstreamGrad.getSize(); i++){
 
     </div>
 
-    <div id="step-7" class="article-text-div">
+    <div id="step-8" class="article-text-div">
       <h3 class="heading-spaced">Opt. 8 - Fix memory leak across units</h3>
 
       {% include pytorch-opt-summary.html 
