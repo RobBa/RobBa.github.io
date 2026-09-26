@@ -1304,7 +1304,7 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
         src="./img_4/profiling/before_step_5.png"
         alt="perf output before step 5.">
         <figcaption>
-          perf output before fix 5..
+          perf output before fix 5.
         </figcaption>
       </figure>
 
@@ -1318,9 +1318,9 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
         <img
         class="blog-image pytorch-perf"
         src="./img_4/profiling/before_step_5_2.png"
-        alt="perf output before step 5-2.">
+        alt="perf annotated matmul output before step 5.">
         <figcaption>
-          perf annotated output before fix 5.
+          perf annotated matmul output before fix 5.
         </figcaption>
       </figure>
 
@@ -1328,9 +1328,13 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
         The interesting one here is the call through the Procedure-Linkage-Table, which is indicated by the @plt at the end of the line after the 
         highlighted one in the screenshot above (I personally find white letters on a black background easier to read than black letters on a yellow
         background). This points us to a general problem with how we compile, and this fix is not constraint to the matmul itself, but rather to the whole
-        backend. Understanding this fix requires an knowledge of the Global-Offset-Table (GOT) and the Procedure-Linkage-Table. For those who want to follow
+        backend.
+      </p>
+
+      <p>
+        Understanding this fix requires an knowledge of the Global-Offset-Table (GOT) and the Procedure-Linkage-Table. For those who want to follow
         this entry and do not know what these are about I have an optional section next. Anyone who knows them or who does not care about the details in this 
-        section is free to skip past the optional section. 
+        section is free to skip past the optional section.
       </p>
 
       <details class="pytorch-optional" id="optional-avx-review">
@@ -1371,7 +1375,6 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
           Call in static linking exemplified. The callee calls directly into the relevant function, implying one indirection.
         </figcaption>
       </figure>
-      </details>
 
       <p>
         The figure shows that a function call is a simple call at the relevant address. Additionally, this address is known at compile time,
@@ -1432,7 +1435,23 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
       </details>
 
       <p>
-        
+        The problem with using the PLT in our code is that it calls the PLT to walk through the backend itself. It is in matmul, where a local tile
+        object resides, and utilizes the PLT to call into an object that should technically reside in the same translation unit. But how is that 
+        possible? 
+      </p>
+
+      <p>
+        The reason is in the default behavior of the compiler. When we compile a dynamic library, the compiler does not know which methods we want 
+        accessible from the outside, and which ones we don't. That in turn makes the compiler generate a GOT and PLT for all publicly interfaceable 
+        functions. Our fix then is of course to revert the compiler's choices. We tell the compiler to generate invisible functions by 
+        <code>target_compile_options(BackendCore PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)</code>. We can then on a per class or 
+        function level decide to expose them by <code>__attribute__((visibility("default")))</code> in GCC and clang. 
+      </p>
+
+      <p>
+        In my case I just did a blanket per-class exposure on classes that are partially or fully exposed on the Python side, and one can do a fine 
+        tuning for classes that only need partial exposure on the Python side. Crucially Python does not need to know about the tiles, hence we do not
+        expose that one, concluding our fix. 
       </p>
 
     </div>
@@ -1444,8 +1463,166 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
         before="5.84s" after="5.53s"
         speedup="1.06" branch="dev/cpu_optimization_fixed" commit="c8529031d984aa9aef970bd9b02151682e878423" %}
 
-        <p>
-          This fix is gonna be a very brief and quick one. 
-        </p>
+      <p>
+        This fix is gonna be a very brief and quick one. As we saw in our previous step, accessing the tensor's values now chewes up a lot of our 
+        cycles. For reference the output here again:
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/before_step_5.png"
+        alt="perf output before step 5.">
+        <figcaption>
+          perf output before fix 5.
+        </figcaption>
+      </figure>
+
+      <p>
+        Now the crux is that I decided to make these functions safe by using boundary checks as in 
+      </p> 
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
+
+ftype Tensor::tensorValues_t::operator[](const tensorSize_t idx) const {
+  if(idx >= size)
+    throw std::out_of_range("Out of range for tensor");
+
+  // ...
+}</code></pre>
+
+      <p>
+        Once a network has proven itself there is however no reason for those boundary checks, and given a well-defined network they 
+        will not occur in any case. Instead those are more more for debugging purposes for us as the backend devs. Hence we can simply 
+        guard those checks by 
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
+
+ftype Tensor::tensorValues_t::operator[](const tensorSize_t idx) const {
+#ifndef NDEBUG
+  if(idx >= size)
+    throw std::out_of_range("Out of range for tensor");
+#endif
+
+  // ...
+}</code></pre>
+
+      <p>
+        And that's the fix already. I have to admit here though that this was my bad. If you go into the code yourself you'll find that I 
+        flipped the condition around with <code>&#35;ifdef NDEBUG</code>. A small letter making a huge difference. The new output looks like this 
+        now:
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/after_step_6.png"
+        alt="perf output after step 6.">
+        <figcaption>
+          perf output after fix 6.
+        </figcaption>
+      </figure>
+
+      <p>
+        To be fair, it didn't seem to tilt the needle in the perf profiling, but we get some improvements in our benchmark that we happily take.
+      </p>
+
+    </div>
+
+    <div id="step-7" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 7 - Remove redundant device checks</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="5.53s" after="3.41s"
+        speedup="1.62x" branch="dev/cpu_optimization_fixed" commit="b53efbdce06f51868d8650b772895ff61cb498cc" %}
+
+      <p>
+        Looking at the output after the last fix we can still see that the getter- and setter-methods to access our tensors are taking a long time.
+        So let's have a look at an example now of what they look like: 
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.cpp
+
+ftype Tensor::tensorValues_t::operator[](const tensorSize_t idx) const {
+#ifndef NDEBUG
+  if(idx >= size)
+    throw std::out_of_range("Out of range for tensor");
+#endif
+
+  switch(device){
+    case Device::CPU:
+      return values[idx];
+    case Device::CUDA:
+      #ifdef __CUDA
+      {
+        ftype res;
+        cudaErrchk(cudaMemcpy(&res, values + idx, sizeof(ftype), cudaMemcpyDeviceToHost));
+        return res;
+      }
+      #else
+        __throw_invalid_argument("Not compiled with CUDA");
+        break;
+      #endif
+  }
+
+  __throw_runtime_error("Should never reach here.");
+  return 0; // suppress warnings
+}</code></pre>
+
+      <p>
+        Now that's a whole lot for simply reading a value. It becomes more absurd when we think about how we structured our 
+        CUDA side in the code: We request an operation, say a matmul, then check where the tensors reside, then perform the operations.
+        On the CUDA side that works just fine, since we operate on raw tensors. 
+      </p>
+
+      <p>
+        However, on the CPU side we use this function for every value we read. That's a whole lot of redundant device checks we perform here.
+        In the following we bypass these redundant checks. We leave the operator for the Python binding, where a user might want to use single
+        values or print out some information about the tensor. And as for the backend side, we give the functions on the CPU side a pointer to 
+        the raw array, mimicking the CUDA side. For instance, we transform this part 
+      </p>
+
+<pre><code class="language-cpp">// src/backend/computational_graph/activation_functions/relu_node.cpp
+
+for(tensorSize_t i = 0; i < upstreamGrad.getSize(); i++){
+  res->set((*parent)[i] > zero ? upstreamGrad[i] : zero, i); // uses non-optimal []-operator
+}
+</code></pre>
+
+      <p>
+        into this:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/computational_graph/activation_functions/relu_node.cpp
+
+for(tensorSize_t i = 0; i < upstreamGrad.getSize(); i++){
+  res->data()[i] = parent->data()[i] > zero ? upstreamGrad.data()[i] : zero; // uses raw pointer directly
+}
+</code></pre>
+
+      <p>
+        The result of this fix once again put the matmul into our focus again. But before that we should finally fix a memory leak 
+        that went unnoticed until now (at least on my smaller benchmarks). 
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/after_step_7.png"
+        alt="perf output after step 7.">
+        <figcaption>
+          perf output after fix 7.
+        </figcaption>
+      </figure>
+
+    </div>
+
+    <div id="step-7" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 8 - Fix memory leak across units</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="3.41s" after="-"
+        speedup="-" branch="dev/cpu_optimization_fixed" commit="26dca2014f1a871486fa6886975441b06eeb8757" %}
 
     </div>
