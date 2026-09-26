@@ -1393,7 +1393,7 @@ def train_epoch(net, loss_fn, optim, x_gpu, y_gpu, batch_size=64, max_batch_coun
         speedup="54.53x" commit="a979eaf1c4f148c296cf13cd166bd2a6896d772b" %}
 
       <p>
-        This example is benchmarked on a small example, because it was so slow to run. We will move on from that very quickly and 
+        This first version is benchmarked on a small example, because it was so slow to run. We will move on from that very quickly and 
         get to larger examples, but for now we benchmark on a mere 5 epochs with 10 batches each. The batch-size remains 64 samples
         throughout this whole blog entry, as well as the next. We start off by running NSys to see the execution on a continuous timeline.
         I note that because NSys significantly slows down the run and generates huge amounts of data then needs to load (sometimes
