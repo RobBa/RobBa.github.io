@@ -1355,23 +1355,85 @@ Tensor Tensor::matMulImpl(const Tensor& left, const Tensor& right, const bool tr
         <img
         id="pytorch-static-linking"
         class="blog-image"
-        src="./img_4/avx-load.png"
-        alt="Load into AVX registers exemplified">
+        src="./img_4/function-call-static.png"
+        alt="Function call in static linking - exemplified">
         <figcaption>
-          Contrasting aligned and unaligned loads and stores into AVX registers.
+          Call in static linking exemplified. The callee calls directly into the relevant function, implying one indirection.
         </figcaption>
         </figure>
         <figure class="fig-dark">
         <img
         id="pytorch-static-linking-dark"
         class="blog-image"
-        src="./img_4/"
-        alt="Load into AVX registers exemplified">
+        src="./img_4/function-call-static-dark.png"
+        alt="Function call in static linking - exemplified">
         <figcaption>
-          Contrasting aligned and unaligned loads and stores into AVX registers.
+          Call in static linking exemplified. The callee calls directly into the relevant function, implying one indirection.
         </figcaption>
       </figure>
       </details>
+
+      <p>
+        The figure shows that a function call is a simple call at the relevant address. Additionally, this address is known at compile time,
+        thus can be directly baked into the assembly code as an immediate. So no surprises here.
+      </p>
+
+      <p>
+        It gets more interesting when we use dynamic linking. In that case the program shares an address space with the binary we just linked 
+        in (the library), but the addresses are not know as run-time. The question now is how does this work, and the answer is rather 
+        mundane, yet worth knowing in jargon. The following image shows the principle, and then I walk you through step-by-step.
+      </p>
+
+      <figure class="fig-light">
+        <img
+        id="pytorch-dynamic-linking"
+        class="blog-image"
+        src="./img_4/function-call-dynamic.png"
+        alt="Function call in dynamic linking exemplified">
+        <figcaption>
+          Call in dynamic linking exemplified. The first time the call follows the dashed line, and every subsequent call 
+          is routed through the solid line.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-dynamic-linking-dark"
+        class="blog-image"
+        src="./img_4/function-call-dynamic-dark.png"
+        alt="Function call in dynamic linking exemplified">
+        <figcaption>
+          Call in dynamic linking exemplified. The first time the call follows the dashed line, and every subsequent call 
+          is routed through the solid line.
+        </figcaption>
+      </figure>
+
+      <p>
+        Here, I introduced two new segments in the program. First there is the GOT, which is part of the .data segment, i.e. 
+        it can be written to. The second segment is the read-only PLT segment. It holds a stub pointing to the entry in the GOT.
+        The first time a function is called, the GOT holds a reference to an address resolver. That resolver then calls the dynamic 
+        linker, returning back the address of the function in the loaded library, which then gets cached in the GOT.
+      </p>
+
+      <p>
+        The whole mechanism results in a chain of indirections the first time the function is called. But then every subsequent call 
+        gets resolved by three indirections: First into the PLT, then into the GOT, pointing to the function itself.The main idea behind 
+        this is lazy binding. We only load memory addresses of calls that we need. We could theoretically bypass the PLT, calling into the 
+        GOT directly, but that would mean we could not distinguish the first call from the follow up calls, forcing us to fill the GOT at 
+        program start-up, which can be very costly and inducing overhead on functions we actually do not use on first call.
+      </p>
+
+      <p>
+        It is also interesting to know that the route through the PLT is actually not possible with objects and variables. The reason is that 
+        functions are executable. When we call the function, we can first call another function that replaces the address for us as a side effect.
+        Objects do not have such a mechanism inherently. So for global objects and variables the addresses are filled into the GOT at load time,
+        and a call to those will always be one indirection into the GOT and then a second one into the library, resulting in two indirections.
+      </p>
+
+      </details>
+
+      <p>
+        
+      </p>
 
     </div>
 

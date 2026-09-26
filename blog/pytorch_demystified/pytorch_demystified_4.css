@@ -11,21 +11,41 @@ h5 {
     width: 75%;
 }
 
-@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
-    #pytorch-step-4,
-    #pytorch-step-4-dark {
-        width: 87%;
-    }
-}
-
 .pytorch-perf {
     width: 100%;
     margin-top: 20px;
     margin-bottom: 20px;
 }
 
-/* Hover preview for perf images */
+#pytorch-static-linking,
+#pytorch-static-linking-dark {
+    width: 55%;
+}
 
+#pytorch-dynamic-linking,
+#pytorch-dynamic-linking-dark {
+    width: 80%;
+}
+
+/* Phone setting again */
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    #pytorch-step-4,
+    #pytorch-step-4-dark {
+        width: 87%;
+    }
+
+    #pytorch-static-linking,
+    #pytorch-static-linking-dark {
+        width: 75%;
+    }
+
+    #pytorch-dynamic-linking,
+    #pytorch-dynamic-linking-dark {
+        width: 95%;
+    }
+}
+
+/* Hover preview for perf images */
 @media (hover: hover) {
     .pytorch-perf {
         position: relative;
