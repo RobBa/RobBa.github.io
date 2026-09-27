@@ -1146,25 +1146,58 @@ target_include_directories(py_data_modeling PRIVATE ${PYTHON_INCLUDE_DIRS} ${Boo
           If you wonder why we choose to compile our Python library as a <code>MODULE</code>, this will be for you.
           Essentially, CMake gives us four options to consider: <code>STATIC</code>, <code>SHARED</code>, <code>MODULE</code>, and <code>INTERFACE</code>. 
           <code>STATIC</code> is the bread and butter for most C++ devs. It compiles a static library, and everytime we link a binary against it the 
-          binary gets a full copy of it. It is the fastest during execution of binary, since no intermediate address translation layer has to be called, but 
-          it makes the binary larger and might lead to larger compile times, depending on your use case. <code>SHARED</code> and 
+          binary gets a full copy of it. It is the fastest during execution of binary, since no intermediate address translation takes, but 
+          it makes the binary larger and might lead to larger compile times, depending on your use case.
+        </p>
+
+        <p>
+          <code>SHARED</code> and 
           <code>MODULE</code> both introduce a shared library object. The difference between them is how they get loaded at run-time. 
           When we compile with SHARED and execute the binary, then the binary will look for MYLIB_NAME.so before main is executed, and load
           it before <code>main()</code> is called. The advantage here is that two binaries can use the same shared library, saving memory 
           and loading times. <code>MODULE</code> is quite similar, but a library compiled with this flag cannot be linked against any 
-          binary. Instead it has to be loaded dynamically via a syscall. Lastly, <code>INTERFACE</code> is a little cryptic. It
-          "does not compile sources and does not produce a library artifact on disk" (<a href="https://cmake.org/cmake/help/latest/guide/tutorial/In-Depth%20CMake%20Library%20Concepts.html#background"
+          binary. Instead it has to be loaded dynamically via a syscall.
+        </p>
+
+        <p>
+          Lastly, <code>INTERFACE</code> is a little cryptic. It "does not compile sources and does not produce a library artifact on disk" 
+          (<a href="https://cmake.org/cmake/help/latest/guide/tutorial/In-Depth%20CMake%20Library%20Concepts.html#background"
           target="_blank">CMake tutorials</a>). What sounds odd at first glance makes a little bit more sense knowing that its 
           main purpose is for header-only libraries.
         </p>
+
+        <div class="pytorch-table-wrap pytorch-module-table-wrap">
+          <table class="pytorch-reg-table pytorch-module-table">
+            <thead>
+              <tr>
+                <th>STATIC</th>
+                <th>SHARED</th>
+                <th>MODULE</th>
+                <th>INTERFACE</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-label="STATIC">Each binary it gets linked against gets an own full copy. Fast, but can increase program size.</td>
+                <td data-label="SHARED">Several binaries can share this library. Gets loaded by the linker at program startup, and program fails if not findable.</td>
+                <td data-label="MODULE">Gets loaded by a program through system call. Needed for Python's import mechanism.</td>
+                <td data-label="INTERFACE">Does not compile into a loadable artifact. Mainly for header libraries.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <p>
           Going full circle now why <code>MODULE</code>, I hope this has gotten somewhat clear now. When running Python, our main
           binary we run is the Python interpreter. Knowing that a Python library only ever gets included via an <code>import my_lib</code>
           leaves <code>MODULE</code> as pretty much the only candidate now. It is important to note however that this alone is not enough. 
-          Since we do not link statically we also have to tell the compiler to generate position independent code for us. I did this 
-          globally, but the better approach would be a localized version telling it explicitly which parts of the code should be <a href="https://en.wikipedia.org/wiki/Position-independent_code"
-          target="_blank">position independent code</a> compiled. Anyway, I ain't perfect, and it's now on my TODO-list. We will revisit 
+          Since we do not link statically we also have to tell the compiler to generate <a href="https://en.wikipedia.org/wiki/Position-independent_code" 
+          target="_blank"></a>position independent code</p> for us. I did this globally, but the better approach would be a localized version 
+          telling it explicitly which parts of the code should be position independent code compiled. 
+        </p>
+
+        <p>
+          Anyway, I ain't perfect, and it's now on my TODO-list. We will revisit 
           this flag later in the optimization posts. But for now know that we have to 
           do this because we are using a shared library. That means that the objects of the shared library cannot sit at fixed positions 
           before linking against the binary, since that would mean that addresses there could clash. Position independent code does not 

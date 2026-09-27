@@ -29,7 +29,45 @@
     width: 70%;
 }
 
+.pytorch-module-table-wrap {
+    margin: 32px 0;
+}
+
+.pytorch-module-table {
+    table-layout: fixed;
+}
+
+.pytorch-module-table th,
+.pytorch-module-table td {
+    width: 25%;
+    white-space: normal;
+    word-break: break-word;
+}
+
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    .pytorch-module-table thead {
+        display: none;
+    }
+
+    .pytorch-module-table,
+    .pytorch-module-table tbody,
+    .pytorch-module-table tr,
+    .pytorch-module-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .pytorch-module-table td {
+        text-align: left;
+    }
+
+    .pytorch-module-table td::before {
+        content: attr(data-label);
+        display: block;
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
     .pytorch-step-row-reverse {
         flex-direction: column;
     }
