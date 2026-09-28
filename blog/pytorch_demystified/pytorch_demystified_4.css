@@ -27,6 +27,16 @@ h5 {
     width: 80%;
 }
 
+#pytorch-memleak-includes,
+#pytorch-memleak-includes-dark {
+    width: 70%;
+}
+
+#pytorch-memleak-calls,
+#pytorch-memleak-calls-dark {
+    width: 92%;
+}
+
 /* Phone setting again */
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
     #pytorch-step-4,
@@ -37,6 +47,16 @@ h5 {
     #pytorch-static-linking,
     #pytorch-static-linking-dark {
         width: 75%;
+    }
+
+    #pytorch-memleak-includes,
+    #pytorch-memleak-includes-dark {
+        width: 80%;
+    }
+
+    #pytorch-memleak-calls,
+    #pytorch-memleak-calls-dark {
+        width: 95%;
     }
 
     #pytorch-dynamic-linking,

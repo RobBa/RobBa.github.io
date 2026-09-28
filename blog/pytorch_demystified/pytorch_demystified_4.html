@@ -57,7 +57,7 @@ mathjax: false
               <a href="#step-7">Opt. 7 - Remove redundant device checks</a>
             </li>
             <li>
-              <a href="#step-8">Opt. 8 - Fix memory leak across units</a>
+              <a href="#step-8">Opt. 8 - Fix memory leak on ABI level</a>
             </li>
           </ul>
         </li>
@@ -1639,10 +1639,225 @@ for(tensorSize_t i = 0; i &lt; upstreamGrad.getSize(); i++){
     </div>
 
     <div id="step-8" class="article-text-div">
-      <h3 class="heading-spaced">Opt. 8 - Fix memory leak across units</h3>
+      <h3 class="heading-spaced">Opt. 8 - Fix memory leak on ABI level</h3>
 
       {% include pytorch-opt-summary.html 
-        before="3.41s" after="-"
-        speedup="-" branch="dev/cpu_optimization_fixed" commit="26dca2014f1a871486fa6886975441b06eeb8757" %}
+        before="3.41s" after="2.78s"
+        speedup="1.23" branch="dev/cpu_optimization_fixed" commit="a9d6658b813a1f9a1b062df753d54483502b91bf" %}
+
+      <p>
+        Before we move on to the final fix we first have to fix a memory leak that started to appear in my unit tests now. We had several 
+        memory leaks across the path already, and I fixed them silently (you can find them in the git history of course, but not in these blogposts).
+        However, this one I found particularly interesting, so I wanted to share it with you.
+      </p>
+
+      <p>
+        Importantly at first, the memory leak started to show its teeth on "larger" benchmarks. Even a simple MNIST example could burst my working 
+        memory, and fill the GPU as well. However, running <code>compute-sanitizer --leak-check full</code> did not reveal anything. So the memory 
+        leak is not visible once the program shut down. So how do we go about it now? Sitting there with no clue as to what might be going on we 
+        might want to try <code>git bisect</code>, checking which commit introduced the leak and then go about fixing it.
+      </p>
+
+      <p>
+        Luckily for us though we localized memory management, so we might as well start about taking a closer look at our memory pool. For reference, 
+        here are its declaration and its instantiation again.
+      </p>
+
+<pre><code class="language-cpp">// src/backend/shared/memory_pool.h
+
+namespace mempool_impl {
+  template<typename T>
+  class DLLIB_API MemoryPool final {
+    private:
+      // hold pointers to unused allocated memory.
+      std::unordered_map<tensorSize_t, std::vector<T*>> freeLists;
+      std::unordered_map<tensorSize_t, std::vector<T*>> freeListsCuda;
+      
+    public:
+      MemoryPool() = default;
+      ~MemoryPool() noexcept;
+
+      T* request(Device d, tensorSize_t n);
+      void giveback(T* ptr, Device d, tensorSize_t n);
+      void flush(Device d) noexcept;
+  };
+}
+
+namespace mempool {
+  inline static mempool_impl::MemoryPool<ftype> tensorPool;
+  inline static mempool_impl::MemoryPool<tensorDim_t> tensorDimPool;
+  inline static mempool_impl::MemoryPool<tensorSize_t> tensorSizePool;
+}</code></pre>
+
+      <p>
+        Two steps earlier we were already talking about static and dynamic linking, and how they differ in execution below. That priming will 
+        come in handy now as we will see. So let us first think about my sloppy initialization of the memory pools. I used inline static without
+        giving it much thought, but that already reveals a problem, more concretely in the use of static.
+      </p>
+
+      <p>
+        The <b>keyword static</b> has a little more to it than meets the eye. At a class level we can make a static declared object a class object that 
+        all instances share. Inside a function the drill is the same. But what about namespace scope, as we have it here? In that case the C++
+        standard gives it static storage duration and internal linkage. That firmly squares it as a <a href="https://en.cppreference.com/cpp/language/storage_duration" 
+        target="_blank">translation unit local entity</a>. That is, each translation unit gets its own copy.
+      </p>
+
+      <p>
+        A translation unit is one .cpp file after being fully expanded as a result of the preprocessor doing its thing. So now we can see why what I did 
+        here is dangerous: Each .cpp including our memory pool has its own memory pool before the linker comes in, and the static keyword tells the 
+        compiler that this is what we wanted. The learning here clearly is to be careful with the static keyword at namespace scope. Especially inside 
+        headers!  
+      </p>
+
+      <p>
+        Plainly removing static does not fix our problem yet though, so let's look deeper. We have the <b>inline keyword</b> left, which gives external 
+        linkage, meaning the one-definition-rule (ODR) must be satisfied among translation units. When we compile the program, then at first we end 
+        up with many translation units, each having their own local copy of the memory pool. But when we link them together then the linker picks up 
+        on the inline keyword and merges them all into one canonical memory pool for the compiled output, satisfying the ODR for us. So far so good.
+      </p>
+
+      <p>
+        What breaks our code now is the one dimension that the linker itself cannot see at this point, namely the dynamic linking itself. In the previous 
+        steps we have introduced a new compiler flag, forcing everything of our shared libBackendCore.so to be invisible to the binary we link it against, 
+        except for the parts we want to expose. Obviously the memory pool is not part of that.
+      </p>
+
+      <p>
+        However, since we instantiate the memory pools in a header, 
+        there ends up an instance of a memory pool in each of the libraries. The inline keyword is supposed to tell the linker that it should resolve all 
+        those into one memory pool only, but our invisibility flag renders that attempt impossible. Additionally I did the following in the tensor class:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.h
+
+class DLLIB_API Tensor final : public std::enable_shared_from_this<Tensor>
+{
+  // ...
+  
+  class DLLIB_API tensorValues_t final
+  {
+  private:
+    tensorSize_t size = 0;
+    ftype* values = nullptr;
+
+    Device device;
+    inline static Device defaultDevice = Device::CPU;
+
+  public:
+    explicit tensorValues_t() { device = defaultDevice; }
+    explicit tensorValues_t(Device d) : device(d) {}
+
+    ~tensorValues_t() noexcept {
+      if(values != nullptr)
+        mempool::tensorPool.giveback(values, device, size);
+    }
+
+    // ...
+  };
+};</pre></code>
+
+      <p>
+        The DLLIB_API macro here hides the visibility=default attribute, enabling cross-library access through the PLT and the GOT for these 
+        two classes. The error snuck in when I inlined the destructor of tensorValues_t though, leading to a local copy of the destructor in the 
+        shared libraries as well. The following image shows how the includes can happen:
+      </p>
+
+      <figure class="fig-light">
+        <img
+        id="pytorch-memleak-includes"
+        class="blog-image"
+        src="./img_4/memory-leak-includes.png"
+        alt="Memory leak includes schematic">
+        <figcaption>
+          The schema of shared libraries, and how they include both the memory pool and the tensor.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-memleak-includes-dark"
+        class="blog-image"
+        src="./img_4/memory-leak-includes-dark.png"
+        alt="Memory leak includes schematic">
+        <figcaption>
+          The schema of shared libraries, and how they include both the memory pool and the tensor.
+        </figcaption>
+      </figure>
+
+      <p>
+        On the left side of this image we see the libBackendCore.so. This is the fundamental backend library that all the Python modules use
+        and link against at run-time. It is a shared library to avoid duplicate code and make object management simpler. On the right side we 
+        see the Python modules. These are the bindings wrapping around the backend library and exposing it to the Python frontend. Both the 
+        tensor.h and the memory_pool.h get included in each of these, or at least theoretically can do so. 
+      </p>
+
+      <p>
+        The libBackendCore.so has default visibility of objects set to hidden, while the right side has visibility to visible on everything. 
+        The problem that arises from that is depicted in this second image.
+      </p>
+      
+      <figure class="fig-light">
+        <img
+        id="pytorch-memleak-calls"
+        class="blog-image"
+        src="./img_4/memory-leak-calls.png"
+        alt="Memory leak calls schematic">
+        <figcaption>
+          The two sides of the Python library (backend and frontend), and how they forward requests to the memory pools.
+        </figcaption>
+        </figure>
+        <figure class="fig-dark">
+        <img
+        id="pytorch-memleak-calls-dark"
+        class="blog-image"
+        src="./img_4/memory-leak-calls-dark.png"
+        alt="Memory leak calls schematic">
+        <figcaption>
+          The two sides of the Python library (backend and frontend), and how they forward requests to the memory pools.
+        </figcaption>
+      </figure>
+
+      <p>
+        And here we finally go full circle. The hidden visibility creates two memory pools, one owned by libBackendCore.so, and 
+        one shared among the Python fronends. Because the constructor (or more precise the resize()-method of the tensorValues_t class)
+        is exposed through the dynamic libary, requests to allocate memory go into the backend. Because methods accessing the values 
+        walk through the backend as well usually this all works fine so far. 
+      </p>
+
+      <p>
+        However, deallocation happens in the inlined destructor of tensorValues_t, and gets called directly in the Python frontend modules.
+        Because they do not see the libBackendCore's memory pool, but instead their own copy of it, they direct these requests to their own 
+        memory pool. This results in a loop where the memory pool in libBackendCore keeps on allocating memory, but is never asked to free any
+        of that. 
+      </p>
+
+      <p>
+        The fix to that now is straight-forward. We can either non-inline the destructor, in which case a developer might be inclined to do so 
+        again or something similar in the future. In other words, we would be setting up a booby-trap for ourselves and everyone else working on
+        the same project. Or alternatively we could open up the memory pools by making them visible in the backend as well, ensuring that all parties
+        see the same instances of memory pools. My measuremements did not indicate a significant performance penalty in either direction, so I went 
+        with the latter solution, ending up with 
+      </p>
+
+<pre><code class="language-cpp">// src/backend/shared/memory_pool.h
+
+namespace mempool {
+  // DLLIB_API == macro returning visibility to default
+  DLLIB_API inline mempool_impl::MemoryPool<ftype> tensorPool;
+  DLLIB_API inline mempool_impl::MemoryPool<tensorDim_t> tensorDimPool;
+  DLLIB_API inline mempool_impl::MemoryPool<tensorSize_t> tensorSizePool;
+}</code></pre>
+
+    </div>
+
+    <div id="step-8" class="article-text-div">
+      <h3 class="heading-spaced">Opt. 9 - Multithreaded matrix multiplication</h3>
+
+      {% include pytorch-opt-summary.html 
+        before="2.78s" after="s"
+        speedup="-" branch="dev/cpu_optimization_fixed" commit="a9d6658b813a1f9a1b062df753d54483502b91bf" %}
+
+      <p>
+        We want to do one last optimization step that is pretty obvious and a nice test bench as well. 
+      </p>
 
     </div>
