@@ -513,27 +513,30 @@ mathjax: false
         spends most of the execution time:
       </p>
 
-<pre>+   40.06%    40.06%  python3  [.] Tensor::matMulImpl(Tensor const&, Tensor const&, bool, bool)
-+    6.97%     0.00%  python3  [.] 0x8348535554415541
-+    6.97%     0.00%  python3  [.] 0x00007a5e1326ebe8
-+    6.97%     0.00%  python3  [.] 0x0000000038d1b717
-+    3.48%     2.97%  python3  [.] Tensor::tensorValues_t::operator[](unsigned int) const</pre>
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/before_step_1.png"
+        alt="perf output before step 1.">
+        <figcaption>
+          perf output before step 1, showing where the program spends most of its cycles on a function basis.
+        </figcaption>
+      </figure>
 
       <p>
         We can further use perf to look into the assembly code, where we get more details of what is happening. We find the following for the inner 
         loop of the matmul:
       </p>
 
-<pre>        │490:   mov        %edi,%eax
-        │       mov        %ecx,%r8d 
-        │       add        $0x1,%ecx
-  14.06 │       movss      (%r14,%r8,4),%xmm0
-   1.01 │       mulss      (%rbx,%rax,4),%xmm0
-        │       mov        0x8(%rsp),%eax
-        │       add        %eax,%edi
-  13.83 │       addss      %xmm0,%xmm1
-        │       cmp        %ebp,%ecx
-  12.56 │     ↑ jne        490</pre>
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/before_step_1_2.png"
+        alt="perf output before step 1.">
+        <figcaption>
+          perf output before step 1, showing the instructions issued by the compiler.
+        </figcaption>
+      </figure>
 
       <p>
         The most telling sign for now is the ss-suffix, indicating single operand instructions. My machine is an Asus laptop with an Intel i5 210Hx12,
@@ -544,9 +547,10 @@ mathjax: false
       <p>
         Since so far we did not specify an optimization flag, it is the
         most natural solution to first try to use a more aggressive optimization. If you want to follow this step, simply add the line
-        <code>set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")</code> in CMake. While the program executes as expected, that is the optimization did not
-        introduce errors so far, the improvement is also not that strong. As we will see in the next section the compiler still has not figured out how
-        to optimize the inner loop yet, so the optimizations happened somewhere in less impactful parts of the program.
+        <code>set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")</code> in CMake. The program executes as expected, so the optimization did not
+        introduce errors so far. The improvement on the other side is an easy win, but not that strong. As we will see in the next section the
+         compiler still has not figured out how to optimize the inner loop yet, so the optimizations happened somewhere in less impactful parts of 
+         the program.
       </p>
 
     </div>
@@ -558,7 +562,26 @@ mathjax: false
         before="35.48s" after="28.10s"
         speedup="1.26x" branch="main" commit="ec17463cf7e568efe7d99a0be64a4d5e52d08efe" %}
 
+        <p>
+          In this section we will lay our hands on the matmul operation. Looking at the perf output for now we can 
+          see that again the matmul eats almost all of our cake: 
+        </p>
 
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/before_step_2.png"
+        alt="perf output before step 2.">
+        <figcaption>
+          perf output before step 2. The matrix multiplication is the one we want to chew down.
+        </figcaption>
+      </figure>
+
+        <p>
+          Because we will be talking about the matmul quite a bit in this post it is probably a good idea to first take 
+          a look at it. We will start with the version below and gradually refine over the next few subsections that are part of this 
+          blog entry. So here it is:
+        </p>
 
 <pre><code class="language-cpp">// src/backend/data_modeling/tensor.h
 
@@ -607,7 +630,7 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
         src="./img_4/profiling/step_2_cycles.png"
         alt="perf output before step 2, showing the number of cycles spent per instruction.">
         <figcaption>
-          perf output before step 2, showing the number of cycles spent per instruction.
+          perf output showing the number of cycles spent per instruction.
         </figcaption>
       </figure>
 
@@ -643,7 +666,7 @@ void Tensor::matMul2DCpu(Tensor& res, const Tensor& left, const Tensor& right, c
         src="./img_4/profiling/step_2_cache_misses.png"
         alt="perf output before step 2, showing the cache misses per instruction.">
         <figcaption>
-          perf output before step 2, showing the cache misses per instruction.
+          perf output showing the cache misses per instruction.
         </figcaption>
       </figure>
 
