@@ -17,6 +17,10 @@ h5 {
     margin-bottom: 20px;
 }
 
+.pytorch-perf.pytorch-perf-large {
+    width: 85%;
+}
+
 #pytorch-static-linking,
 #pytorch-static-linking-dark {
     width: 55%;
@@ -39,6 +43,10 @@ h5 {
 
 /* Phone setting again */
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    .pytorch-perf.pytorch-perf-large {
+        width: 100%;
+    }
+
     #pytorch-step-4,
     #pytorch-step-4-dark {
         width: 87%;

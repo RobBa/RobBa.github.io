@@ -59,7 +59,13 @@ mathjax: false
             <li>
               <a href="#step-8">Opt. 8 - Fix memory leak on ABI level</a>
             </li>
+            <li>
+              <a href="#step-9">Opt. 9 - Multithreaded matrix multiplication</a>
+            </li>
           </ul>
+        </li>
+        <li>
+          <a href="#summary">Summary</a>
         </li>
       </ul>
     </div>
@@ -1654,24 +1660,24 @@ for(tensorSize_t i = 0; i &lt; upstreamGrad.getSize(); i++){
       <p>
         Importantly at first, the memory leak started to show its teeth on "larger" benchmarks. Even a simple MNIST example could burst my working 
         memory, and fill the GPU as well. However, running <code>compute-sanitizer --leak-check full</code> did not reveal anything. So the memory 
-        leak is not visible once the program shut down. So how do we go about it now? Sitting there with no clue as to what might be going on we 
+        leak is not visible once the program shuts down. So how do we go about it now? Sitting there with no clue as to what might be going on we 
         might want to try <code>git bisect</code>, checking which commit introduced the leak and then go about fixing it.
       </p>
 
       <p>
-        Luckily for us though we localized memory management, so we might as well start about taking a closer look at our memory pool. For reference, 
+        Luckily for us though we localized memory management, so we might as well start by taking a closer look at our memory pool. For reference, 
         here are its declaration and its instantiation again.
       </p>
 
 <pre><code class="language-cpp">// src/backend/shared/memory_pool.h
 
 namespace mempool_impl {
-  template<typename T>
+  template&lt;typename T&gt;
   class DLLIB_API MemoryPool final {
     private:
       // hold pointers to unused allocated memory.
-      std::unordered_map<tensorSize_t, std::vector<T*>> freeLists;
-      std::unordered_map<tensorSize_t, std::vector<T*>> freeListsCuda;
+      std::unordered_map&lt;tensorSize_t, std::vector&lt;T*&gt;&gt; freeLists;
+      std::unordered_map&lt;tensorSize_t, std::vector&lt;T*&gt;&gt; freeListsCuda;
       
     public:
       MemoryPool() = default;
@@ -1684,13 +1690,13 @@ namespace mempool_impl {
 }
 
 namespace mempool {
-  inline static mempool_impl::MemoryPool<ftype> tensorPool;
-  inline static mempool_impl::MemoryPool<tensorDim_t> tensorDimPool;
-  inline static mempool_impl::MemoryPool<tensorSize_t> tensorSizePool;
+  inline static mempool_impl::MemoryPool&lt;ftype&gt; tensorPool;
+  inline static mempool_impl::MemoryPool&lt;tensorDim_t&gt; tensorDimPool;
+  inline static mempool_impl::MemoryPool&lt;tensorSize_t&gt; tensorSizePool;
 }</code></pre>
 
       <p>
-        Two steps earlier we were already talking about static and dynamic linking, and how they differ in execution below. That priming will 
+        Three steps earlier we were already talking about static and dynamic linking, and how they differ in execution below. That priming will 
         come in handy now as we will see. So let us first think about my sloppy initialization of the memory pools. I used inline static without
         giving it much thought, but that already reveals a problem, more concretely in the use of static.
       </p>
@@ -1730,7 +1736,7 @@ namespace mempool {
 
 <pre><code class="language-cpp">// src/backend/data_modeling/tensor.h
 
-class DLLIB_API Tensor final : public std::enable_shared_from_this<Tensor>
+class DLLIB_API Tensor final : public std::enable_shared_from_this&lt;Tensor&gt;
 {
   // ...
   
@@ -1754,7 +1760,7 @@ class DLLIB_API Tensor final : public std::enable_shared_from_this<Tensor>
 
     // ...
   };
-};</pre></code>
+};</code></pre>
 
       <p>
         The DLLIB_API macro here hides the visibility=default attribute, enabling cross-library access through the PLT and the GOT for these 
@@ -1791,7 +1797,7 @@ class DLLIB_API Tensor final : public std::enable_shared_from_this<Tensor>
       </p>
 
       <p>
-        The libBackendCore.so has default visibility of objects set to hidden, while the right side has visibility to visible on everything. 
+        The libBackendCore.so has default visibility of objects set to hidden, while the right side has visibility set to visible on everything. 
         The problem that arises from that is depicted in this second image.
       </p>
       
@@ -1818,9 +1824,9 @@ class DLLIB_API Tensor final : public std::enable_shared_from_this<Tensor>
 
       <p>
         And here we finally go full circle. The hidden visibility creates two memory pools, one owned by libBackendCore.so, and 
-        one shared among the Python fronends. Because the constructor (or more precise the resize()-method of the tensorValues_t class)
-        is exposed through the dynamic libary, requests to allocate memory go into the backend. Because methods accessing the values 
-        walk through the backend as well usually this all works fine so far. 
+        one shared among the Python frontends. Because the constructor (or more precisely the resize()-method of the tensorValues_t class)
+        is exposed through the dynamic library, requests to allocate memory go into the backend. Because methods accessing the values 
+        walk through the backend as well, this usually works fine so far. 
       </p>
 
       <p>
@@ -1831,20 +1837,20 @@ class DLLIB_API Tensor final : public std::enable_shared_from_this<Tensor>
       </p>
 
       <p>
-        The fix to that now is straight-forward. We can either non-inline the destructor, in which case a developer might be inclined to do so 
+        The fix to that now is straightforward. We can either non-inline the destructor, in which case a developer might be inclined to do so 
         again or something similar in the future. In other words, we would be setting up a booby-trap for ourselves and everyone else working on
         the same project. Or alternatively we could open up the memory pools by making them visible in the backend as well, ensuring that all parties
-        see the same instances of memory pools. My measuremements did not indicate a significant performance penalty in either direction, so I went 
-        with the latter solution, ending up with 
+        see the same instances of memory pools. My measurements did not indicate a significant performance penalty in either direction, so I went 
+        with the latter solution, ending up with:
       </p>
 
 <pre><code class="language-cpp">// src/backend/shared/memory_pool.h
 
 namespace mempool {
   // DLLIB_API == macro returning visibility to default
-  DLLIB_API inline mempool_impl::MemoryPool<ftype> tensorPool;
-  DLLIB_API inline mempool_impl::MemoryPool<tensorDim_t> tensorDimPool;
-  DLLIB_API inline mempool_impl::MemoryPool<tensorSize_t> tensorSizePool;
+  DLLIB_API inline mempool_impl::MemoryPool&lt;ftype&gt; tensorPool;
+  DLLIB_API inline mempool_impl::MemoryPool&lt;tensorDim_t&gt; tensorDimPool;
+  DLLIB_API inline mempool_impl::MemoryPool&lt;tensorSize_t&gt; tensorSizePool;
 }</code></pre>
 
     </div>
@@ -1875,7 +1881,7 @@ namespace mempool {
         Our library now sings "Honey came in and she caught me red handed...", and we can safely proceed on optimizing the matmul, knowing 
         that our efforts mean something. There's not too much we can do in this current setting though, albeit I have some more ideas (see the summary),
         but the most obvious one and perhaps the most interesting is a parallel computation. We already know from CUDA that we can assign one thread to 
-        compute an entire tile of the result without any worries of thread coordination, so why not doing that here as well? 
+        compute an entire tile of the result without any worries of thread coordination, so why not do that here as well? 
       </p>
 
       <p>
@@ -1896,20 +1902,20 @@ namespace threadpool_impl {
         constexpr unsigned int nthreads = 3; // we leave one P-core for the rest of the program
         threads.reserve(nthreads);
         
-        for(unsigned int i = 0; i < nthreads; i++) {
-          threads.emplace_back(&ThreadPool::workerLoop, this);
+        for(unsigned int i = 0; i &lt; nthreads; i++) {
+          threads.emplace_back(&amp;ThreadPool::workerLoop, this);
         }
       };
 
       ~ThreadPool() noexcept;
 
       // thread pool is singleton, hence suppress copies and moves
-      ThreadPool(const ThreadPool&) = delete;
-      ThreadPool& operator=(const ThreadPool&) = delete;
-      ThreadPool(ThreadPool&&) = delete;
-      ThreadPool& operator=(ThreadPool&&) = delete;
+      ThreadPool(const ThreadPool&amp;) = delete;
+      ThreadPool&amp; operator=(const ThreadPool&amp;) = delete;
+      ThreadPool(ThreadPool&amp;&amp;) = delete;
+      ThreadPool&amp; operator=(ThreadPool&amp;&amp;) = delete;
 
-      void enque(std::function<void()> f);
+      void enque(std::function&lt;void()&gt; f);
 
       void waitAll();
   };
@@ -1919,10 +1925,10 @@ namespace threadpool_impl {
         I already took some time here to empirically find the optimal number of threads. A more canonical way would be to determine the number of 
         cores the computer has via <code>std::thread::hardware_concurrency()</code>, and then doing some empirics. In the case of my 
         <a href="https://www.intel.com/content/www/us/en/products/sku/241652/intel-core-5-processor-210h-12m-cache-up-to-4-80-ghz/specifications.html"
-        target="_blank">Intel i5 210H</a>, it supplies us with four power cores and 4 efficiency cores. The power cores return a value of two each, 
-        so the function call returns a 12 for me. Obviously though the efficiency cores are slower than the power cores, and giving the operation 
-        more than four threads resulted in degraded results. The optimal number of threads seemed to be three, one for each power core with one 
-        power core being free for other tasks. 
+        target="_blank">Intel i5 210H</a>, it supplies us with four performance cores and four efficiency cores. The performance cores return a value of two each, 
+        so the function call returns a 12 for me. Obviously though the efficiency cores are slower than the performance cores, and giving the operation 
+        more than four threads resulted in degraded results. The optimal number of threads seemed to be three, one for each performance core with one 
+        performance core being free for other tasks. 
       </p>
 
       <p>
@@ -1931,59 +1937,59 @@ namespace threadpool_impl {
 
 <pre><code class="language-cpp">// src/backend/shared/threadpool.h
 
-template<bool transposeLeft, bool transposeRight>
-void Tensor::matMul2DCpuAvx(Tensor& res, const Tensor& left, const Tensor& right, const tensorSize_t resOffset,
+template&lt;bool transposeLeft, bool transposeRight&gt;
+void Tensor::matMul2DCpuAvx(Tensor&amp; res, const Tensor&amp; left, const Tensor&amp; right, const tensorSize_t resOffset,
                                const tensorSize_t leftOffset, const tensorSize_t rightOffset) {
 
   // same as before... 
 
-  if constexpr (!transposeLeft && !transposeRight) {
-    for(tensorSize_t i = 0; i < nRowsLeft; i += TILESIZE) {
-      auto worker = [matmulTiles, &res, &left, &right, i, nRowsLeft, nRowsRight, nColsLeft, nColsRight, resOffset, leftOffset, rightOffset]() {
+  if constexpr (!transposeLeft &amp;&amp; !transposeRight) {
+    for(tensorSize_t i = 0; i &lt; nRowsLeft; i += TILESIZE) {
+      auto worker = [matmulTiles, &amp;res, &amp;left, &amp;right, i, nRowsLeft, nRowsRight, nColsLeft, nColsRight, resOffset, leftOffset, rightOffset]() {
         tile_t tiles;
 
-        for(tensorSize_t j = 0; j < nColsRight; j += TILESIZE) {
+        for(tensorSize_t j = 0; j &lt; nColsRight; j += TILESIZE) {
           tiles.clearResult();
 
-          for(tensorSize_t k0 = 0; k0 < nColsLeft; k0 += TILESIZE) {
-            tiles.loadLeft(left.values->data() + leftOffset, i, k0, nRowsLeft, nColsLeft);
-            tiles.loadRight(right.values->data() + rightOffset, k0, j, nRowsRight, nColsRight);
+          for(tensorSize_t k0 = 0; k0 &lt; nColsLeft; k0 += TILESIZE) {
+            tiles.loadLeft(left.values-&gt;data() + leftOffset, i, k0, nRowsLeft, nColsLeft);
+            tiles.loadRight(right.values-&gt;data() + rightOffset, k0, j, nRowsRight, nColsRight);
 
             matmulTiles(tiles);
           }
 
-          tiles.addResult(res.values->data() + resOffset, i, j, nRowsLeft, nColsRight);
+          tiles.addResult(res.values-&gt;data() + resOffset, i, j, nRowsLeft, nColsRight);
         }
       };
 
       threadPool.enque(worker);
     }
-    // other template overloads
-    else {
-      // ... last template overload
-    }
-
-    threadPool.waitAll();
   }
-</code></pre>
+  // other template overloads
+  else {
+    // ... last template overload
+  }
+
+  threadPool.waitAll();
+}</code></pre>
 
       <p>
         No surprises there. Lastly we also want to make sure that we avoid <a href="" target="_blank">false sharing</a>. We can do this by making 
         sure that the tilesize is a multiple of the size of a cache-line, e.g. through <code>constexpr tensorSize_t TILESIZE = 
         (MemoryLayout::CACHE_LINE_BYTES / sizeof(ftype)) * 4;</code>, and making sure that the tiles are cache-line aligned as well, by using 
-        <p>alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array<T, TileM * TileK> left{};</p>. Tensor-alignment is 64 in my case, once again the size 
+        <code>alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array&lt;T, TileM * TileK&gt; left{};</code>. Tensor-alignment is 64 in my case, once again the size 
         of a cache-line on my system. 
       </p>
 
       <p>
-        Running the parallel matmul now gives us the following run-time now: 4.11s. That's a fraction of 0.68, or in other words, the version we had 
+        Running the parallel matmul now gives us the following run-time: 4.11s. That's a fraction of 0.68, or in other words, the version we had 
         before was 1.48 times faster. On top of it this version is also much more volatile in its run-time, meaning the variance in between subsequent 
-        batches also increased visibly. Running perf-sat gives us the next figure.
+        batches also increased visibly. Running perf stat gives us the next figure.
       </p>
 
       <figure>
         <img
-        class="blog-image pytorch-perf"
+        class="blog-image pytorch-perf pytorch-perf-large"
         src="./img_4/profiling/perf_stat_parallel_matmul_raw.png"
         alt="perf stat output parallel matmul-1.">
         <figcaption>
@@ -1997,7 +2003,7 @@ void Tensor::matMul2DCpuAvx(Tensor& res, const Tensor& left, const Tensor& right
 
       <figure>
         <img
-        class="blog-image pytorch-perf"
+        class="blog-image pytorch-perf pytorch-perf-large"
         src="./img_4/profiling/perf_stat_non_parallel_matmul.png"
         alt="perf stat output for non-parallel matmul.">
         <figcaption>
@@ -2007,15 +2013,15 @@ void Tensor::matMul2DCpuAvx(Tensor& res, const Tensor& left, const Tensor& right
 
       <p>
         The two most striking things are something we have already seen. We find ourselves in a lot of context switches, and also still an 
-        elevated number of efficieny core instructions. If the scheduler wills it what say do we have? Ok well, we do actually have a say in 
+        elevated number of efficiency core instructions. If the scheduler wills it, what say do we have? Ok well, we do actually have a say in 
         it, but just for reference we might try with more threads. I have 12 possible threads I can run, so let's try 10 threads for now. We get
         a run-time of 5.10s (with a least stable variance again). I will spare you the perf stat output here, since it just captures the previous 
         trend.
       </p>
 
       <p>
-        So in summary, our enemy has become the scheduler, and our remedy against is it <a href="https://www.aussieai.com/book/avx-18-core-pinning"
-        target="_blank">core pinning</a>. We take the three threads we had earlier and assign them one of the power cores. The threadpool's new 
+        So in summary, our enemy has become the scheduler, and our remedy against it is <a href="https://www.aussieai.com/book/avx-18-core-pinning"
+        target="_blank">core pinning</a>. We take the three threads we had earlier and assign them one of the performance cores. The threadpool's new 
         constructor now looks like this:
       </p>
 
@@ -2025,8 +2031,8 @@ void Tensor::matMul2DCpuAvx(Tensor& res, const Tensor& left, const Tensor& right
 #define PIN_CORES
 
 #ifdef PIN_CORES
-#include <pthread.h>
-#include <sched.h>
+#include &lt;pthread.h&gt;
+#include &lt;sched.h&gt;
 #endif
 
 namespace threadpool_impl {
@@ -2034,37 +2040,34 @@ namespace threadpool_impl {
     private:
       // ...
     public:
-    public:
       ThreadPool() : stop{false}, activeTasks{0} {
       #ifdef PIN_CORES
         constexpr unsigned int nthreads = 3; // we leave one P-core for the rest of the program
-        const std::vector<int> pCores = {0, 2, 4, 6};
+        const std::vector&lt;int&gt; pCores = {0, 2, 4, 6};
       #else 
-        const unsigned int nthreads = 10; //std::max(static_cast<unsigned int>(1), std::thread::hardware_concurrency() / 2);
+        const unsigned int nthreads = 10; //std::max(static_cast&lt;unsigned int&gt;(1), std::thread::hardware_concurrency() / 2);
       #endif
         threads.reserve(nthreads);
         
-        for(unsigned int i = 0; i < nthreads; i++) {
-          threads.emplace_back(&ThreadPool::workerLoop, this);
+        for(unsigned int i = 0; i &lt; nthreads; i++) {
+          threads.emplace_back(&amp;ThreadPool::workerLoop, this);
         
         #ifdef PIN_CORES
           cpu_set_t cpuset;
-          CPU_ZERO(&cpuset);
-          CPU_SET(pCores[i], &cpuset);
+          CPU_ZERO(&amp;cpuset);
+          CPU_SET(pCores[i], &amp;cpuset);
           pthread_setaffinity_np(threads.back().native_handle(),
-                                sizeof(cpu_set_t), &cpuset);
+                                sizeof(cpu_set_t), &amp;cpuset);
         #endif
         }
       };
 
       // ...
   };
-}
-
-</code></pre>
+}</code></pre>
 
       <p>
-        The core numbers <code>const std::vector<int> pCores = {0, 2, 4, 6};</code> are CPU specific and need to be queried using lscpu. 
+        The core numbers <code>const std::vector&lt;int&gt; pCores = {0, 2, 4, 6};</code> are CPU specific and need to be queried using lscpu. 
         For example, <code>lscpu --extended</code> gives me
       </p>
 
@@ -2084,7 +2087,7 @@ namespace threadpool_impl {
 
       <p>
         We can use the frequencies to identify P- and E-cores, and the core tells us which physical unit this is. 
-        Giving now three threads, one per physical P-core and fixing it to that core, our benchmark times becomes
+        Giving now three threads, one per physical P-core and fixing it to that core, our benchmark time becomes
         3.53s. Better than before, but still slower than the non-parallel 2.78s we get. Attempting to give each P-core 
         two threads increases the time back to 4.22s. Running perf stat again on the three-threaded application parrots 
         back at us the following:
@@ -2092,7 +2095,7 @@ namespace threadpool_impl {
 
       <figure>
         <img
-        class="blog-image pytorch-perf"
+        class="blog-image pytorch-perf pytorch-perf-large"
         src="./img_4/profiling/perf_stat_parallel_matmul_core_pinning.png"
         alt="perf stat output for after core pinning.">
         <figcaption>
@@ -2101,8 +2104,8 @@ namespace threadpool_impl {
       </figure>
 
       <p>
-        Interestingly the program was way faster than its been previously, with a benchmark time down to 2.68s. Running it a minute 
-        later with perf stat shows that this seemed a fluke. I cannot find yet what it was, perhaps a temperature change in the room 
+        Interestingly the program was way faster than it had been previously, with a benchmark time down to 2.68s. Running it a minute 
+        later with perf stat shows that this seemed to be a fluke. I cannot find yet what it was, perhaps a temperature change in the room 
         or just a lucky scheduling? Hard to say, but anyway, we do see our context switches having gone down by half, but they're still 
         above what we were used to in the single threaded application.
       </p>
@@ -2115,7 +2118,7 @@ namespace threadpool_impl {
 
       <figure>
         <img
-        class="blog-image pytorch-perf"
+        class="blog-image pytorch-perf pytorch-perf-large"
         src="./img_4/profiling/benchmark_non_parallel_matmul.png"
         alt="Google benchmark output on single-threaded matmul.">
         <figcaption>
@@ -2129,7 +2132,7 @@ namespace threadpool_impl {
 
       <figure>
         <img
-        class="blog-image pytorch-perf"
+        class="blog-image pytorch-perf pytorch-perf-large"
         src="./img_4/profiling/benchmark_parallel_matmul.png"
         alt="Google benchmark output on multi-threaded matmul.">
         <figcaption>
@@ -2138,14 +2141,14 @@ namespace threadpool_impl {
       </figure>
 
       <p>
-        And here we can finally see what was going on. In general the parallel version whops the single threaded version on CPU 
+        And here we can finally see what was going on. In general the parallel version whups the single threaded version on CPU 
         time every time. Looking at the overall time we do see that the single threaded version wins every time with only the 
         exceptions of the largest inputs. Even three dimensional input matrices with dimensions 512/512/512 are not big enough to 
         show the superiority of the parallel matmul. 
       </p>
 
       <p>
-        In the end the system seems to be losing a lot of time just managing all of our threads that the gains it wins on the parallel 
+        In the end the system seems to be losing so much time just managing all of our threads that the gains it wins on the parallel 
         matmul get lost in kernel space itself. That is not a bad result for us though, as on smaller inputs, at least for our small networks
         we've been playing with so far, the single-threaded matmul is not a complete drag, and we can be content with it for now. And once 
         we start using very large networks with huge latent spaces we could still switch on the parallel version, albeit probably some dedicated 
@@ -2161,11 +2164,11 @@ namespace threadpool_impl {
     </div>
 
     <div id="summary" class="article-text-div">
-      <h3 class="heading-spaced">Summary</h3>
+      <h2 class="heading-spaced">Summary</h2>
 
       <p>
-        This concludes the last part of this four part series on PyToch demystified. In this part we looked at the CPU of the program and used 
-        perf for profiler driven optimizations, and we reduced the overall time from 41.45s down to 3.53s. That a more than 10-fold increase in 
+        This concludes the last part of this four part series on PyTorch demystified. In this part we looked at the CPU of the program and used 
+        perf for profiler driven optimizations, and we reduced the overall time from 41.45s down to 2.78s. That is a nearly 15-fold improvement in 
         run-time performance, and we started out with a program that wasn't written all too shabby to begin with. 
       </p>
 
@@ -2177,7 +2180,7 @@ namespace threadpool_impl {
 
       <p>
         We could add further optimizations both for CUDA and for the CPU backend. For instance, we could implement mixed precision floating point 
-        arithmetics, modern datatypes such as the brainfloat data type, more constexpr-functions for lookups, such as in the sigmoid function, among 
+        arithmetic, modern datatypes such as the brainfloat data type, more constexpr-functions for lookups, such as in the sigmoid function, among 
         others. But for now it's a good choice to rest and enjoy our well earned evening walk or whatever you are into. As always I'd be happy to hear
         feedback, so feel free to reach out. Cheers.
       </p>
