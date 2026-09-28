@@ -1890,7 +1890,7 @@ namespace mempool {
         the implementation in detail in the repository. The definition looks like this now:
       </p>
 
-<pre><code class="language-cpp">// 
+<pre><code class="language-cpp">// src/backend/shared/threadpool.h 
 
 namespace threadpool_impl {
   class ThreadPool final {
@@ -1935,7 +1935,7 @@ namespace threadpool_impl {
         Launching the threadpool onto our matmul looks like this now:
       </p>
 
-<pre><code class="language-cpp">// src/backend/shared/threadpool.h
+<pre><code class="language-cpp">// src/backend/data_modeling/tensor.h
 
 template&lt;bool transposeLeft, bool transposeRight&gt;
 void Tensor::matMul2DCpuAvx(Tensor&amp; res, const Tensor&amp; left, const Tensor&amp; right, const tensorSize_t resOffset,
@@ -1974,8 +1974,8 @@ void Tensor::matMul2DCpuAvx(Tensor&amp; res, const Tensor&amp; left, const Tenso
 }</code></pre>
 
       <p>
-        No surprises there. Lastly we also want to make sure that we avoid <a href="" target="_blank">false sharing</a>. We can do this by making 
-        sure that the tilesize is a multiple of the size of a cache-line, e.g. through <code>constexpr tensorSize_t TILESIZE = 
+        No surprises there. Lastly we also want to make sure that we avoid <a href="https://en.wikipedia.org/wiki/False_sharing" target="_blank">false sharing</a>. 
+        We can do this by making sure that the tilesize is a multiple of the size of a cache-line, e.g. through <code>constexpr tensorSize_t TILESIZE = 
         (MemoryLayout::CACHE_LINE_BYTES / sizeof(ftype)) * 4;</code>, and making sure that the tiles are cache-line aligned as well, by using 
         <code>alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array&lt;T, TileM * TileK&gt; left{};</code>. Tensor-alignment is 64 in my case, once again the size 
         of a cache-line on my system. 
