@@ -733,31 +733,15 @@ void Tensor::matMul2DCpuScalar(Tensor& res, const Tensor& left, const Tensor& ri
         shows us this:
       </p>
 
-<pre>---------------------------------------------------------------------------------------
-Benchmark                             Time             CPU   Iterations UserCounters...
----------------------------------------------------------------------------------------
-BM_MatMul_CPU/64/64/64              521 us          521 us         1346 GFLOP/s=1.00686/s
-BM_MatMul_CPU/256/256/256         30242 us        30143 us           23 GFLOP/s=1.11317/s
-BM_MatMul_CPU/512/512/512        240924 us       239886 us            3 GFLOP/s=1.11901/s
-BM_MatMul_CPU/1024/1024/1024    1899346 us      1896614 us            1 GFLOP/s=1.13227/s
-BM_MatMul_CPU/64/784/256          23110 us        23081 us           30 GFLOP/s=1.11306/s
-BM_MatMul_CPU/64/256/128           4008 us         4003 us          175 GFLOP/s=1.04782/s
-BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=0.693071/s
-
- Performance counter stats for './bm_matmul --benchmark_filter=BM_MatMul_CPU/':
-
-    30,493,695,954      cpu_core/cycles/                                                      
-   172,518,480,863      cpu_core/instructions/           #    5.66  insn per cycle            
-        11,217,468      cpu_core/cache-misses/                                                
-    69,372,480,963      cpu_core/L1-dcache-loads/                                             
-        27,245,452      cpu_core/L1-dcache-load-misses/  #    0.04% of all L1-dcache accesses 
-         1,986,866      cpu_core/LLC-loads/                                                   
-           676,631      cpu_core/LLC-load-misses/        #   34.06% of all LL-cache accesses  
-
-       8.144915641 seconds time elapsed
-
-       7.771304000 seconds user
-       0.343924000 seconds sys</pre>
+      <figure>
+        <img
+        class="blog-image pytorch-perf pytorch-perf-large"
+        src="./img_4/profiling/step_2_benchmark_output.png"
+        alt="perf stat output on the matmul-benchmark.">
+        <figcaption>
+          perf stat output on the matmul benchmark. We see that cache misses are overall low on the benchmark (only non-transposed case).
+        </figcaption>
+      </figure>
 
       <p>
        The surprising part about this is that even though L1-cache misses are low at around 0.04% roughly,
@@ -765,16 +749,15 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
        find this:  
       </p>
 
-<pre>    0.04 :   6dde2:  mov    %r14,%rdi
-   22.88 :   6dde5:  call   6d230 &lt;Tensor::operator[](unsigned int) const&gt; // tensor.h:320
-         : 593   ftype* data() noexcept { return values; }
-    0.02 :   6ddea:  mov    0x8(%rsp),%rax
-         : 595   res.values-&gt;data()[resOffset + j] += leftVal * right[rightOffset + j];
-    0.00 :   6ddef:  lea    (%rbx,%r15,1),%edx
-    0.01 :   6ddf3:  mulss  0x10(%rsp),%xmm0
-         : 598   for(tensorSize_t j = 0; j &lt; nColsRight; j++) {
-   24.15 :   6ddf9:  add    $0x1,%ebx // tensor.h:319
-         : 600   ftype* data() noexcept { return values; }</pre>
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/step_2_benchmark_annotated.png"
+        alt="perf output on the matmul-benchmark, annotated by instruction.">
+        <figcaption>
+          perf output on the matmul benchmark on a release build. We find function calls we would rather have inlined.
+        </figcaption>
+      </figure>
 
       <p>
         The interesting part is the second line from above, showing us that the indexing operator on the tensor could not be inlined.
@@ -801,7 +784,7 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
 
       <figure>
         <img
-        class="blog-image pytorch-perf"
+        class="blog-image pytorch-perf pytorch-perf-large"
         src="./img_4/profiling/step_2_before_inlining.png"
         alt="perf stat output before inline.">
         <figcaption>
@@ -811,7 +794,7 @@ BM_MatMul_CPU/64/128/10             237 us          236 us         2960 GFLOP/s=
 
       <figure>
         <img
-        class="blog-image pytorch-perf"
+        class="blog-image pytorch-perf pytorch-perf-large"
         src="./img_4/profiling/step_2_after_inlining.png"
         alt="perf stat output after inline.">
         <figcaption>
