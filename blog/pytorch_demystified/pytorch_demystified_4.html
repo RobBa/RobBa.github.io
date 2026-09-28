@@ -2148,23 +2148,23 @@ namespace threadpool_impl {
 
       <p>
         And here we can finally see what was going on. In general the parallel version whups the single threaded version on CPU 
-        time every time. Looking at the overall time we do see that the single threaded version wins every time with only the 
-        exceptions of the largest inputs. Even three dimensional input matrices with dimensions 512/512/512 are not big enough to 
-        show the superiority of the parallel matmul. 
+        time every time. Looking at the overall time we do see that the single threaded version wins on smaller samples, while the multi-threaded 
+        version does so on larger ones. The threshold in the examples is somewhere between the sizes of 64/64/64/ and 256/256/256.
       </p>
 
       <p>
-        In the end the system seems to be losing so much time just managing all of our threads that the gains it wins on the parallel 
+        On the MNIST benchmark the system seems to be losing so much time just managing all of our threads, that the gains it wins on the parallel 
         matmul get lost in kernel space itself. That is not a bad result for us though, as on smaller inputs, at least for our small networks
-        we've been playing with so far, the single-threaded matmul is not a complete drag, and we can be content with it for now. And once 
-        we start using very large networks with huge latent spaces we could still switch on the parallel version, albeit probably some dedicated 
-        hardware accelerators are the better choice in those cases.
+        we've been playing with so far, the single-threaded matmul is sufficient. If we want to keep the multithreaded matmul, then the way forward
+        is to run further benchmarks and decide a sensible threshold on the input dimensions, adjusted by the system one is running on.
       </p>
 
       <p>
-        For now I decided to keep the parallel matmul and hide its compilation behind an optional CMake flag, which is turned off by default. 
-        If you feel like experimenting with it I won't stop you and would appreciate if you could let me know what you found. But for now 
-        I wrap it up.
+        That's of course quite some work to do there, should we want to generalize the parallel matmul. And I do not even have the systems to test 
+        all of that on. For now I decided to keep the parallel matmul and hide its compilation behind an optional CMake flag, which is turned 
+        off by default. The core pinning hides behind a flag inside the code itself and next to the threadpool. If you feel like experimenting with 
+        those settings I won't stop you and would appreciate if you could let me know what you found. As for this article though it's probably a good 
+        time to call it a day.
       </p>
 
     </div>
