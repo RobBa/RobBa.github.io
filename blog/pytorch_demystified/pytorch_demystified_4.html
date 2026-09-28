@@ -78,14 +78,15 @@ mathjax: false
         and giving it a Python binding to be compiled into a Python module, we are ready for our last optimization, the C++ backend optimization.
         Because we already walked over the source code this time we can dive right into the optimization work. In the following we will learn about 
         some CPU-native features, specifically looking at x86-64 (in the following only x64), among other optimization techniques. For everyone not familiar
-        with x86 I give a small optional primer that will be enough for you to follow this blogpost, given you are familiar with assembly language in general.
+        with x86 I give a small optional primer that will be enough for you to follow this blogpost, given you are already familiar with assembly language in 
+        general.
       </p>
 
       <div class="pytorch-step-row pytorch-step-row-compact">
         <div class="pytorch-step-text">
           <p>
             About the profiling tools, I personally run Linux, and the 
-            profiling tools of choice are Valgrind and perf. Since Valgrind requires us to set compile flags so that it can hook into the program we 
+            profiling tools of choice  here are Valgrind and perf. Since Valgrind requires us to set compile flags so that it can hook into the program we 
             need to recompile every time we want to analyze it with Valgrind, but still want to compare with the actual release version. perf is the simpler 
             tool for that, so this post will be using it throughout.
           </p>
@@ -109,7 +110,7 @@ mathjax: false
       </div>
     </div>
 
-    <div class="article-text-div">
+<!--     <div class="article-text-div">
       <details class="pytorch-optional" id="optional-risc-cisc">
       <summary class="pytorch-optional-summary">
         <h4>Optional: RISC vs. CISC, and where they stand today</h4>
@@ -130,13 +131,6 @@ mathjax: false
         to design CPUs, known as RISC (Reduced Instruction Set Computer) and CISC (Complex Instruction Set Computer). To understand them better
         we have to take a little detour.
       </p>
-
-<!--       <p>
-        The difference, in my own faul words, is that RISC kept things simple. Instructions are reduced the very ones necessary to perform 
-        the desired operations. CISC on the other hand has more complex instructions. One instruction might fetch data from memory, add an 
-        operand on top, and save the data at a target address. Without digging the whole rabbit hole as what has happened since then, I 
-        still find it interesting to see why that was, and mark the trade-offs clearly.
-      </p> -->
 
       <p>
          Let's go a little back in time: Phones had actual buttons to be pressed when dialing a number, 
@@ -175,7 +169,7 @@ mathjax: false
 
       </details>
 
-    </div>
+    </div> -->
 
     <div class="article-text-div">
       <details class="pytorch-optional" id="optional-x86-primer">
