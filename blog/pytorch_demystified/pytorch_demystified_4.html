@@ -1643,7 +1643,7 @@ for(tensorSize_t i = 0; i &lt; upstreamGrad.getSize(); i++){
 
       {% include pytorch-opt-summary.html 
         before="3.41s" after="2.78s"
-        speedup="1.23" branch="dev/cpu_optimization_fixed" commit="a9d6658b813a1f9a1b062df753d54483502b91bf" %}
+        speedup="1.23x" branch="dev/cpu_optimization_fixed" commit="a9d6658b813a1f9a1b062df753d54483502b91bf" %}
 
       <p>
         Before we move on to the final fix we first have to fix a memory leak that started to appear in my unit tests now. We had several 
@@ -1849,15 +1849,337 @@ namespace mempool {
 
     </div>
 
-    <div id="step-8" class="article-text-div">
+    <div id="step-9" class="article-text-div">
       <h3 class="heading-spaced">Opt. 9 - Multithreaded matrix multiplication</h3>
 
       {% include pytorch-opt-summary.html 
-        before="2.78s" after="s"
-        speedup="-" branch="dev/cpu_optimization_fixed" commit="a9d6658b813a1f9a1b062df753d54483502b91bf" %}
+        before="2.78s" after="3.53s"
+        speedup="0.79x" branch="dev/cpu_optimization_fixed" commit="9d07371a5bead2c4e96c370a1b28df2e6b215bc0" %}
 
       <p>
-        We want to do one last optimization step that is pretty obvious and a nice test bench as well. 
+        We want to do one last optimization step that is pretty obvious and a nice experiment as well. In the previous steps we found that 
+        matmul became once again our bottleneck. To verify that this still holds we can run perf once more to see the obvious once more:
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/before_step_9.png"
+        alt="perf output before step 9.">
+        <figcaption>
+          perf output before fix 9.
+        </figcaption>
+      </figure>
+
+      <p>
+        Our library now sings "Honey came in and she caught me red handed...", and we can safely proceed on optimizing the matmul, knowing 
+        that our efforts mean something. There's not too much we can do in this current setting though, albeit I have some more ideas (see the summary),
+        but the most obvious one and perhaps the most interesting is a parallel computation. We already know from CUDA that we can assign one thread to 
+        compute an entire tile of the result without any worries of thread coordination, so why not doing that here as well? 
+      </p>
+
+      <p>
+        Since we might be wanting to do that with other operations as well in the future I decided to go for a thread pool. Because the implementation of 
+        that is probably not too interesting here, and there are great sources out there, I simply give you the class definition, and you can look up 
+        the implementation in detail in the repository. The definition looks like this now:
+      </p>
+
+<pre><code class="language-cpp">// 
+
+namespace threadpool_impl {
+  class ThreadPool final {
+    private:
+      // ...
+
+    public:
+      ThreadPool() : stop{false}, activeTasks{0} {
+        constexpr unsigned int nthreads = 3; // we leave one P-core for the rest of the program
+        threads.reserve(nthreads);
+        
+        for(unsigned int i = 0; i < nthreads; i++) {
+          threads.emplace_back(&ThreadPool::workerLoop, this);
+        }
+      };
+
+      ~ThreadPool() noexcept;
+
+      // thread pool is singleton, hence suppress copies and moves
+      ThreadPool(const ThreadPool&) = delete;
+      ThreadPool& operator=(const ThreadPool&) = delete;
+      ThreadPool(ThreadPool&&) = delete;
+      ThreadPool& operator=(ThreadPool&&) = delete;
+
+      void enque(std::function<void()> f);
+
+      void waitAll();
+  };
+}</code></pre>
+
+      <p>
+        I already took some time here to empirically find the optimal number of threads. A more canonical way would be to determine the number of 
+        cores the computer has via <code>std::thread::hardware_concurrency()</code>, and then doing some empirics. In the case of my 
+        <a href="https://www.intel.com/content/www/us/en/products/sku/241652/intel-core-5-processor-210h-12m-cache-up-to-4-80-ghz/specifications.html"
+        target="_blank">Intel i5 210H</a>, it supplies us with four power cores and 4 efficiency cores. The power cores return a value of two each, 
+        so the function call returns a 12 for me. Obviously though the efficiency cores are slower than the power cores, and giving the operation 
+        more than four threads resulted in degraded results. The optimal number of threads seemed to be three, one for each power core with one 
+        power core being free for other tasks. 
+      </p>
+
+      <p>
+        Launching the threadpool onto our matmul looks like this now:
+      </p>
+
+<pre><code class="language-cpp">// src/backend/shared/threadpool.h
+
+template<bool transposeLeft, bool transposeRight>
+void Tensor::matMul2DCpuAvx(Tensor& res, const Tensor& left, const Tensor& right, const tensorSize_t resOffset,
+                               const tensorSize_t leftOffset, const tensorSize_t rightOffset) {
+
+  // same as before... 
+
+  if constexpr (!transposeLeft && !transposeRight) {
+    for(tensorSize_t i = 0; i < nRowsLeft; i += TILESIZE) {
+      auto worker = [matmulTiles, &res, &left, &right, i, nRowsLeft, nRowsRight, nColsLeft, nColsRight, resOffset, leftOffset, rightOffset]() {
+        tile_t tiles;
+
+        for(tensorSize_t j = 0; j < nColsRight; j += TILESIZE) {
+          tiles.clearResult();
+
+          for(tensorSize_t k0 = 0; k0 < nColsLeft; k0 += TILESIZE) {
+            tiles.loadLeft(left.values->data() + leftOffset, i, k0, nRowsLeft, nColsLeft);
+            tiles.loadRight(right.values->data() + rightOffset, k0, j, nRowsRight, nColsRight);
+
+            matmulTiles(tiles);
+          }
+
+          tiles.addResult(res.values->data() + resOffset, i, j, nRowsLeft, nColsRight);
+        }
+      };
+
+      threadPool.enque(worker);
+    }
+    // other template overloads
+    else {
+      // ... last template overload
+    }
+
+    threadPool.waitAll();
+  }
+</code></pre>
+
+      <p>
+        No surprises there. Lastly we also want to make sure that we avoid <a href="" target="_blank">false sharing</a>. We can do this by making 
+        sure that the tilesize is a multiple of the size of a cache-line, e.g. through <code>constexpr tensorSize_t TILESIZE = 
+        (MemoryLayout::CACHE_LINE_BYTES / sizeof(ftype)) * 4;</code>, and making sure that the tiles are cache-line aligned as well, by using 
+        <p>alignas(MemoryLayout::CPU_TENSOR_ALIGNMENT) std::array<T, TileM * TileK> left{};</p>. Tensor-alignment is 64 in my case, once again the size 
+        of a cache-line on my system. 
+      </p>
+
+      <p>
+        Running the parallel matmul now gives us the following run-time now: 4.11s. That's a fraction of 0.68, or in other words, the version we had 
+        before was 1.48 times faster. On top of it this version is also much more volatile in its run-time, meaning the variance in between subsequent 
+        batches also increased visibly. Running perf-sat gives us the next figure.
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/perf_stat_parallel_matmul_raw.png"
+        alt="perf stat output parallel matmul-1.">
+        <figcaption>
+          perf stat output for parallel matmul.
+        </figcaption>
+      </figure>
+
+      <p>
+        We want to compare this with the non-parallel matmul:
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/perf_stat_non_parallel_matmul.png"
+        alt="perf stat output for non-parallel matmul.">
+        <figcaption>
+          perf stat output for non-parallel matmul.
+        </figcaption>
+      </figure>
+
+      <p>
+        The two most striking things are something we have already seen. We find ourselves in a lot of context switches, and also still an 
+        elevated number of efficieny core instructions. If the scheduler wills it what say do we have? Ok well, we do actually have a say in 
+        it, but just for reference we might try with more threads. I have 12 possible threads I can run, so let's try 10 threads for now. We get
+        a run-time of 5.10s (with a least stable variance again). I will spare you the perf stat output here, since it just captures the previous 
+        trend.
+      </p>
+
+      <p>
+        So in summary, our enemy has become the scheduler, and our remedy against is it <a href="https://www.aussieai.com/book/avx-18-core-pinning"
+        target="_blank">core pinning</a>. We take the three threads we had earlier and assign them one of the power cores. The threadpool's new 
+        constructor now looks like this:
+      </p>
+
+
+<pre><code class="language-cpp">// src/backend/shared/threadpool.h
+
+#define PIN_CORES
+
+#ifdef PIN_CORES
+#include <pthread.h>
+#include <sched.h>
+#endif
+
+namespace threadpool_impl {
+  class ThreadPool final {
+    private:
+      // ...
+    public:
+    public:
+      ThreadPool() : stop{false}, activeTasks{0} {
+      #ifdef PIN_CORES
+        constexpr unsigned int nthreads = 3; // we leave one P-core for the rest of the program
+        const std::vector<int> pCores = {0, 2, 4, 6};
+      #else 
+        const unsigned int nthreads = 10; //std::max(static_cast<unsigned int>(1), std::thread::hardware_concurrency() / 2);
+      #endif
+        threads.reserve(nthreads);
+        
+        for(unsigned int i = 0; i < nthreads; i++) {
+          threads.emplace_back(&ThreadPool::workerLoop, this);
+        
+        #ifdef PIN_CORES
+          cpu_set_t cpuset;
+          CPU_ZERO(&cpuset);
+          CPU_SET(pCores[i], &cpuset);
+          pthread_setaffinity_np(threads.back().native_handle(),
+                                sizeof(cpu_set_t), &cpuset);
+        #endif
+        }
+      };
+
+      // ...
+  };
+}
+
+</code></pre>
+
+      <p>
+        The core numbers <code>const std::vector<int> pCores = {0, 2, 4, 6};</code> are CPU specific and need to be queried using lscpu. 
+        For example, <code>lscpu --extended</code> gives me
+      </p>
+
+<pre>CPU NODE SOCKET CORE L1d:L1i:L2:L3 ONLINE    MAXMHZ   MINMHZ       MHZ
+  0    0      0    0 0:0:0:0          yes 4800.0000 400.0000  400.5820
+  1    0      0    0 0:0:0:0          yes 4800.0000 400.0000  400.0000
+  2    0      0    1 4:4:1:0          yes 4800.0000 400.0000  888.9070
+  3    0      0    1 4:4:1:0          yes 4800.0000 400.0000  400.0000
+  4    0      0    2 8:8:2:0          yes 4800.0000 400.0000  810.4840
+  5    0      0    2 8:8:2:0          yes 4800.0000 400.0000  400.0000
+  6    0      0    3 12:12:3:0        yes 4800.0000 400.0000  668.5630
+  7    0      0    3 12:12:3:0        yes 4800.0000 400.0000  947.8300
+  8    0      0    4 20:20:5:0        yes 3600.0000 400.0000  611.9660
+  9    0      0    5 21:21:5:0        yes 3600.0000 400.0000 1515.2030
+ 10    0      0    6 22:22:5:0        yes 3600.0000 400.0000  885.3500
+ 11    0      0    7 23:23:5:0        yes 3600.0000 400.0000 1000.5190</pre>
+
+      <p>
+        We can use the frequencies to identify P- and E-cores, and the core tells us which physical unit this is. 
+        Giving now three threads, one per physical P-core and fixing it to that core, our benchmark times becomes
+        3.53s. Better than before, but still slower than the non-parallel 2.78s we get. Attempting to give each P-core 
+        two threads increases the time back to 4.22s. Running perf stat again on the three-threaded application parrots 
+        back at us the following:
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/perf_stat_parallel_matmul_core_pinning.png"
+        alt="perf stat output for after core pinning.">
+        <figcaption>
+          perf stat output after core pinning.
+        </figcaption>
+      </figure>
+
+      <p>
+        Interestingly the program was way faster than its been previously, with a benchmark time down to 2.68s. Running it a minute 
+        later with perf stat shows that this seemed a fluke. I cannot find yet what it was, perhaps a temperature change in the room 
+        or just a lucky scheduling? Hard to say, but anyway, we do see our context switches having gone down by half, but they're still 
+        above what we were used to in the single threaded application.
+      </p>
+
+      <p>
+        The solution to the puzzle comes from running the benchmarks that are in {project root}/benchmarking. Here is a benchmark file
+        using Google benchmark, where multiple sizes of inputs are run. The following image shows those benchmarking results for the single 
+        threaded matmul operation on different input sizes, along with total time and CPU time.
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/benchmark_non_parallel_matmul.png"
+        alt="Google benchmark output on single-threaded matmul.">
+        <figcaption>
+          Google benchmark output on single-threaded matmul.
+        </figcaption>
+      </figure>
+
+      <p>
+        To get the full picture of course we do need to compare with the multithreaded version, which looks like this:
+      </p>
+
+      <figure>
+        <img
+        class="blog-image pytorch-perf"
+        src="./img_4/profiling/benchmark_parallel_matmul.png"
+        alt="Google benchmark output on multi-threaded matmul.">
+        <figcaption>
+          Google benchmark output on multi-threaded matmul.
+        </figcaption>
+      </figure>
+
+      <p>
+        And here we can finally see what was going on. In general the parallel version whops the single threaded version on CPU 
+        time every time. Looking at the overall time we do see that the single threaded version wins every time with only the 
+        exceptions of the largest inputs. Even three dimensional input matrices with dimensions 512/512/512 are not big enough to 
+        show the superiority of the parallel matmul. 
+      </p>
+
+      <p>
+        In the end the system seems to be losing a lot of time just managing all of our threads that the gains it wins on the parallel 
+        matmul get lost in kernel space itself. That is not a bad result for us though, as on smaller inputs, at least for our small networks
+        we've been playing with so far, the single-threaded matmul is not a complete drag, and we can be content with it for now. And once 
+        we start using very large networks with huge latent spaces we could still switch on the parallel version, albeit probably some dedicated 
+        hardware accelerators are the better choice in those cases.
+      </p>
+
+      <p>
+        For now I decided to keep the parallel matmul and hide its compilation behind an optional CMake flag, which is turned off by default. 
+        If you feel like experimenting with it I won't stop you and would appreciate if you could let me know what you found. But for now 
+        I wrap it up.
+      </p>
+
+    </div>
+
+    <div id="summary" class="article-text-div">
+      <h3 class="heading-spaced">Summary</h3>
+
+      <p>
+        This concludes the last part of this four part series on PyToch demystified. In this part we looked at the CPU of the program and used 
+        perf for profiler driven optimizations, and we reduced the overall time from 41.45s down to 3.53s. That a more than 10-fold increase in 
+        run-time performance, and we started out with a program that wasn't written all too shabby to begin with. 
+      </p>
+
+      <p>
+        Our optimizations led us over compiler optimizations to better cache behavior in the matmul operations, as well as AVX instructions and a 
+        threadpool, but also led us across to other interesting parts of the program where we optimized, most notably the interface in between 
+        shared libraries.
+      </p>
+
+      <p>
+        We could add further optimizations both for CUDA and for the CPU backend. For instance, we could implement mixed precision floating point 
+        arithmetics, modern datatypes such as the brainfloat data type, more constexpr-functions for lookups, such as in the sigmoid function, among 
+        others. But for now it's a good choice to rest and enjoy our well earned evening walk or whatever you are into. As always I'd be happy to hear
+        feedback, so feel free to reach out. Cheers.
       </p>
 
     </div>
