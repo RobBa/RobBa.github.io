@@ -16,7 +16,7 @@ mathjax: false
       <cite>&mdash; Adam Jones (Tool)</cite>
     </blockquote>
 
-    <br>asfasdf
+    <br>
 
     <div class="article-content-div">
       <h2 class="heading-spaced">Content</h2>
@@ -186,15 +186,15 @@ mathjax: false
 
       <p>
         This is a brief section intended to familiarize you with the basics of x64 assembly language, so that you can follow the discussions below. 
-        If you already know it well you can skip this section. To start off, let us start with what x86 is. If you read the discussion above about 
-        RISC-vs-CISC then you know that it is the architecture mostly run by Intel and AMD today. Unfortunately for us their commitment to backwards 
-        compatibility means for us that we now have to deal with a lot of historical baggage accumulated over decades.
+        If you already know it well you can skip this section. To start off, x86 is a CISC architecture mostly run by Intel and AMD today. Unfortunately 
+        for us their commitment to backwards compatibility means for us that we now have to deal with a lot of historical baggage accumulated over 
+        decades.
       </p>
 
         <h5>Intel notation vs. AT&T notation</h5>
 
         <p>
-          We start off with the notation. Unfortunately there are two main ways to write x86 assembly code. The first is the <b>AT&T notation</b>. 
+          We start with the notation. There are two main ways to write x86 assembly code. The first is the <b>AT&T notation</b>. 
           This style of x86 is marked by a ton of %-symbols, which is mainly how you identify it. It writes instructions in order
           <code>instruction source, destination</code>. Registers are prefixed with %, and immediates are prefixed with $. On top of that, it has 
           instructions suffixed with operand size. <code>b</code> stands for byte, <code>w</code> for word (16-bit), <code>l</code> for long (32-bit),
@@ -1105,7 +1105,7 @@ _mm256_load_ps (float const *__P)
       </figure>
 
       <p>
-        What we can see is that when memory is unaligned, which is latest a physical demand when we load from cache lines, then 
+        What we can see is that when memory is unaligned, which happens at very least when we load from cache memory, then 
         AVX is forced to perform two loads over one. However, with aligned memory we can simply load the operand all at once. 
       </p>
 
