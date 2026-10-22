@@ -366,11 +366,13 @@ figcaption {
 @media (min-width: 1201px) {
     .home-top {
         display: flex;
-        justify-content: space-around;
+        justify-content: center;
+        max-width: 1400px;
+        margin: 0 auto;
     }
 
     #home-top-left {
-        flex: 0.4;
+        flex: 0 0 auto;
         margin-top: 16px;
         margin-left: 4%;
         margin-right: 2%;
@@ -378,7 +380,7 @@ figcaption {
     }
 
     #home-top-right {
-        flex: 0.6;
+        flex: 0 0 auto;
         margin-top: 16px;
         margin-right: 3%;
         max-width: 500px;
