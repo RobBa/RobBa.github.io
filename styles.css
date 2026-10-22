@@ -162,6 +162,79 @@ a:hover {
     transform: translateY(-2px);
 }
 
+/* ─── Collapsible "Optional" sections (shared across articles) ──────────── */
+
+.article-optional {
+    margin: 30px 0;
+    border: 1px solid var(--color-article-date);
+    border-radius: 6px;
+    padding: 0 20px 20px 20px;
+}
+
+.article-optional-summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 15px 0;
+}
+
+.article-optional-summary::-webkit-details-marker {
+    display: none;
+}
+
+.article-optional-summary h2,
+.article-optional-summary h3,
+.article-optional-summary h4 {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.article-optional-summary h2::before,
+.article-optional-summary h3::before,
+.article-optional-summary h4::before {
+    content: "\25B8";
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.article-optional[open] .article-optional-summary h2::before,
+.article-optional[open] .article-optional-summary h3::before,
+.article-optional[open] .article-optional-summary h4::before {
+    transform: rotate(90deg);
+}
+
+.article-optional-collapse-bar {
+    position: sticky;
+    top: 40px;
+    z-index: 500;
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+    margin: 0 0 10px 0;
+    background: var(--color-bg);
+}
+
+.article-optional-collapse-btn {
+    background-color: var(--color-chrome-bg);
+    color: var(--color-chrome-text);
+    border: none;
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.article-optional-collapse-btn:hover {
+    opacity: 0.85;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+    .article-optional-collapse-bar {
+        top: 55px;
+    }
+}
+
 footer {
     display: flex;
     position: absolute;

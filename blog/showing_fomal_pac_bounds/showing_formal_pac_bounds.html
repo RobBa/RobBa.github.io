@@ -36,7 +36,7 @@ mathjax: true
           <a href="#pac-bounds-graph-creation">Bounds on graph creation</a>
         </li>
         <li>
-          <a href="#pac-bounds-random-algos">On non-optimal solutions</a>
+          <a href="#pac-bounds-random-algos">Optional: On non-optimal solutions</a>
         </li>
         <li>
           <a href="#pac-bounds-connect">Wrapping up</a>
@@ -467,14 +467,24 @@ mathjax: true
       that works on larger data sizes. We leave it up to the community to build on the idea.
     </div>
 
-    <div id="pac-bounds-random-algos" class="article-text-div">
-      <h2>On non-optimal solutions</h2>
+    <div class="article-text-div">
+      <details class="article-optional" id="pac-bounds-random-algos">
+      <summary class="article-optional-summary">
+        <h2>On non-optimal solutions</h2>
+      </summary>
+
+      <div class="article-optional-collapse-bar">
+        <button type="button" class="article-optional-collapse-btn"
+          onclick="var s=document.getElementById('pac-bounds-random-algos'); s.removeAttribute('open'); s.scrollIntoView({block: 'start'});">
+          &#9650; Collapse
+        </button>
+      </div>
 
       <p>
         Now this is all nice and well, but one can note that we don't have explicit guarantees, and therefore the whole concept is shaky at best. While I do acknowledge the limitations of the approach,
         I briefly want to address the rightfully critical mind's concerns. The first thing I want to note is the following: Pretty much all of contemporary ML algorithms run on the same assumptions.
         I do know that there is foundational work on the mathematical framework of deep learning (see e.g. works of <a href="https://web.cs.ucla.edu/~qgu/" target="_blank">this interesting scholar</a>,
-        e.g. a publication on <a href="https://arxiv.org/abs/2202.06526" target="_blank">benign overfitting</a>), but regardless of that, analyses normally focus on small models only so far.
+        here a publication of his on <a href="https://arxiv.org/abs/2202.06526" target="_blank">benign overfitting</a>), but regardless of that, analyses normally focus on small models only so far.
         In other words, these theoretical bounds do not hold for the extremely large models that have popped up over the past years. They might be discovered some day, but for now the common approach is
         still to simply train and cushion against the worst cases through empirical testing.
       </p>
@@ -484,6 +494,7 @@ mathjax: true
         The first one is an example of a randomized algorithm, i.e. it is non-deterministic. The algorithm is not the optimal algorithm for the problem it solves, but it serves as a good example
         how random algorithms are still capable to find elegant solutions for difficult problems. The second algorithm we briefly touch on solves the infamous Knapsack problem, an instance of an 
         <a href="https://en.wikipedia.org/wiki/NP-hardness" target="_blank">NP-hard</a> problem.
+      </p>
 
       <h4 class="heading-spaced">Karger's algorithm for the min-cut problem</h4>
 
@@ -569,9 +580,11 @@ mathjax: true
 
       <p>
         In practice we could simply note that guarantees exist while simply running the algorithm and accepting that the solution might not be 
-        the optimal solution. But it still might be good enough for our purposes. And this, i.e. the notion of what is good enough, is something we can control by understanding the algorithm and its limits, 
+        the optimal solution. But it still might be good enough for our purposes. And this, i.e. the notion of what is good enough, is something we can control by understanding the algorithm and its limits,
         and by setting our hyperparameters according to our needs.
       </p>
+
+      </details>
     </div>
 
     <div id="pac-bounds-connect" class="article-text-div">
